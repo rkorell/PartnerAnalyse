@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cisco Partner Quality Index 2026</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Cisco Partner Quality Index</h1>
+            <p class="subtitle" id="survey-subtitle">Public Sector Partner Bewertung</p>
+        </header>
+
+
+
+
+
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="progress-steps">
+                <span class="step active" id="step-1">1</span>
+                <span class="step" id="step-2">2</span>
+                <span class="step" id="step-3">3</span>
+                <span class="step" id="step-4">4</span>
+                <span class="step" id="step-5">5</span>
+            </div>
+        </div>
+
+        <div class="wizard-container">
+            
+            <div class="wizard-step active" id="wizard-step-1">
+                <h2>Persönliche Angaben</h2>
+                <div class="form-section">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="name">Name (optional):</label>
+                            <input type="text" id="name" name="name" placeholder="Dein Name">
+                        </div>
+                        <div class="form-group">
+                            <label for="email">E-Mail (optional):</label>
+                            <input type="email" id="email" name="email" placeholder="deine.email@cisco.com">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group checkbox-group">
+                            <div class="checkbox-wrapper" style="display: flex; align-items: center; margin-top: 10px;">
+                                <input type="checkbox" id="is_manager" name="is_manager" style="width: auto; margin-right: 10px;">
+                                <label for="is_manager" style="margin-bottom: 0;">Ich habe Führungsverantwortung</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="department">Abteilung *:</label>
+                            <select id="department" name="department" required>
+                                <option value="">Bitte wählen...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="area">Bereich:</label>
+                            <select id="area" name="area">
+                                <option value="">Bitte wählen...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="team">Team:</label>
+                            <select id="team" name="team">
+                                <option value="">Bitte wählen...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="wizard-step" id="wizard-step-2">
+                <h2>Wichtigkeits-Bewertung</h2>
+                <p class="step-description">Bewerte, wie wichtig Dir die folgenden Kriterien sind:</p>
+                <div id="importance-criteria-container">
+                    </div>
+            </div>
+
+            <div class="wizard-step" id="wizard-step-3">
+                <h2>Partner-Auswahl</h2>
+                <p class="step-description">Wähle die Partner aus, die Du bewerten möchtest (mindestens einen):</p>
+                <div class="partner-selection" id="partner-selection-container">
+                    </div>
+                <div class="selection-info">
+                    <span id="selected-partners-count">0</span> Partner ausgewählt
+                </div>
+            </div>
+
+            <div class="wizard-step" id="wizard-step-4">
+                <h2>Partner-Bewertung</h2>
+                <div id="performance-container">
+                    </div>
+                <div class="partner-navigation">
+                    <button type="button" id="prev-partner" class="btn btn-secondary">← Vorheriger Partner</button>
+                    <span id="partner-progress">Partner 1 von X</span>
+                    <button type="button" id="next-partner" class="btn btn-secondary">Nächster Partner →</button>
+                </div>
+            </div>
+
+            <div class="wizard-step" id="wizard-step-5">
+                <div class="success-container">
+                    <div class="success-icon">✓</div>
+                    <h2>Vielen Dank!</h2>
+                    <p>Deine Bewertungen wurden erfolgreich gespeichert.</p>
+                    <p class="success-details">
+                        Die Daten werden für die Analyse des Partner Quality Index verwendet.
+                    </p>
+                    <button type="button" id="restart-survey" class="btn btn-primary">Neue Bewertung starten</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="navigation">
+            <button type="button" id="prev-btn" class="btn btn-secondary">← Zurück</button>
+            <button type="button" id="next-btn" class="btn btn-primary">Weiter →</button>
+            <button type="button" id="submit-btn" class="btn btn-success" style="display: none;">Bewertung absenden</button>
+        </div>
+
+        <div class="loading-overlay" id="loading-overlay" style="display: none;">
+            <div class="loading-spinner"></div>
+            <p>Daten werden gespeichert...</p>
+        </div>
+
+        <div class="error-message" id="error-message" style="display: none;">
+            <div class="error-content">
+                <h3>Fehler</h3>
+                <p id="error-text">Es ist ein Fehler aufgetreten.</p>
+                <button type="button" id="close-error" class="btn btn-secondary">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

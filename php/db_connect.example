@@ -1,0 +1,25 @@
+<?php
+/* DATEI: php/db_connect.php
+   # Modified: 22.11.2025 - Datenbankverbindung
+*/
+$host = 'localhost';
+$db   = 'partner_analyse';
+$user = 'your_username';
+$pass = 'your_very_secret_password'; 
+$charset = 'utf8';
+
+$dsn = "pgsql:host=$host;port=5432;dbname=$db;user=$user;password=$pass";
+$options = [
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES   => false,
+];
+
+try {
+    $pdo = new PDO($dsn);
+} catch (\PDOException $e) {
+    http_response_code(500);
+    echo json_encode(["error" => "Datenbankfehler: " . $e->getMessage()]);
+    exit;
+}
+?>

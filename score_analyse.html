@@ -1,0 +1,92 @@
+<!--
+  Datei: /var/www/html/score_analyse.html
+  Zweck: Analyse-Frontend für Partner Score (One-Pager, Filter & Heatmap, Collapsing-Tree für Abteilungen)
+  # Modified: 23.11.2025, 15:00 - Collapsing-Tree für Departments, Layout und IDs abgestimmt auf JS
+  # Modified: 23.11.2025, 15:30 - Analyse-Button zentriert, Survey-Auswahl: is_active wird berücksichtigt
+-->
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cisco Partner Score Analyse</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .filter-row { display: flex; gap: 24px; margin-bottom: 18px; }
+        .filter-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .collapsing-tree-container { display: flex; flex-direction: column; align-items: center; margin: 0 auto 24px auto; }
+        .collapsing-tree { min-width: 320px; max-width: 520px; width: 100%; }
+        .department-node { display: flex; align-items: center; margin: 0; padding: 0 0 2px 0; }
+        .department-node label { margin: 0 0 0 2px; font-weight: normal; cursor: pointer; }
+        .department-node input[type="checkbox"] { margin-right: 7px; }
+        .chevron { cursor: pointer; font-size: 1.2em; user-select: none; width: 22px; text-align: center; display: inline-block; color: #3498db; }
+        .chevron.invisible { visibility: hidden; }
+        .department-checkbox-group { margin-left: 18px; border-left: 1px dotted #ccc; padding-left: 8px; }
+        .slider-row { width: 100%; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; }
+        .slider-label-row { width:100%; text-align:center; margin-bottom:3px; }
+        .analyse-btn-row { width: 100%; text-align: center; margin: 24px 0 0 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <img src="img/cisco.png" alt="Cisco Logo" style="height: 56px; margin-bottom: 12px; display: block; margin-left: auto; margin-right: auto;">
+            <h1>Cisco Partner Score Analyse</h1>
+            <p class="subtitle" id="analyse-subtitle">Analyse des Partner Quality Index (Public Sector)</p>
+        </header>
+
+        <div class="wizard-container" style="min-height: 0;">
+            <!-- Slider-Zeile -->
+            <div class="slider-row">
+                <label for="min-answers-slider" style="margin-right:18px;">Mindestanzahl Antworten: <span id="min-answers-value">5</span></label>
+                <input type="range" id="min-answers-slider" name="min-answers-slider" min="2" max="20" value="5" style="width:220px;">
+            </div>
+            <!-- Survey und Manager-Filter, gleich breit -->
+            <div class="filter-row">
+                <div class="filter-col">
+                    <label for="survey-filter">Survey(s):</label>
+                    <select id="survey-filter" name="survey-filter" multiple required>
+                        <!-- Optionen werden dynamisch geladen -->
+                    </select>
+                </div>
+                <div class="filter-col">
+                    <label>Manager:</label>
+                    <div id="manager-radio-list" style="display: flex; flex-direction: row; gap: 12px; margin-top:6px;">
+                        <label><input type="radio" name="manager-filter" value="alle" checked> Alle</label>
+                        <label><input type="radio" name="manager-filter" value="nur_manager"> Nur Manager</label>
+                        <label><input type="radio" name="manager-filter" value="nur_nicht_manager"> Nur Nicht-Manager</label>
+                    </div>
+                </div>
+            </div>
+            <!-- Abteilungsbaum zentriert -->
+            <div class="collapsing-tree-container">
+                <label for="department-collapsing-tree" style="margin-bottom: 6px;">Abteilung(en):</label>
+                <div id="department-collapsing-tree" class="collapsing-tree">
+                    <!-- Baum wird dynamisch eingefügt -->
+                </div>
+            </div>
+            <!-- Analyse-Button zentriert -->
+            <div class="analyse-btn-row">
+                <form id="analyse-filter-form" autocomplete="off" style="display:inline;">
+                    <button type="submit" id="analyse-btn" class="btn btn-primary">Analysieren</button>
+                </form>
+            </div>
+            <div id="loading-overlay" class="loading-overlay" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p>Daten werden analysiert...</p>
+            </div>
+            <div id="error-message" class="error-message" style="display: none;">
+                <div class="error-content">
+                    <h3>Fehler</h3>
+                    <p id="error-text">Es ist ein Fehler aufgetreten.</p>
+                    <button type="button" id="close-error" class="btn btn-secondary">Schließen</button>
+                </div>
+            </div>
+            <div id="result-section" style="margin-top:30px;">
+                <!-- Ergebnistabelle wird hier dynamisch eingefügt -->
+            </div>
+        </div>
+    </div>
+    <script src="js/score_analyse.js"></script>
+</body>
+</html>
