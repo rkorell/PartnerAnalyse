@@ -1,9 +1,3 @@
-<!--
-  Datei: /var/www/html/score_analyse.html
-  Zweck: Analyse-Frontend für Partner Score (One-Pager, Filter & Heatmap, Collapsing-Tree für Abteilungen)
-  # Modified: 23.11.2025, 15:00 - Collapsing-Tree für Departments, Layout und IDs abgestimmt auf JS
-  # Modified: 23.11.2025, 15:30 - Analyse-Button zentriert, Survey-Auswahl: is_active wird berücksichtigt
--->
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -12,19 +6,30 @@
     <title>Cisco Partner Score Analyse</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
+        /* Lokale Layout-Hilfen für das Grid, die nicht global sind */
         .filter-row { display: flex; gap: 24px; margin-bottom: 18px; }
         .filter-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-        .collapsing-tree-container { display: flex; flex-direction: column; align-items: center; margin: 0 auto 24px auto; }
-        .collapsing-tree { min-width: 320px; max-width: 520px; width: 100%; }
-        .department-node { display: flex; align-items: center; margin: 0; padding: 0 0 2px 0; }
-        .department-node label { margin: 0 0 0 2px; font-weight: normal; cursor: pointer; }
-        .department-node input[type="checkbox"] { margin-right: 7px; }
-        .chevron { cursor: pointer; font-size: 1.2em; user-select: none; width: 22px; text-align: center; display: inline-block; color: #3498db; }
-        .chevron.invisible { visibility: hidden; }
-        .department-checkbox-group { margin-left: 18px; border-left: 1px dotted #ccc; padding-left: 8px; }
+        .collapsing-tree-container { display: block; margin: 0 auto 24px auto; width: 100%; max-width: 600px; }
         .slider-row { width: 100%; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; }
-        .slider-label-row { width:100%; text-align:center; margin-bottom:3px; }
         .analyse-btn-row { width: 100%; text-align: center; margin: 24px 0 0 0; }
+        
+        /* Styles für die Matrix-Controls im Modal */
+        .matrix-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            background: #f1f2f6;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        .matrix-controls label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            user-select: none;
+        }
     </style>
 </head>
 <body>
@@ -36,21 +41,18 @@
         </header>
 
         <div class="wizard-container" style="min-height: 0;">
-            <!-- Slider-Zeile -->
             <div class="slider-row">
                 <label for="min-answers-slider" style="margin-right:18px;">Mindestanzahl Antworten: <span id="min-answers-value">5</span></label>
                 <input type="range" id="min-answers-slider" name="min-answers-slider" min="2" max="20" value="5" style="width:220px;">
             </div>
-            <!-- Survey und Manager-Filter, gleich breit -->
             <div class="filter-row">
                 <div class="filter-col">
                     <label for="survey-filter">Survey(s):</label>
                     <select id="survey-filter" name="survey-filter" multiple required>
-                        <!-- Optionen werden dynamisch geladen -->
-                    </select>
+                        </select>
                 </div>
                 <div class="filter-col">
-                    <label>Manager:</label>
+                    <label>Welche Gruppe möchtest Du analysieren?</label>
                     <div id="manager-radio-list" style="display: flex; flex-direction: row; gap: 12px; margin-top:6px;">
                         <label><input type="radio" name="manager-filter" value="alle" checked> Alle</label>
                         <label><input type="radio" name="manager-filter" value="nur_manager"> Nur Manager</label>
@@ -58,14 +60,11 @@
                     </div>
                 </div>
             </div>
-            <!-- Abteilungsbaum zentriert -->
             <div class="collapsing-tree-container">
                 <label for="department-collapsing-tree" style="margin-bottom: 6px;">Abteilung(en):</label>
-                <div id="department-collapsing-tree" class="collapsing-tree">
-                    <!-- Baum wird dynamisch eingefügt -->
-                </div>
+                <div id="department-collapsing-tree" class="collapsing-tree tree-view">
+                    </div>
             </div>
-            <!-- Analyse-Button zentriert -->
             <div class="analyse-btn-row">
                 <form id="analyse-filter-form" autocomplete="off" style="display:inline;">
                     <button type="submit" id="analyse-btn" class="btn btn-primary">Analysieren</button>
@@ -83,10 +82,29 @@
                 </div>
             </div>
             <div id="result-section" style="margin-top:30px;">
-                <!-- Ergebnistabelle wird hier dynamisch eingefügt -->
-            </div>
+                </div>
+            
+            <div class="author-signature">Dr. Ralf Korell, 2025</div>
         </div>
     </div>
+
+    <div id="matrix-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content-large">
+            <span id="close-matrix" class="modal-close">&times;</span>
+            <h2 id="matrix-title">Partner Matrix</h2>
+            
+            <div class="matrix-controls">
+                <span style="font-weight:bold; color:#7f8c8d; margin-right:5px;">Zentrierung:</span>
+                <label><input type="radio" name="matrix-center" value="standard" checked> Standard (5.0)</label>
+                <label><input type="radio" name="matrix-center" value="mean"> Mittelwert (Ø)</label>
+            </div>
+
+            <div id="matrix-container" class="matrix-wrapper">
+                </div>
+            <div id="matrix-tooltip" class="matrix-tooltip" style="display: none;"></div>
+        </div>
+    </div>
+
     <script src="js/score_analyse.js"></script>
 </body>
 </html>

@@ -1,5 +1,6 @@
 // Modified: November 21, 2025, 20:50 - Vollständiges JavaScript für Cisco Partner Quality Index Wizard erstellt
 // # Modified: 22.11.2025, 14:45 - Umstellung auf DB-Backend, Fix Standardwerte, Header-Korrektur, Unique DOM IDs, Name/Email/Manager
+// # Modified: 23.11.2025, 11:35 - Anpassung auf englische JSON-Keys (category, name, description)
 
 class QualityIndexWizard {
     constructor() {
@@ -199,11 +200,13 @@ class QualityIndexWizard {
                     
                     const nameDiv = document.createElement('div');
                     nameDiv.className = 'criteria-name';
-                    nameDiv.textContent = criterion.kriterium;
+                    // HIER GEÄNDERT: criterion.name statt criterion.kriterium
+                    nameDiv.textContent = criterion.name;
                     
                     const descDiv = document.createElement('div');
                     descDiv.className = 'criteria-description';
-                    descDiv.textContent = criterion.erläuterung;
+                    // HIER GEÄNDERT: criterion.description statt criterion.erläuterung
+                    descDiv.textContent = criterion.description;
                     
                     infoDiv.appendChild(nameDiv);
                     infoDiv.appendChild(descDiv);
@@ -231,7 +234,8 @@ class QualityIndexWizard {
     groupCriteria() {
         const grouped = {};
         this.criteriaData.forEach(criterion => {
-            const groupName = criterion.gruppe;
+            // HIER GEÄNDERT: criterion.category statt criterion.gruppe
+            const groupName = criterion.category;
             if (!grouped[groupName]) {
                 grouped[groupName] = [];
             }
@@ -468,11 +472,13 @@ class QualityIndexWizard {
                 
                 const nameDiv = document.createElement('div');
                 nameDiv.className = 'criteria-name';
-                nameDiv.textContent = criterion.kriterium;
+                // HIER GEÄNDERT: criterion.name statt criterion.kriterium
+                nameDiv.textContent = criterion.name;
                 
                 const descDiv = document.createElement('div');
                 descDiv.className = 'criteria-description';
-                descDiv.textContent = criterion.erläuterung;
+                // HIER GEÄNDERT: criterion.description statt criterion.erläuterung
+                descDiv.textContent = criterion.description;
                 
                 infoDiv.appendChild(nameDiv);
                 infoDiv.appendChild(descDiv);

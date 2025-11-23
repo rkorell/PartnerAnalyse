@@ -679,6 +679,215 @@ body {
     color: #2c3e50;
     font-size: 1.1em;
     margin-top: 1px;
-    margin-bottom: 3px;
+    margin-bottom: 3px; 
 }
 
+/* =========================================
+   Tree View Styles (Explorer Look) - FINAL v2
+   ========================================= */
+
+/* 1. Basis-Container */
+.tree-view {
+    box-sizing: border-box; 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.4; 
+}
+
+/* 2. Knoten & Header */
+.tree-node {
+    position: relative;
+    list-style: none;
+    overflow: visible !important; 
+}
+
+.tree-header {
+    display: flex;
+    align-items: center;
+    padding: 2px 5px;
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+    z-index: 2; 
+    background-color: transparent; 
+}
+
+.tree-header:hover {
+    background-color: #eaf6ff;
+}
+
+/* 3. Elemente im Header */
+/* Chevron (Pfeil): Cisco Blue */
+.tree-header .chevron { 
+    width: 20px; 
+    text-align: center; 
+    color: #3498db;  /* Das gewünschte Blau */
+    font-size: 0.9em; 
+    font-weight: bold;
+    transition: transform 0.1s;
+}
+
+/* KORREKTUR: Platz sparen bei Blättern (keine Kinder) */
+.tree-header .chevron.invisible { 
+    display: none; /* Entfernt den Platzhalter komplett */
+}
+
+/* Checkbox */
+.tree-header input[type="checkbox"] { 
+    margin: 0 6px 0 0; 
+}
+
+/* Wenn kein Chevron da ist (Leaf Node), braucht die Checkbox etwas Abstand zur Linie */
+.tree-header .chevron.invisible + input[type="checkbox"] {
+    margin-left: 5px; /* Kleiner Abstand zur vertikalen Linie */
+}
+
+.tree-header label { 
+    cursor: pointer; 
+    user-select: none; 
+    flex: 1; 
+    font-size: 14px; 
+    color: #333; 
+}
+
+/* 4. Der Kinder-Container (Die Einrückung) */
+.tree-children {
+    margin-left: 10px;    
+    padding-left: 20px;   
+    position: relative;
+    overflow: visible !important;
+}
+
+/* =========================================
+   Die Verbindungslinien (L-Shape) 
+   ========================================= */
+
+/* Vertikale Linie */
+.tree-children .tree-node::before {
+    content: "";              
+    display: block;
+    position: absolute;
+    z-index: 1;
+    left: -11px;              
+    top: 0;
+    bottom: 0;                
+    border-left: 1px solid #999; /* Dein gewähltes Grau */
+}
+
+/* Horizontale Linie (Ast) */
+.tree-children .tree-node::after {
+    content: "";
+    display: block;
+    position: absolute;
+    z-index: 1;
+    left: -11px;              
+    top: 15px;                
+    width: 13px;              
+    border-top: 1px solid #999; /* Dein gewähltes Grau */
+}
+
+/* Spezialfall: Letztes Kind */
+.tree-children .tree-node:last-child::before {
+    bottom: auto;      
+    height: 16px;      
+}
+
+
+/* =========================================
+   Modal & IPA Matrix Styles
+   ========================================= */
+
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6);
+    z-index: 2000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.3s;
+}
+
+.modal-content-large {
+    background: white;
+    width: 90%;
+    max-width: 600px;
+    border-radius: 12px;
+    padding: 25px;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.modal-close {
+    position: absolute;
+    top: 15px; right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    color: #7f8c8d;
+    cursor: pointer;
+}
+.modal-close:hover { color: #e74c3c; }
+
+#matrix-title {
+    margin: 0 0 20px 0;
+    color: #2c3e50;
+}
+
+.matrix-wrapper {
+    width: 100%;
+    max-width: 450px; /* Quadratisch halten */
+    aspect-ratio: 1 / 1;
+    background: #fdfdfd;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 10px;
+    position: relative;
+}
+
+/* Tooltip unter/über der Grafik */
+.matrix-tooltip {
+    margin-top: 15px;
+    padding: 10px 15px;
+    background: #34495e;
+    color: white;
+    border-radius: 6px;
+    font-size: 0.95em;
+    min-height: 40px; /* Damit es nicht springt */
+    text-align: center;
+    width: 100%;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+/* SVG Styles */
+.matrix-svg text {
+    font-family: sans-serif;
+    pointer-events: none; /* Text blockiert Maus nicht */
+}
+
+.matrix-dot {
+    cursor: pointer;
+    transition: r 0.2s, fill 0.2s;
+}
+
+.matrix-dot:hover {
+    r: 9;
+    fill: #e74c3c; /* Wird rot beim Hovern */
+    z-index: 100;
+}
+
+/* =========================================
+   Author Signature (Branding)
+   ========================================= */
+
+.author-signature {
+    text-align: right;
+    color: #95a5a6; /* Cisco "Concrete" Grey */
+    margin-top: 30px;
+    font-size: 0.8em;
+    font-weight: normal;
+    border-top: 1px solid #ecf0f1; /* Optionale feine Linie zur Abgrenzung */
+    padding-top: 10px;
+}

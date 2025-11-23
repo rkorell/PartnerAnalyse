@@ -3,6 +3,7 @@
   Datei: /var/www/html/php/get_data.php
   Zweck: Liefert Survey-/Partner-/Kriterien-/Abteilungsdaten für das Frontend als JSON (Analyse & Erhebung)
   # Modified: 22.11.2025, 23:00 - surveys jetzt immer als Array (id, name), CI/CD für Analyse-Frontend
+  # Modified: 23.11.2025, 11:35 - Aliase entfernt (Fix: Keine Umlaute/Germanismen in JSON-Keys)
 */
 
 header('Content-Type: application/json');
@@ -31,8 +32,9 @@ try {
     }
 
     // Criteria (alle Felder, CI/CD für Wizard)
+    // HIER GEÄNDERT: Original-Spaltennamen statt deutscher Aliase
     $criteria = [];
-    $stmt = $pdo->query("SELECT id, category AS Gruppe, name AS Kriterium, description AS Erläuterung, sort_order FROM criteria ORDER BY sort_order ASC, id ASC");
+    $stmt = $pdo->query("SELECT id, category, name, description, sort_order FROM criteria ORDER BY sort_order ASC, id ASC");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $criteria[] = $row;
     }
