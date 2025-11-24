@@ -4,6 +4,7 @@
   Zweck: Liefert Survey-/Partner-/Kriterien-/Abteilungsdaten für das Frontend als JSON (Analyse & Erhebung)
   # Modified: 22.11.2025, 23:00 - surveys jetzt immer als Array (id, name), CI/CD für Analyse-Frontend
   # Modified: 23.11.2025, 11:35 - Aliase entfernt (Fix: Keine Umlaute/Germanismen in JSON-Keys)
+  # Modified: 23.11.2025, 21:15 - App-Texte (Tooltips) aus DB laden (app_texts)
 */
 
 header('Content-Type: application/json');
@@ -31,8 +32,7 @@ try {
         ];
     }
 
-    // Criteria (alle Felder, CI/CD für Wizard)
-    // HIER GEÄNDERT: Original-Spaltennamen statt deutscher Aliase
+    // Criteria (Original Spaltennamen)
     $criteria = [];
     $stmt = $pdo->query("SELECT id, category, name, description, sort_order FROM criteria ORDER BY sort_order ASC, id ASC");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -50,12 +50,26 @@ try {
             'level_depth' => intval($row['level_depth'])
         ];
     }
-    file_put_contents('/tmp/debug_criteria.txt', print_r($criteria, true));
+
+    // NEU: App Texte laden
+    $app_texts = [];
+    try {
+        // Wir prüfen vorsichtig, ob die Tabelle existiert/gefüllt ist
+        $stmt = $pdo->query("SELECT category, content FROM app_texts");
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $app_texts[$row['category']] = $row['content'];
+        }
+    } catch (Exception $e) {
+        // Fallback: Wenn Tabelle fehlt, leeres Array (Frontend zeigt dann Platzhalter oder nichts)
+        // Man könnte hier auch Default-Texte hardcoden, aber wir nutzen die DB.
+    }
+
     echo json_encode([
         'surveys'     => $surveys,
         'partners'    => $partners,
         'criteria'    => $criteria,
-        'departments' => $departments
+        'departments' => $departments,
+        'app_texts'   => $app_texts // Neue Property
     ]);
 } catch (Exception $e) {
     http_response_code(500);

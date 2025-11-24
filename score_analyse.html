@@ -6,41 +6,27 @@
     <title>Cisco Partner Score Analyse</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
-        /* Lokale Layout-Hilfen für das Grid, die nicht global sind */
         .filter-row { display: flex; gap: 24px; margin-bottom: 18px; }
         .filter-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
         .collapsing-tree-container { display: block; margin: 0 auto 24px auto; width: 100%; max-width: 600px; }
         .slider-row { width: 100%; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; }
         .analyse-btn-row { width: 100%; text-align: center; margin: 24px 0 0 0; }
-        
-        /* Styles für die Matrix-Controls im Modal */
-        .matrix-controls {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 15px;
-            background: #f1f2f6;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 14px;
-        }
-        .matrix-controls label {
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            user-select: none;
-        }
+        .matrix-controls { display: flex; gap: 15px; margin-bottom: 15px; background: #f1f2f6; padding: 8px 15px; border-radius: 20px; font-size: 14px; }
+        .matrix-controls label { cursor: pointer; display: flex; align-items: center; gap: 5px; user-select: none; }
     </style>
 </head>
 <body>
     <div class="container">
         <header class="header">
             <img src="img/cisco.png" alt="Cisco Logo" style="height: 56px; margin-bottom: 12px; display: block; margin-left: auto; margin-right: auto;">
-            <h1>Cisco Partner Score Analyse</h1>
-            <p class="subtitle" id="analyse-subtitle">Analyse des Partner Quality Index (Public Sector)</p>
+            <h1>Score Analyse</h1>
+            <p class="subtitle" id="analyse-subtitle">Darstellung und Untersuchung des Partner Quality Indexes</p>
         </header>
 
-        <div class="wizard-container" style="min-height: 0;">
+        <div class="wizard-container" style="min-height: 0; position: relative;">
+            
+            <div class="info-trigger" onclick="window.openInfoModal('analytic-mask')" title="Lesehilfe & Methodik">i</div>
+
             <div class="slider-row">
                 <label for="min-answers-slider" style="margin-right:18px;">Mindestanzahl Antworten: <span id="min-answers-value">5</span></label>
                 <input type="range" id="min-answers-slider" name="min-answers-slider" min="2" max="20" value="5" style="width:220px;">
@@ -48,8 +34,7 @@
             <div class="filter-row">
                 <div class="filter-col">
                     <label for="survey-filter">Survey(s):</label>
-                    <select id="survey-filter" name="survey-filter" multiple required>
-                        </select>
+                    <select id="survey-filter" name="survey-filter" multiple required></select>
                 </div>
                 <div class="filter-col">
                     <label>Welche Gruppe möchtest Du analysieren?</label>
@@ -62,8 +47,7 @@
             </div>
             <div class="collapsing-tree-container">
                 <label for="department-collapsing-tree" style="margin-bottom: 6px;">Abteilung(en):</label>
-                <div id="department-collapsing-tree" class="collapsing-tree tree-view">
-                    </div>
+                <div id="department-collapsing-tree" class="collapsing-tree tree-view"></div>
             </div>
             <div class="analyse-btn-row">
                 <form id="analyse-filter-form" autocomplete="off" style="display:inline;">
@@ -71,18 +55,14 @@
                 </form>
             </div>
             <div id="loading-overlay" class="loading-overlay" style="display: none;">
-                <div class="loading-spinner"></div>
-                <p>Daten werden analysiert...</p>
+                <div class="loading-spinner"></div><p>Daten werden analysiert...</p>
             </div>
             <div id="error-message" class="error-message" style="display: none;">
                 <div class="error-content">
-                    <h3>Fehler</h3>
-                    <p id="error-text">Es ist ein Fehler aufgetreten.</p>
-                    <button type="button" id="close-error" class="btn btn-secondary">Schließen</button>
+                    <h3>Fehler</h3><p id="error-text">Es ist ein Fehler aufgetreten.</p><button type="button" id="close-error" class="btn btn-secondary">Schließen</button>
                 </div>
             </div>
-            <div id="result-section" style="margin-top:30px;">
-                </div>
+            <div id="result-section" style="margin-top:30px;"></div>
             
             <div class="author-signature">Dr. Ralf Korell, 2025</div>
         </div>
@@ -92,16 +72,20 @@
         <div class="modal-content-large">
             <span id="close-matrix" class="modal-close">&times;</span>
             <h2 id="matrix-title">Partner Matrix</h2>
-            
             <div class="matrix-controls">
                 <span style="font-weight:bold; color:#7f8c8d; margin-right:5px;">Zentrierung:</span>
                 <label><input type="radio" name="matrix-center" value="standard" checked> Standard (5.0)</label>
                 <label><input type="radio" name="matrix-center" value="mean"> Mittelwert (Ø)</label>
             </div>
-
-            <div id="matrix-container" class="matrix-wrapper">
-                </div>
+            <div id="matrix-container" class="matrix-wrapper"></div>
             <div id="matrix-tooltip" class="matrix-tooltip" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div id="global-info-modal" class="info-modal-overlay">
+        <div class="info-modal-content">
+            <span class="info-modal-close" id="close-info-modal">&times;</span>
+            <div id="info-modal-body"></div>
         </div>
     </div>
 

@@ -2,6 +2,11 @@
 // # Modified: 22.11.2025, 14:45 - Umstellung auf DB-Backend, Fix Standardwerte, Header-Korrektur, Unique DOM IDs, Name/Email/Manager
 // # Modified: 23.11.2025, 11:35 - Anpassung auf englische JSON-Keys (category, name, description)
 
+// Modified: November 21, 2025, 20:50 - Vollständiges JavaScript für Cisco Partner Quality Index Wizard erstellt
+// # Modified: 22.11.2025, 14:45 - Umstellung auf DB-Backend, Fix Standardwerte, Header-Korrektur, Unique DOM IDs, Name/Email/Manager
+// # Modified: 23.11.2025, 11:35 - Anpassung auf englische JSON-Keys (category, name, description)
+// # Modified: 23.11.2025, 21:30 - Integration Info-Modal und Laden der App-Texte aus DB
+
 class QualityIndexWizard {
     constructor() {
         this.currentStep = 1;
@@ -14,6 +19,9 @@ class QualityIndexWizard {
         this.hierarchyData = [];
         this.criteriaData = [];
         this.partnerData = [];
+        
+        // NEU: Texte für Tooltips
+        this.appTexts = {};
         
         this.importanceData = {};
         this.performanceData = {};
@@ -59,7 +67,6 @@ class QualityIndexWizard {
             
             if (data.error) throw new Error(data.error);
 
-           // this.surveyId = data.survey_id;
             if (Array.isArray(data.surveys) && data.surveys.length > 0) {
                 this.surveyId = data.surveys[0].id;
                 const subtitle = document.getElementById('survey-subtitle');
@@ -72,19 +79,14 @@ class QualityIndexWizard {
                 if (subtitle) subtitle.textContent = "Kein aktives Survey gefunden";
             }
 
-
-
-
-
             this.hierarchyData = data.departments; 
             this.criteriaData = data.criteria; 
             this.partnerData = data.partners; 
-
-            // NEU: Survey Name im Header setzen
-            //const subtitle = document.getElementById('survey-subtitle');
-            //if(subtitle && data.survey_name) {
-              //  subtitle.textContent = data.survey_name;
-           //  }
+            
+            // NEU: Texte speichern
+            if (data.app_texts) {
+                this.appTexts = data.app_texts;
+            }
 
         } catch (error) {
             throw new Error('Konfigurationsdateien konnten nicht geladen werden: ' + error.message);
@@ -167,7 +169,6 @@ class QualityIndexWizard {
     }
 
     setupImportanceCriteria() {
-
         setTimeout(() => {
             const container = document.getElementById('importance-criteria-container');
             const groupedCriteria = this.groupCriteria();
@@ -200,12 +201,10 @@ class QualityIndexWizard {
                     
                     const nameDiv = document.createElement('div');
                     nameDiv.className = 'criteria-name';
-                    // HIER GEÄNDERT: criterion.name statt criterion.kriterium
                     nameDiv.textContent = criterion.name;
                     
                     const descDiv = document.createElement('div');
                     descDiv.className = 'criteria-description';
-                    // HIER GEÄNDERT: criterion.description statt criterion.erläuterung
                     descDiv.textContent = criterion.description;
                     
                     infoDiv.appendChild(nameDiv);
@@ -227,14 +226,12 @@ class QualityIndexWizard {
 
             // Slider Event Listeners hinzufügen
             this.bindSliderEvents('importance');
-        }, 10); // end timer gegen race condition
-
+        }, 10);
     }
 
     groupCriteria() {
         const grouped = {};
         this.criteriaData.forEach(criterion => {
-            // HIER GEÄNDERT: criterion.category statt criterion.gruppe
             const groupName = criterion.category;
             if (!grouped[groupName]) {
                 grouped[groupName] = [];
@@ -273,16 +270,11 @@ class QualityIndexWizard {
         `;
     }
 
-
     bindSliderEvents(type) {
         const sliders = document.querySelectorAll(`input[data-type="${type}"]`);
-        console.log(`Binde Events für ${type}, gefundene Slider:`, sliders.length); // DEBUG
         
         sliders.forEach(slider => {
-            console.log(`Binde Event für Slider:`, slider.id); // DEBUG
-            
             slider.addEventListener('input', (e) => {
-                console.log(`Slider ${e.target.id} bewegt auf:`, e.target.value); // DEBUG
                 this.updateSliderValue(e.target);
             });
             
@@ -292,43 +284,17 @@ class QualityIndexWizard {
         });
     }
 
-
-
-
     updateSliderValue(slider) {
-        
-
-        console.log(`=== START updateSliderValue ===`);
-        console.log(`Slider DOM ID:`, slider.id);
-        
-        // WICHTIG: Echte ID aus data-Attribute holen
         const rawId = slider.dataset.critId;
-        console.log(`DB ID (raw):`, rawId);
-
-        console.log(`Slider.value VORHER:`, slider.value);
-        console.log(`Slider.min:`, slider.min);
-        console.log(`Slider.max:`, slider.max);
-        
         const value = parseInt(slider.value);
-        console.log(`Parsed value:`, value);
         
         const valueDisplay = document.getElementById(`value_${slider.id}`);
-        console.log(`ValueDisplay Element:`, valueDisplay);
         const tooltip = document.getElementById(`tooltip_${slider.id}`);
 
         if (valueDisplay) {
-            console.log(`ValueDisplay.textContent VORHER:`, valueDisplay.textContent);
             valueDisplay.textContent = value;
-            console.log(`ValueDisplay.textContent NACHHER:`, valueDisplay.textContent);
         }
         
-        console.log(`Slider.value NACHHER:`, slider.value);
-        console.log(`=== ENDE updateSliderValue ===`);
-
-
-
-
-
         const type = slider.dataset.type;
         let tooltipText = `${value} - Neutral`;
         
@@ -357,8 +323,6 @@ class QualityIndexWizard {
             }
         }
     }
-
-
 
     showSliderTooltip(slider) {
         const tooltip = document.getElementById(`tooltip_${slider.id}`);
@@ -472,12 +436,10 @@ class QualityIndexWizard {
                 
                 const nameDiv = document.createElement('div');
                 nameDiv.className = 'criteria-name';
-                // HIER GEÄNDERT: criterion.name statt criterion.kriterium
                 nameDiv.textContent = criterion.name;
                 
                 const descDiv = document.createElement('div');
                 descDiv.className = 'criteria-description';
-                // HIER GEÄNDERT: criterion.description statt criterion.erläuterung
                 descDiv.textContent = criterion.description;
                 
                 infoDiv.appendChild(nameDiv);
@@ -506,9 +468,7 @@ class QualityIndexWizard {
 
     restorePartnerValues(partnerId) {
         if (this.performanceData[partnerId]) {
-            // rawId ist hier der Key (z.B. 10)
             Object.entries(this.performanceData[partnerId]).forEach(([rawId, value]) => {
-                // Wir müssen die DOM-ID rekonstruieren ('perf_' + 10)
                 const domId = 'perf_' + rawId;
                 const slider = document.getElementById(domId);
                 if (slider) {
@@ -558,6 +518,29 @@ class QualityIndexWizard {
 
         // Error Modal
         document.getElementById('close-error').addEventListener('click', () => this.hideError());
+
+        // NEU: Info Modal Events
+        const modal = document.getElementById('global-info-modal');
+        const closeBtn = document.getElementById('close-info-modal'); // ID im HTML angepasst? Check: class="info-modal-close"
+        // Fallback falls per class selektiert werden muss:
+        const closeBtnClass = document.querySelector('.info-modal-close');
+        
+        if(closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+        else if(closeBtnClass) closeBtnClass.addEventListener('click', () => { modal.style.display = 'none'; });
+
+        if(modal) modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.style.display = 'none';
+        });
+
+        // Global verfügbar machen für den onclick im HTML
+        window.openInfoModal = (category) => this.openInfoModal(category);
+    }
+
+    // NEU: Info Modal Logik
+    openInfoModal(category) {
+        const content = this.appTexts[category] || "<p>Information wird geladen oder ist nicht verfügbar.</p>";
+        document.getElementById('info-modal-body').innerHTML = content;
+        document.getElementById('global-info-modal').style.display = 'flex';
     }
 
     previousStep() {

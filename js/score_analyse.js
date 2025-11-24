@@ -6,6 +6,7 @@
   # Modified: 23.11.2025, 18:30 - Dynamische Zentrierung (Mean/Median) für Matrix implementiert
   # Modified: 23.11.2025, 19:15 - Echter Zoom/Entzerrung (Fadenkreuz fix in Mitte, Punkte dynamisch skaliert)
   # Modified: 23.11.2025, 19:45 - Cleanup: Median-Logik entfernt
+  # Modified: 23.11.2025, 21:30 - Integration Info-Modal und App-Texte aus DB
 */
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -31,6 +32,11 @@ document.addEventListener("DOMContentLoaded", function() {
     // Matrix Radio Buttons
     const matrixRadios = document.querySelectorAll('input[name="matrix-center"]');
 
+    // NEU: Info Modal Elemente und Speicher für Texte
+    let appTexts = {};
+    const infoModal = document.getElementById('global-info-modal');
+    const closeInfoBtn = document.getElementById('close-info-modal');
+
     // Globale Daten
     let analysisData = [];
     let currentPartnerDetails = null; 
@@ -38,11 +44,26 @@ document.addEventListener("DOMContentLoaded", function() {
     fetchSurveys();
     fetchDepartments();
 
+    // Event Listeners
     minAnswersSlider.addEventListener('input', () => { minAnswersValue.textContent = minAnswersSlider.value; });
     closeErrorBtn.addEventListener('click', () => { errorMessage.style.display = 'none'; });
     
+    // Matrix Modal Schließen
     closeMatrixBtn.addEventListener('click', () => { matrixModal.style.display = 'none'; });
     window.addEventListener('click', (e) => { if (e.target === matrixModal) matrixModal.style.display = 'none'; });
+
+    // NEU: Info Modal Schließen
+    if(closeInfoBtn) closeInfoBtn.addEventListener('click', () => { infoModal.style.display = 'none'; });
+    if(infoModal) infoModal.addEventListener('click', (e) => {
+        if (e.target === infoModal) infoModal.style.display = 'none';
+    });
+
+    // Globaler Öffner für das Info-Modal (für onclick im HTML)
+    window.openInfoModal = function(category) {
+        const content = appTexts[category] || "<p>Information wird geladen oder ist nicht verfügbar.</p>";
+        document.getElementById('info-modal-body').innerHTML = content;
+        infoModal.style.display = 'flex';
+    }
 
     matrixRadios.forEach(radio => {
         radio.addEventListener('change', () => {
@@ -57,60 +78,167 @@ document.addEventListener("DOMContentLoaded", function() {
         analyseScores();
     });
 
-    // --- (fetchSurveys, fetchDepartments, renderNode bleiben unverändert) ---
-    // Der Code für Tree und Fetch bleibt identisch wie in der Vorversion.
-    // ... [Tree Code beibehalten] ... 
     function fetchSurveys() {
-        fetch('php/get_data.php').then(r=>r.json()).then(d=>{
-            if(d&&d.surveys){
-                surveySelect.innerHTML='';let any=false;
-                d.surveys.forEach(s=>{
-                    const o=document.createElement('option');o.value=s.id;o.textContent=s.name;
-                    if(s.is_active){o.selected=true;any=true;}surveySelect.appendChild(o);
-                });
-                if(!any&&surveySelect.options.length)surveySelect.options[0].selected=true;
-            }
-        });
-    }
-    function fetchDepartments() {
-        fetch('php/get_data.php').then(r=>r.json()).then(d=>{
-            if(d&&d.departments){
-                departmentTreeContainer.innerHTML='';
-                const deps=d.departments.map(x=>({...x,id:Number(x.id),parent_id:x.parent_id?Number(x.parent_id):null,children:[]}));
-                const map={};deps.forEach(x=>map[x.id]=x);const roots=[];
-                deps.forEach(x=>map[x.id]=x);
-                deps.forEach(x=>{if(x.parent_id===null)roots.push(x);else if(map[x.parent_id])map[x.parent_id].children.push(x);});
-                
-                function renderNode(n){
-                    const div=document.createElement('div');div.className='tree-node';
-                    const h=document.createElement('div');h.className='tree-header';
-                    const chev=document.createElement('span');chev.className='chevron';
-                    if(n.children.length){chev.textContent=n._expanded?"▼":"▶";chev.onclick=(e)=>{n._expanded=!n._expanded;renderTree();e.stopPropagation();};}
-                    else{chev.classList.add('invisible');chev.textContent="▶";}
-                    const cb=document.createElement('input');cb.type='checkbox';cb.value=n.id;cb.checked=!!n._checked;cb.indeterminate=!!n._indeterminate;
-                    cb.onchange=(e)=>{setCheck(n,cb.checked);updatePar(n);renderTree();e.stopPropagation();};
-                    const lbl=document.createElement('label');lbl.textContent=n.name;
-                    lbl.onclick=(e)=>{cb.checked=!cb.checked;cb.dispatchEvent(new Event('change'));e.stopPropagation();};
-                    h.append(chev,cb,lbl);div.appendChild(h);
-                    if(n.children.length&&n._expanded){
-                        const cDiv=document.createElement('div');cDiv.className='tree-children';
-                        n.children.sort((a,b)=>a.name.localeCompare(b.name)).forEach(c=>cDiv.appendChild(renderNode(c)));
-                        div.appendChild(cDiv);
-                    }
-                    return div;
+        fetch('php/get_data.php')
+            .then(response => response.json())
+            .then(data => {
+                // NEU: Texte speichern (gleich beim ersten Fetch)
+                if (data.app_texts) {
+                    appTexts = data.app_texts;
                 }
-                function setCheck(n,v){n._checked=v;n._indeterminate=false;if(n.children)n.children.forEach(c=>setCheck(c,v));}
-                function updatePar(n){if(n.parent_id&&map[n.parent_id]){
-                    const p=map[n.parent_id];const tot=p.children.length;const c=p.children.filter(x=>x._checked).length;const i=p.children.filter(x=>x._indeterminate).length;
-                    if(c===tot){p._checked=true;p._indeterminate=false;}else if(c===0&&i===0){p._checked=false;p._indeterminate=false;}else{p._checked=false;p._indeterminate=true;}
-                    updatePar(p);
-                }}
-                function expand(ns){ns.forEach(n=>{if(typeof n._expanded==='undefined')n._expanded=true;if(n.children.length)expand(n.children);});}
-                expand(roots);
-                function renderTree(){departmentTreeContainer.innerHTML='';roots.sort((a,b)=>a.name.localeCompare(b.name)).forEach(r=>departmentTreeContainer.appendChild(renderNode(r)));}
-                renderTree();
-            }
-        });
+
+                if (data && data.surveys) {
+                    surveySelect.innerHTML = '';
+                    let anyActive = false;
+                    data.surveys.forEach(survey => {
+                        const opt = document.createElement('option');
+                        opt.value = survey.id;
+                        opt.textContent = survey.name;
+                        if (survey.is_active) {
+                            opt.selected = true;
+                            anyActive = true;
+                        }
+                        surveySelect.appendChild(opt);
+                    });
+                    if (!anyActive && surveySelect.options.length) {
+                        surveySelect.options[0].selected = true;
+                    }
+                }
+            });
+    }
+
+    function fetchDepartments() {
+        fetch('php/get_data.php')
+            .then(response => response.json())
+            .then(data => {
+                // Falls fetchSurveys schiefgeht, holen wir Texte hier zur Sicherheit auch
+                if (data.app_texts) appTexts = data.app_texts;
+
+                if (data && data.departments && departmentTreeContainer) {
+                    departmentTreeContainer.innerHTML = '';
+                    const departments = data.departments.map(dep => ({
+                        ...dep,
+                        id: Number(dep.id),
+                        parent_id: (dep.parent_id === null || dep.parent_id === undefined || dep.parent_id === "") ? null : Number(dep.parent_id),
+                        children: []
+                    }));
+
+                    const deptMap = {};
+                    departments.forEach(dep => { deptMap[dep.id] = dep; });
+                    const roots = [];
+                    departments.forEach(dep => {
+                        if (dep.parent_id === null) {
+                            roots.push(dep);
+                        } else if (deptMap[dep.parent_id]) {
+                            deptMap[dep.parent_id].children.push(dep);
+                        }
+                    });
+
+                    // Render-Funktion mit CSS-Klassen für Explorer-Look
+                    function renderNode(node) {
+                        const nodeDiv = document.createElement('div');
+                        nodeDiv.className = 'tree-node';
+
+                        const headerDiv = document.createElement('div');
+                        headerDiv.className = 'tree-header';
+
+                        const chevron = document.createElement('span');
+                        chevron.className = 'chevron';
+                        if (node.children.length > 0) {
+                            chevron.textContent = node._expanded ? "▼" : "▶";
+                            chevron.addEventListener('click', function(e) {
+                                node._expanded = !node._expanded;
+                                renderTree();
+                                e.stopPropagation();
+                            });
+                        } else {
+                            chevron.classList.add('invisible');
+                            chevron.textContent = "▶";
+                        }
+
+                        const checkbox = document.createElement('input');
+                        checkbox.type = "checkbox";
+                        checkbox.value = node.id;
+                        checkbox.checked = !!node._checked;
+                        checkbox.indeterminate = !!node._indeterminate;
+                        checkbox.addEventListener('change', function(e) {
+                            setCheckState(node, checkbox.checked);
+                            updateParentIndeterminate(node);
+                            renderTree();
+                            e.stopPropagation();
+                        });
+
+                        const label = document.createElement('label');
+                        label.textContent = node.name;
+                        label.addEventListener('click', function(e) {
+                            checkbox.checked = !checkbox.checked;
+                            checkbox.dispatchEvent(new Event('change'));
+                            e.stopPropagation();
+                        });
+
+                        headerDiv.appendChild(chevron);
+                        headerDiv.appendChild(checkbox);
+                        headerDiv.appendChild(label);
+                        nodeDiv.appendChild(headerDiv);
+
+                        if (node.children.length > 0 && node._expanded) {
+                            const childrenDiv = document.createElement('div');
+                            childrenDiv.className = 'tree-children'; 
+                            
+                            node.children
+                                .sort((a, b) => a.name.localeCompare(b.name))
+                                .forEach(child => {
+                                    childrenDiv.appendChild(renderNode(child));
+                                });
+                            nodeDiv.appendChild(childrenDiv);
+                        }
+
+                        return nodeDiv;
+                    }
+
+                    function setCheckState(node, checked) {
+                        node._checked = checked;
+                        node._indeterminate = false;
+                        if (node.children) {
+                            node.children.forEach(child => setCheckState(child, checked));
+                        }
+                    }
+                    function updateParentIndeterminate(node) {
+                        if (node.parent_id !== null && deptMap[node.parent_id]) {
+                            const parent = deptMap[node.parent_id];
+                            const total = parent.children.length;
+                            const checked = parent.children.filter(c => c._checked).length;
+                            const indet = parent.children.filter(c => c._indeterminate).length;
+                            if (checked === total) {
+                                parent._checked = true;
+                                parent._indeterminate = false;
+                            } else if (checked === 0 && indet === 0) {
+                                parent._checked = false;
+                                parent._indeterminate = false;
+                            } else {
+                                parent._checked = false;
+                                parent._indeterminate = true;
+                            }
+                            updateParentIndeterminate(parent);
+                        }
+                    }
+                    function expandRoots(nodes) {
+                        nodes.forEach(n => {
+                            if (typeof n._expanded === "undefined") n._expanded = true;
+                            if (n.children.length > 0) expandRoots(n.children);
+                        });
+                    }
+                    expandRoots(roots);
+
+                    function renderTree() {
+                        departmentTreeContainer.innerHTML = '';
+                        roots.sort((a, b) => a.name.localeCompare(b.name)).forEach(root => {
+                            departmentTreeContainer.appendChild(renderNode(root));
+                        });
+                    }
+                    renderTree();
+                }
+            });
     }
 
     function showLoader() { loadingOverlay._timeout = setTimeout(() => { loadingOverlay.style.display = 'flex'; }, 300); }
@@ -209,7 +337,6 @@ document.addEventListener("DOMContentLoaded", function() {
         const imps = details.map(d => parseFloat(d.imp));
         const perfs = details.map(d => parseFloat(d.perf));
         
-        // Nur noch Mean (Durchschnitt) berechnen, Median wurde entfernt
         const sumImp = imps.reduce((a,b) => a+b, 0);
         const sumPerf = perfs.reduce((a,b) => a+b, 0);
         
