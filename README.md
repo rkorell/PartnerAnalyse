@@ -6,7 +6,7 @@
 ## 1. Einleitung & Methodik
 
 ### 1.1. Zielsetzung
-Das System dient der Erhebung, Speicherung und Analyse von qualitativen Bewertungen der Cisco-Vertriebspartner im Public Sector. Ziel ist es, subjektive Einzelmeinungen in objektivierbare Kennzahlen zu überführen und historisch vergleichbar zu machen.
+Das System dient der Erhebung, Speicherung und Analyse von qualitativen Bewertungen der Cisco-Vertriebspartner. Ziel ist es, subjektive Einzelmeinungen in objektivierbare Kennzahlen zu überführen und historisch vergleichbar zu machen.
 
 ### 1.2. Methodischer Ansatz: Importance-Performance Analysis (IPA)
 Das System basiert auf dem Modell der **Importance-Performance Analysis**. Die Leistung (*Performance*) eines Partners wird nicht isoliert betrachtet, sondern in Relation zur Wichtigkeit (*Importance*) des jeweiligen Kriteriums für den Bewerter gesetzt.
