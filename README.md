@@ -93,3 +93,23 @@ Die Datenbank wird über SQL-Skripte initialisiert.
 Erstellt Tabellen, Constraints und Indizes. Achtung: Löscht vorhandene Daten!
 ```bash
 psql -U dein_user -d deine_db -f sql/1_create_schema.sql
+```
+
+### Schritt 2: Stammdaten importieren
+Lädt Partner, Kriterien und Hierarchie. Setzt Survey auf Test-Modus (Standard).
+```bash
+psql -U dein_user -d deine_db -f sql/2_initial_data.sql
+```
+
+### Schritt 3: Konfiguration
+Datenbank-Zugangsdaten in php/db_connect.php anpassen.
+
+
+```bash
+$host = 'localhost';
+$db   = 'partner_analyse';
+$user = '...';
+$pass = '...';
+```
+
+
