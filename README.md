@@ -1,32 +1,26 @@
 # Cisco Partner Quality Index (CPQI)
 
-**Version:** 1.0  
-**Datum:** 23.11.2025
+**Version:** 1.1  
+**Datum:** 27.11.2025
 
 ## 1. Einleitung & Methodik
 
 ### 1.1. Zielsetzung
-Das System dient der Erhebung, Speicherung und Analyse von qualitativen Bewertungen der Cisco-Vertriebspartner. Ziel ist es, subjektive Einzelmeinungen in objektivierbare Kennzahlen zu überführen und historisch vergleichbar zu machen.
+Das System dient der Erhebung, Speicherung und Analyse von qualitativen Bewertungen der Cisco-Vertriebspartner im Public Sector. Ziel ist es, subjektive Einzelmeinungen in objektivierbare Kennzahlen zu überführen, historisch vergleichbar zu machen und Handlungsempfehlungen abzuleiten.
 
 ### 1.2. Methodischer Ansatz: Importance-Performance Analysis (IPA)
 Das System basiert auf dem Modell der **Importance-Performance Analysis**. Die Leistung (*Performance*) eines Partners wird nicht isoliert betrachtet, sondern in Relation zur Wichtigkeit (*Importance*) des jeweiligen Kriteriums für den Bewerter gesetzt.
 
 **Datenerhebung:**
 * **Importance:** Der Teilnehmer gewichtet ca. 20 Kriterien nach ihrer Relevanz (Skala 1-10).
-* **Performance:** Der Teilnehmer bewertet ausgewählte Partner anhand derselben Kriterien (Skala 1-10).
+* **Performance:** Der Teilnehmer bewertet ausgewählte Partner anhand derselben Kriterien (Skala 1-10, optional).
+* **Metadaten:** Zusätzlich werden **NPS** (Net Promoter Score), **Interaktionsfrequenz** und **Qualitative Kommentare** erhoben.
 
 **Berechnungsziel:**
 Der finale "Score" eines Partners ist ein gewichteter Index:
 $$Score = \sum (Performance_i \times Importance_i)$$
 
-### 1.3. Architektur-Evolution
-Das System ersetzt eine manuelle, Excel-basierte Lösung.
-
-**Vorteile der Neulösung:**
-* Zentrale Datenhaltung (Single Source of Truth)
-* Skalierbarkeit
-* Flexible Hierarchien durch RDBMS
-* Einfache Benutzeroberfläche via Web-Wizard
+Zusätzlich werden Diskrepanzen in der Wahrnehmung zwischen Führungskräften (Manager) und operativen Mitarbeitern (Team) analysiert ("Conflict-Check").
 
 ---
 
@@ -36,61 +30,66 @@ Das System folgt einer schlanken **Client-Server-Architektur (LAPP-Stack)** auf 
 
 ### 2.1. Software Stack
 * **Webserver:** Apache2 (Port 443/HTTPS)
-* **Datenbank:** PostgreSQL (Gewählt wegen strikter Typisierung und besserer Performance bei analytischen Abfragen)
+* **Datenbank:** PostgreSQL (Strikte Typisierung, JSON-Support, komplexe Aggregationen)
 * **Backend:** PHP 8.x (API-Layer)
-* **Frontend:** Vanilla JavaScript (ES6+), CSS3
+* **Frontend:** Vanilla JavaScript (ES6+), CSS3 (Cisco CI/CD Konformität)
 
 ---
 
 ## 3. Modulbeschreibung
 
-### 3.1. Frontend (Client-Side)
-**Pfad:** `/var/www/html/`
+### 3.1. Erhebung (Wizard)
+**Pfad:** `/var/www/html/index.html` + `js/app.js`
 
-* **`index.html`**: Beinhaltet das HTML-Gerüst des Wizards, Checkbox für Führungsverantwortung und dynamischen Header.
-* **`css/style.css`**: Steuert das Design (Cisco CI/CD Konformität).
-* **`js/app.js`**:
-    * *Core Logic:* Steuert den Ablauf des Wizards (Steps 1-5).
-    * *Data Handling:* Lädt Konfiguration via fetch vom PHP-Backend (JSON).
-    * *Unique ID Handling:* Trennt DOM-IDs (`imp_10`, `perf_10`) von Datenbank-IDs (`10`), um Konflikte zu vermeiden.
-    * *Validation:* Prüft Pflichtfelder.
+Ein 5-Schritte-Wizard zur Datenerfassung:
+1.  **Persönliche Angaben:** Name, Email, Abteilung (Hierarchie), Manager-Status.
+2.  **Wichtigkeits-Bewertung:** Festlegung der persönlichen Prioritäten (Pflicht).
+3.  **Partner-Auswahl:** Selektion der zu bewertenden Firmen.
+4.  **Partner-Bewertung (Detail):**
+    * **Header:** Frequenz (1-4), NPS (-2 bis 10), Genereller Kommentar.
+    * **Kriterien:** Slider je Kriterium. Bei Extremwerten (≤3 oder ≥8) erscheint ein Icon (`📝`) für spezifische Kommentare.
+    * **Validierung:** Pflichtfelder für Frequenz und NPS.
+5.  **Abschluss:** Speicherung & Dankeseite.
 
-### 3.2. Backend (Server-Side API)
-**Pfad:** `/var/www/html/php/`
+*Feature:* **Test-Modus** (aktivierbar in DB), der Formulare automatisch mit Zufallsdaten befüllt.
 
-* **`db_connect.php`**: Zentrale PDO-Verbindung zur PostgreSQL-Datenbank.
-* **`get_data.php`**: Liest Stammdaten (Kriterien, Partner, Hierarchie) und liefert JSON für das Frontend.
-* **`save_data.php`**: Empfängt Survey-Ergebnisse als JSON, nutzt Transaktionen (BEGIN/COMMIT) und speichert Teilnehmerdaten sowie Bewertungen.
+### 3.2. Analyse (Dashboard)
+**Pfad:** `/var/www/html/score_analyse.html` + `js/score_analyse.js`
 
----
+Interaktives Dashboard für Auswertungen:
+* **Filter:** Survey, Abteilung (rekursiv), Manager-Status, Mindest-Stichprobe (Köpfe).
+* **Visualisierung:**
+    * Ranking-Tabelle mit Heatmap-Balken.
+    * **Insights-Spalte** mit Status-Icons:
+        * `📣` **NPS:** Net Promoter Score Indikator.
+        * `💬` **Kommentare:** Anzahl und Drill-Down (Allgemein vs. Spezifisch).
+        * `⚠️` **Action:** Kritische Handlungsfelder (Imp ≥ 8 & Perf ≤ 5).
+        * `⚡` **Divergenz:** Signifikante Abweichung (> 2.0) zwischen Manager- und Team-Bewertung.
+* **Interaktion:** Klick auf Partner öffnet **IPA-Matrix** (Scatterplot). Klick auf Icons öffnet **Detail-Modal**.
+* **Export:** CSV-Export der gefilterten Daten (Long-Format für Excel Pivot).
+
 
 ## 4. Datenmodell (PostgreSQL)
 
 Das Schema ist normalisiert (3NF) und auf Historisierung ausgelegt.
 
-* **`surveys`**: Steuert Kampagnen (z.B. "Winter 2025"). Erlaubt Vergleichbarkeit über Zeiträume.
-* **`partners`**: Stammdaten der zu bewertenden Firmen.
-* **`criteria`**: Fragenkatalog. `sort_order` bestimmt die Reihenfolge im UI.
-* **`departments`**: Hierarchie-Baum (Adjacency List Model mit `parent_id`).
-* **`participants`**: Speichert den Bewerter (Name, Email, Abteilung, Manager-Status).
-* **`ratings`**: Die Messwerte (Long-Format). Unterscheidung durch `rating_type` ('importance' vs 'performance').
+* **`surveys`**: Kampagnen-Steuerung (inkl. `test_mode` Flag).
+* **`partners`**: Stammdaten der Firmen.
+* **`criteria`**: Fragenkatalog.
+* **`departments`**: Hierarchie-Baum (Adjacency List).
+* **`participants`**: Bewerter (Name, Email, Manager-Status).
+* **`ratings`**: Die Einzelnoten (1-10 oder NULL).
+    * Erweiterung: Spalte `comment` für kriterienbezogenes Feedback.
+* **`partner_feedback`**: Neue Tabelle für Kopfdaten pro Partner-Interaktion.
+    * Spalten: `nps_score`, `interaction_frequency`, `general_comment`.
 
 ---
 
 ## 5. Installation & Setup
 
-Um die Datenbankstruktur und die Stammdaten (Partner, Kriterien) zu initialisieren, liegen SQL-Skripte im Ordner `sql/` bereit.
+Die Datenbank wird über SQL-Skripte initialisiert.
 
 ### Schritt 1: Struktur anlegen
-Führt einen Reset der Datenbankstruktur durch und erstellt alle Tabellen.
-
+Erstellt Tabellen, Constraints und Indizes. Achtung: Löscht vorhandene Daten!
 ```bash
 psql -U dein_user -d deine_db -f sql/1_create_schema.sql
-```
-### Schritt 2: Stammdaten importieren
-Befüllt die Tabellen mit Partnern, Kriterien und der Organisationshierarchie.
-
-```bash
-psql -U dein_user -d deine_db -f sql/2_initial_data.sql
-```
-
