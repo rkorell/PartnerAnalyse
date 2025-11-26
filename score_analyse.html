@@ -9,7 +9,10 @@
         .filter-row { display: flex; gap: 24px; margin-bottom: 18px; }
         .filter-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
         .collapsing-tree-container { display: block; margin: 0 auto 24px auto; width: 100%; max-width: 600px; }
+        
+        /* HIER GEÄNDERT: Flex-Alignment für zweizeiliges Label */
         .slider-row { width: 100%; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; }
+        
         .analyse-btn-row { width: 100%; text-align: center; margin: 24px 0 0 0; }
         .matrix-controls { display: flex; gap: 15px; margin-bottom: 15px; background: #f1f2f6; padding: 8px 15px; border-radius: 20px; font-size: 14px; }
         .matrix-controls label { cursor: pointer; display: flex; align-items: center; gap: 5px; user-select: none; }
@@ -28,7 +31,10 @@
             <div class="info-trigger" onclick="window.openInfoModal('analytic-mask')" title="Lesehilfe & Methodik">i</div>
 
             <div class="slider-row">
-                <label for="min-answers-slider" style="margin-right:18px;">Mindestanzahl Antworten: <span id="min-answers-value">5</span></label>
+                <label for="min-answers-slider" style="margin-right:18px; text-align: right; line-height: 1.2;">
+                    Mindestanzahl Antworten pro Partner: <span id="min-answers-value" style="font-weight:bold;">5</span><br>
+                    <span style="font-size: 0.85em; font-weight: normal; color: #666;">(Minimaler Stichprobenumfang)</span>
+                </label>
                 <input type="range" id="min-answers-slider" name="min-answers-slider" min="2" max="20" value="5" style="width:220px;">
             </div>
             <div class="filter-row">
@@ -52,6 +58,7 @@
             <div class="analyse-btn-row">
                 <form id="analyse-filter-form" autocomplete="off" style="display:inline;">
                     <button type="submit" id="analyse-btn" class="btn btn-primary">Analysieren</button>
+                    <button type="button" id="export-btn" class="btn btn-secondary" disabled style="margin-left: 10px;">Export nach Excel</button>
                 </form>
             </div>
             <div id="loading-overlay" class="loading-overlay" style="display: none;">

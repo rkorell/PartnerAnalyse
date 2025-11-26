@@ -1,11 +1,9 @@
 // Modified: November 21, 2025, 20:50 - Vollständiges JavaScript für Cisco Partner Quality Index Wizard erstellt
 // # Modified: 22.11.2025, 14:45 - Umstellung auf DB-Backend, Fix Standardwerte, Header-Korrektur, Unique DOM IDs, Name/Email/Manager
 // # Modified: 23.11.2025, 11:35 - Anpassung auf englische JSON-Keys (category, name, description)
-
-// Modified: November 21, 2025, 20:50 - Vollständiges JavaScript für Cisco Partner Quality Index Wizard erstellt
-// # Modified: 22.11.2025, 14:45 - Umstellung auf DB-Backend, Fix Standardwerte, Header-Korrektur, Unique DOM IDs, Name/Email/Manager
-// # Modified: 23.11.2025, 11:35 - Anpassung auf englische JSON-Keys (category, name, description)
-// # Modified: 23.11.2025, 21:30 - Integration Info-Modal und Laden der App-Texte aus DB
+// # Modified: 24.11.2025, 23:10 - Implemented Test-Mode, N/A Slider State (0), Importance Validation
+// # Modified: 26.11.2025, 21:15 - Added Partner Header (Freq, NPS, GenComment) and Per-Criteria Comments
+// # Modified: 27.11.2025, 10:15 - Changed GenComment to Textarea, Updated Placeholders
 
 class QualityIndexWizard {
     constructor() {
@@ -16,6 +14,8 @@ class QualityIndexWizard {
         
         // Daten-Container
         this.surveyId = null;
+        this.isTestMode = false;
+
         this.hierarchyData = [];
         this.criteriaData = [];
         this.partnerData = [];
@@ -25,6 +25,8 @@ class QualityIndexWizard {
         
         this.importanceData = {};
         this.performanceData = {};
+        // NEU: Container für Partner-Kopfdaten (Frequenz, NPS, General Comment)
+        this.partnerFeedback = {}; 
         this.personalData = {};
         
         this.init();
@@ -35,6 +37,13 @@ class QualityIndexWizard {
             this.insertLogo();
             await this.loadConfigData();
             this.setupUI();
+            
+            // Wenn Testmodus aktiv, Daten generieren
+            if (this.isTestMode) {
+                console.warn("ACHTUNG: Test-Mode aktiv!");
+                this.prefillTestData();
+            }
+
             this.bindEvents();
             this.updateProgress();
         } catch (error) {
@@ -59,7 +68,6 @@ class QualityIndexWizard {
 
     async loadConfigData() {
         try {
-            // Wir nutzen fetch auf get_data.php um JSON zu erhalten
             const response = await fetch('php/get_data.php');
             if (!response.ok) throw new Error('Netzwerk-Antwort war nicht ok');
             
@@ -69,9 +77,11 @@ class QualityIndexWizard {
 
             if (Array.isArray(data.surveys) && data.surveys.length > 0) {
                 this.surveyId = data.surveys[0].id;
+                this.isTestMode = !!data.surveys[0].test_mode; 
+
                 const subtitle = document.getElementById('survey-subtitle');
                 if(subtitle && data.surveys[0].name) {
-                    subtitle.textContent = data.surveys[0].name;
+                    subtitle.textContent = data.surveys[0].name + (this.isTestMode ? " [TEST-MODE]" : "");
                 }
             } else {
                 this.surveyId = null;
@@ -83,7 +93,6 @@ class QualityIndexWizard {
             this.criteriaData = data.criteria; 
             this.partnerData = data.partners; 
             
-            // NEU: Texte speichern
             if (data.app_texts) {
                 this.appTexts = data.app_texts;
             }
@@ -102,26 +111,21 @@ class QualityIndexWizard {
 
     setupHierarchyDropdowns() {
         const departmentSelect = document.getElementById('department');
-        const areaSelect = document.getElementById('area');
-        const teamSelect = document.getElementById('team');
-
-        // Level 1: Items ohne parent_id
         const departments = this.hierarchyData.filter(d => d.parent_id === null);
         
         departments.forEach(dept => {
             const option = document.createElement('option');
-            option.value = dept.id; // DB ID
+            option.value = dept.id; 
             option.textContent = dept.name;
             departmentSelect.appendChild(option);
         });
 
-        // Event Listeners für Kaskadierung
         departmentSelect.addEventListener('change', () => {
             this.updateAreas();
             this.updateTeams();
         });
 
-        areaSelect.addEventListener('change', () => {
+        document.getElementById('area').addEventListener('change', () => {
             this.updateTeams();
         });
     }
@@ -131,7 +135,6 @@ class QualityIndexWizard {
         const areaSelect = document.getElementById('area');
         const teamSelect = document.getElementById('team');
         
-        // Reset
         areaSelect.innerHTML = '<option value="">Bitte wählen...</option>';
         teamSelect.innerHTML = '<option value="">Bitte wählen...</option>';
         
@@ -168,6 +171,33 @@ class QualityIndexWizard {
         });
     }
 
+    prefillTestData() {
+        document.getElementById('name').value = "Test User " + Math.floor(Math.random() * 1000);
+        document.getElementById('email').value = "test@example.com";
+        document.getElementById('is_manager').checked = Math.random() < 0.3; 
+
+        const leafs = this.hierarchyData.filter(d => d.level_depth === 3);
+        if (leafs.length > 0) {
+            const randomLeaf = leafs[Math.floor(Math.random() * leafs.length)];
+            const level2 = this.hierarchyData.find(d => d.id === randomLeaf.parent_id);
+            if (level2) {
+                const level1 = this.hierarchyData.find(d => d.id === level2.parent_id);
+                if (level1) {
+                    const deptSelect = document.getElementById('department');
+                    deptSelect.value = level1.id;
+                    this.updateAreas(); 
+
+                    const areaSelect = document.getElementById('area');
+                    areaSelect.value = level2.id;
+                    this.updateTeams();
+
+                    const teamSelect = document.getElementById('team');
+                    teamSelect.value = randomLeaf.id;
+                }
+            }
+        }
+    }
+
     setupImportanceCriteria() {
         setTimeout(() => {
             const container = document.getElementById('importance-criteria-container');
@@ -185,13 +215,16 @@ class QualityIndexWizard {
                 const tableDiv = document.createElement('div');
                 tableDiv.className = 'criteria-table';
 
-                criteria.forEach((criterion, index) => {
+                criteria.forEach((criterion) => {
                     const rawId = criterion.id;
-                    // WICHTIG: Unique DOM ID für Step 2
                     const domId = 'imp_' + rawId;
                     
-                    // FIX: Initialwert 5 setzen
-                    this.importanceData[rawId] = 5;
+                    let initialValue = 0;
+                    if (this.isTestMode) {
+                        initialValue = Math.floor(Math.random() * 10) + 1;
+                    }
+                    
+                    this.importanceData[rawId] = initialValue;
 
                     const rowDiv = document.createElement('div');
                     rowDiv.className = 'criteria-row';
@@ -213,8 +246,7 @@ class QualityIndexWizard {
 
                     const sliderDiv = document.createElement('div');
                     sliderDiv.className = 'criteria-content';
-                    // Wir übergeben DOM-ID und Echte-ID
-                    sliderDiv.innerHTML = this.createSliderHTML(domId, rawId, 'importance');
+                    sliderDiv.innerHTML = this.createSliderHTML(domId, rawId, 'importance', initialValue);
                     rowDiv.appendChild(sliderDiv);
 
                     tableDiv.appendChild(rowDiv);
@@ -224,7 +256,6 @@ class QualityIndexWizard {
                 container.appendChild(groupDiv);
             });
 
-            // Slider Event Listeners hinzufügen
             this.bindSliderEvents('importance');
         }, 10);
     }
@@ -241,32 +272,85 @@ class QualityIndexWizard {
         return grouped;
     }
 
-    createSliderHTML(domId, rawId, type) {
-        const tooltipText = type === 'importance' 
-            ? 'ist mir eher unwichtig|ist mir extrem wichtig'
-            : 'erfüllt der Partner sehr schlecht|erfüllt der Partner sehr gut';
-        
-        const [minText, maxText] = tooltipText.split('|');
+    // Helper für Header Slider (Frequenz & NPS)
+    createHeaderSliderHTML(domId, type, initialValue, min, max, labels) {
+        // Bestimme visuelle Klasse: Grau wenn Startwert
+        // Freq: Start=0 (Grau), 1-4 (Blau)
+        // NPS: Start=-2 (Grau), -1 bis 10 (Blau)
+        let extraClass = 'slider-neutral';
+        let displayValue = 'Bitte wählen...';
+
+        if (type === 'frequency' && initialValue > 0) {
+            extraClass = '';
+            displayValue = labels[initialValue] || initialValue;
+        } else if (type === 'nps' && initialValue > -2) {
+            extraClass = '';
+            if (labels[initialValue]) {
+                displayValue = labels[initialValue].replace('{Val}', initialValue);
+            } else {
+                // Fallback Logik für NPS Lücken
+                if (initialValue === 0) displayValue = "0 - Auf keinen Fall";
+                else if (initialValue >= 1 && initialValue <= 3) displayValue = initialValue + " - Eher nicht";
+                else if (initialValue >= 4 && initialValue <= 6) displayValue = initialValue + " - Eher schon";
+                else if (initialValue >= 7 && initialValue <= 10) displayValue = initialValue + " - Auf jeden Fall";
+                else if (initialValue === -1) displayValue = "Möchte ich nicht bewerten";
+            }
+        }
 
         return `
             <div class="slider-container">
-                <span class="slider-label">0</span>
+                <div class="slider-wrapper">
+                    <input type="range" 
+                           id="${domId}" 
+                           class="fancy-slider ${extraClass}" 
+                           min="${min}" 
+                           max="${max}" 
+                           value="${initialValue}" 
+                           data-type="${type}">
+                    <div class="slider-tooltip" id="tooltip_${domId}">
+                        ${displayValue}
+                    </div>
+                </div>
+                <span class="slider-value" id="value_${domId}" style="min-width:200px; text-align:left; margin-left:15px;">${displayValue}</span>
+            </div>
+        `;
+    }
+
+    createSliderHTML(domId, rawId, type, initialValue = 0) {
+        const extraClass = initialValue === 0 ? 'slider-neutral' : '';
+        const displayValue = initialValue === 0 ? 'N/A' : initialValue;
+        
+        // Für Performance: Icon Container hinzufügen
+        let iconHTML = '';
+        if (type === 'performance') {
+            // Icon erscheint bei <= 3 oder >= 8
+            const isExtreme = (initialValue > 0 && initialValue <= 3) || initialValue >= 8;
+            const visibility = isExtreme ? 'visible' : 'hidden';
+            iconHTML = `<span class="comment-icon" id="icon_${domId}" style="visibility:${visibility}; cursor:pointer; font-size:1.2em; margin-left:10px;" title="Kommentar hinzufügen">📝</span>`;
+        }
+
+        // HIER GEÄNDERT: Placeholder für spezifische Kommentare
+        return `
+            <div class="slider-container">
+                <span class="slider-label">1</span>
                 <div class="slider-wrapper">
                     <input type="range" 
                            id="${domId}" 
                            data-crit-id="${rawId}"
-                           class="fancy-slider" 
+                           class="fancy-slider ${extraClass}" 
                            min="0" 
                            max="10" 
-                           value="5" 
+                           value="${initialValue}" 
                            data-type="${type}">
                     <div class="slider-tooltip" id="tooltip_${domId}">
-                        5 - Neutral
+                        ${displayValue}
                     </div>
                 </div>
                 <span class="slider-label">10</span>
-                <span class="slider-value" id="value_${domId}">5</span>
+                <span class="slider-value" id="value_${domId}">${displayValue}</span>
+                ${iconHTML}
             </div>
+            ${type === 'performance' ? `<div id="comment_container_${domId}" style="display:none; margin-top:10px; padding-left:20px;"><textarea id="comment_${domId}" placeholder="[FREIWILLIG: Warum diese Bewertung?]" style="width:100%; height:60px; padding:5px; border-radius:4px; border:1px solid #ccc;"></textarea></div>` : ''}
         `;
     }
 
@@ -281,45 +365,168 @@ class QualityIndexWizard {
             slider.addEventListener('mouseover', (e) => {
                 this.showSliderTooltip(e.target);
             });
+            
+            // NEU: Tooltip verstecken beim Verlassen
+            slider.addEventListener('mouseout', (e) => {
+                const tooltip = document.getElementById(`tooltip_${e.target.id}`);
+                if (tooltip) tooltip.style.opacity = '0';
+            });
+        });
+    }
+
+    // Event-Handling für Kommentare
+    bindCommentEvents(partnerId) {
+        // Suche alle Icons und Textareas auf der aktuellen Seite
+        const icons = document.querySelectorAll('.comment-icon');
+        icons.forEach(icon => {
+            icon.addEventListener('click', (e) => {
+                const domId = e.target.id.replace('icon_', ''); // z.B. perf_10
+                const container = document.getElementById(`comment_container_${domId}`);
+                if (container) {
+                    container.style.display = 'block';
+                    const textarea = container.querySelector('textarea');
+                    if(textarea) textarea.focus();
+                }
+            });
+        });
+
+        const textareas = document.querySelectorAll('textarea[id^="comment_perf_"]');
+        textareas.forEach(area => {
+            area.addEventListener('input', (e) => {
+                const domId = e.target.id.replace('comment_', ''); // perf_10
+                const rawId = domId.replace('perf_', '');
+                const val = e.target.value;
+                
+                // Speichern im Datenobjekt
+                if (!this.performanceData[partnerId]) this.performanceData[partnerId] = {};
+                if (!this.performanceData[partnerId][rawId]) {
+                    // Fallback, falls Score noch nicht gesetzt (sollte nicht passieren)
+                    this.performanceData[partnerId][rawId] = { score: 0, comment: val };
+                } else {
+                    // Existierendes Objekt oder Wert updaten
+                    let entry = this.performanceData[partnerId][rawId];
+                    if (typeof entry !== 'object') {
+                        entry = { score: entry, comment: val };
+                    } else {
+                        entry.comment = val;
+                    }
+                    this.performanceData[partnerId][rawId] = entry;
+                }
+            });
         });
     }
 
     updateSliderValue(slider) {
-        const rawId = slider.dataset.critId;
-        const value = parseInt(slider.value);
-        
-        const valueDisplay = document.getElementById(`value_${slider.id}`);
-        const tooltip = document.getElementById(`tooltip_${slider.id}`);
-
-        if (valueDisplay) {
-            valueDisplay.textContent = value;
-        }
-        
         const type = slider.dataset.type;
+        const value = parseInt(slider.value);
+        const rawId = slider.dataset.critId; // Nur bei Criteria vorhanden
+        const domId = slider.id;
+
+        const valueDisplay = document.getElementById(`value_${domId}`);
+        const tooltip = document.getElementById(`tooltip_${domId}`);
+        
+        // Logik für Frequenz & NPS
+        if (type === 'frequency') {
+            const labels = {1: "Selten / Einmalig", 2: "Monatlich / Gelegentlich", 3: "Wöchentlich / Regelmäßig", 4: "Täglich / Intensiv"};
+            let text = labels[value] || "Bitte wählen...";
+            
+            if (value === 0) {
+                slider.classList.add('slider-neutral');
+            } else {
+                slider.classList.remove('slider-neutral');
+            }
+            if(valueDisplay) valueDisplay.textContent = text;
+            if(tooltip) tooltip.textContent = text;
+            
+            // Speichern
+            const pid = this.getCurrentPartnerId();
+            if(!this.partnerFeedback[pid]) this.partnerFeedback[pid] = {};
+            this.partnerFeedback[pid].frequency = value;
+            return;
+        }
+
+        if (type === 'nps') {
+            let text = "Bitte wählen...";
+            if (value === -2) {
+                slider.classList.add('slider-neutral');
+            } else {
+                slider.classList.remove('slider-neutral');
+                if (value === -1) text = "Möchte ich nicht bewerten";
+                else if (value === 0) text = "0 - Auf keinen Fall";
+                else if (value >= 1 && value <= 3) text = value + " - Eher nicht";
+                else if (value >= 4 && value <= 6) text = value + " - Eher schon";
+                else if (value >= 7 && value <= 10) text = value + " - Auf jeden Fall";
+            }
+            if(valueDisplay) valueDisplay.textContent = text;
+            if(tooltip) tooltip.textContent = text;
+
+            const pid = this.getCurrentPartnerId();
+            if(!this.partnerFeedback[pid]) this.partnerFeedback[pid] = {};
+            this.partnerFeedback[pid].nps = value;
+            return;
+        }
+
+        // Logik für Criteria (Importance / Performance)
         let tooltipText = `${value} - Neutral`;
         
-        if (type === 'importance') {
-            if (value <= 2) tooltipText = `${value} - ist mir eher unwichtig`;
-            else if (value >= 8) tooltipText = `${value} - ist mir extrem wichtig`;
+        if (value === 0) {
+            slider.classList.add('slider-neutral');
+            if (valueDisplay) valueDisplay.textContent = 'N/A';
+            if (tooltip) tooltip.textContent = 'Keine Angabe';
         } else {
-            if (value <= 2) tooltipText = `${value} - erfüllt der Partner sehr schlecht`;
-            else if (value >= 8) tooltipText = `${value} - erfüllt der Partner sehr gut`;
+            slider.classList.remove('slider-neutral');
+            if (valueDisplay) valueDisplay.textContent = value;
+            
+            if (type === 'importance') {
+                if (value <= 2) tooltipText = `${value} - ist mir eher unwichtig`;
+                else if (value >= 8) tooltipText = `${value} - ist mir extrem wichtig`;
+                else tooltipText = `${value} - wichtig`;
+            } else {
+                if (value <= 2) tooltipText = `${value} - erfüllt der Partner sehr schlecht`;
+                else if (value >= 8) tooltipText = `${value} - erfüllt der Partner sehr gut`;
+                else tooltipText = `${value} - neutral`;
+            }
+            if (tooltip) tooltip.textContent = tooltipText;
         }
         
-        if (tooltip) {
-            tooltip.textContent = tooltipText;
-        }
-        
-        // Daten speichern unter der ECHTEN ID (rawId)
+        // Daten speichern
         if (type === 'importance') {
             this.importanceData[rawId] = value;
         } else {
             const partnerId = this.getCurrentPartnerId(); 
             if (partnerId) {
-                if (!this.performanceData[partnerId]) {
-                    this.performanceData[partnerId] = {};
+                // Struktur für Performance: Objekt {score, comment} oder Zahl (alt)
+                // Wir stellen sicher, dass es ein Objekt ist, wenn wir es schreiben
+                if (!this.performanceData[partnerId]) this.performanceData[partnerId] = {};
+                
+                let current = this.performanceData[partnerId][rawId];
+                let comment = '';
+                if (current && typeof current === 'object') comment = current.comment;
+                
+                this.performanceData[partnerId][rawId] = { score: value, comment: comment };
+
+                // Icon Logik
+                const icon = document.getElementById(`icon_${domId}`);
+                const container = document.getElementById(`comment_container_${domId}`);
+                const textarea = document.getElementById(`comment_${domId}`);
+                
+                if (icon) {
+                    // Extremwert Check (<=3 oder >=8) UND Wert > 0 (N/A zählt nicht als extrem in dem Sinne)
+                    const isExtreme = (value > 0 && value <= 3) || value >= 8;
+                    
+                    // Persistenz-Check: Ist Text drin?
+                    const hasText = textarea && textarea.value.trim() !== '';
+                    
+                    if (isExtreme || hasText) {
+                        icon.style.visibility = 'visible';
+                        // Wenn Text drin ist, muss Container offen bleiben, sonst nur Icon zeigen
+                        if (hasText && container) container.style.display = 'block';
+                    } else {
+                        // Kein Extremwert und kein Text -> Verstecken
+                        icon.style.visibility = 'hidden';
+                        if (container) container.style.display = 'none';
+                    }
                 }
-                this.performanceData[partnerId][rawId] = value;
             }
         }
     }
@@ -336,15 +543,14 @@ class QualityIndexWizard {
         container.innerHTML = ''; 
         
         this.partnerData.forEach((partner, index) => {
-            const partnerName = partner.name;
-            const partnerId = partner.id;
+            const isSelected = this.isTestMode && Math.random() < 0.3; 
 
             const checkboxDiv = document.createElement('div');
-            checkboxDiv.className = 'partner-checkbox';
+            checkboxDiv.className = 'partner-checkbox' + (isSelected ? ' selected' : '');
             
             checkboxDiv.innerHTML = `
-                <input type="checkbox" id="partner_${index}" value="${partnerId}" data-name="${partnerName}">
-                <label for="partner_${index}">${partnerName}</label>
+                <input type="checkbox" id="partner_${index}" value="${partner.id}" data-name="${partner.name}" ${isSelected ? 'checked' : ''}>
+                <label for="partner_${index}">${partner.name}</label>
             `;
             
             const checkbox = checkboxDiv.querySelector('input');
@@ -359,6 +565,17 @@ class QualityIndexWizard {
             
             container.appendChild(checkboxDiv);
         });
+
+        if (this.isTestMode) {
+             this.updatePartnerSelection();
+             if (this.selectedPartners.length === 0 && this.partnerData.length > 0) {
+                 const firstBox = container.querySelector('input');
+                 if(firstBox) {
+                    firstBox.checked = true;
+                    firstBox.dispatchEvent(new Event('change'));
+                 }
+             }
+        }
     }
 
     updatePartnerSelection() {
@@ -372,7 +589,6 @@ class QualityIndexWizard {
         
         document.getElementById('selected-partners-count').textContent = this.selectedPartners.length;
         
-        // Navigation Button aktivieren/deaktivieren
         const nextBtn = document.getElementById('next-btn');
         if (this.currentStep === 3) {
             nextBtn.disabled = this.selectedPartners.length === 0;
@@ -393,13 +609,57 @@ class QualityIndexWizard {
     createPartnerEvaluationPage() {
         const container = document.getElementById('performance-container');
         const partner = this.selectedPartners[this.currentPartnerIndex];
-        
-        container.innerHTML = `
+        const partnerId = partner.id;
+
+        // Initiale Datenstrukturen sicherstellen
+        if (!this.partnerFeedback[partnerId]) {
+            // Test Mode Werte oder Default
+            this.partnerFeedback[partnerId] = {
+                frequency: this.isTestMode ? (Math.floor(Math.random() * 4) + 1) : 0,
+                nps: this.isTestMode ? (Math.floor(Math.random() * 11)) : -2,
+                general_comment: ""
+            };
+        }
+        const pf = this.partnerFeedback[partnerId];
+
+        // HTML Aufbau: Header (Freq, Comment, NPS) dann Kriterien
+        // HIER GEÄNDERT: Textarea für General Comment + Placeholder
+        const headerHTML = `
             <h3>Bewertung: ${partner.name}</h3>
-             
+            <div class="partner-header" style="background:#fff; padding:20px; border-radius:8px; border:1px solid #ecf0f1; margin-bottom:30px;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Wie häufig arbeitest Du mit ${partner.name} zusammen? *</label>
+                        ${this.createHeaderSliderHTML(`freq_${partnerId}`, 'frequency', pf.frequency, 0, 4, {1:"Selten", 2:"Monatlich", 3:"Wöchentlich", 4:"Täglich"})}
+                    </div>
+                    <div class="form-group">
+                        <label>Generelles Feedback (optional):</label>
+                        <textarea id="gen_comment_${partnerId}" placeholder="[FREIWILLIG: Dein generelles Feedback]" style="width:100%; height:80px; padding:10px; border:2px solid #ddd; border-radius:8px; resize:vertical;">${pf.general_comment || ''}</textarea>
+                    </div>
+                </div>
+                <div class="form-row" style="margin-top:20px;">
+                    <div class="form-group" style="width:100%;">
+                        <label>Würdest Du ${partner.name} weiterempfehlen? (NPS) *</label>
+                        ${this.createHeaderSliderHTML(`nps_${partnerId}`, 'nps', pf.nps, -2, 10, {})}
+                    </div>
+                </div>
+            </div>
+            <hr style="margin-bottom:30px; border:0; border-top:1px solid #eee;">
             <div id="performance-criteria-container"></div>
         `;
         
+        container.innerHTML = headerHTML;
+        
+        // Event Listener für Generelles Feedback
+        document.getElementById(`gen_comment_${partnerId}`).addEventListener('input', (e) => {
+            this.partnerFeedback[partnerId].general_comment = e.target.value;
+        });
+
+        // Event Listener für Header Slider
+        this.bindSliderEvents('frequency');
+        this.bindSliderEvents('nps');
+
+        // Kriterien aufbauen
         const criteriaContainer = document.getElementById('performance-criteria-container');
         const groupedCriteria = this.groupCriteria();
 
@@ -415,17 +675,34 @@ class QualityIndexWizard {
             const tableDiv = document.createElement('div');
             tableDiv.className = 'criteria-table';
 
-            criteria.forEach((criterion, index) => {
+            criteria.forEach((criterion) => {
                 const rawId = criterion.id;
-                // WICHTIG: Unique DOM ID für Step 4
                 const domId = 'perf_' + rawId;
                 
-                // FIX: Standardwerte sicherstellen
-                if (!this.performanceData[partner.id]) {
-                    this.performanceData[partner.id] = {};
+                // Initiale Datenlogik
+                if (!this.performanceData[partnerId]) {
+                    this.performanceData[partnerId] = {};
                 }
-                if (this.performanceData[partner.id][rawId] === undefined) {
-                    this.performanceData[partner.id][rawId] = 5;
+                
+                // Wert holen (kann Zahl oder Objekt sein)
+                let storedData = this.performanceData[partnerId][rawId];
+                let currentVal = 0;
+                let currentComment = '';
+
+                if (storedData !== undefined) {
+                    if (typeof storedData === 'object') {
+                        currentVal = storedData.score;
+                        currentComment = storedData.comment || '';
+                    } else {
+                        currentVal = storedData;
+                    }
+                } else if (this.isTestMode) {
+                    currentVal = Math.floor(Math.random() * 10) + 1; 
+                    // Testmodus speichert initial als Objekt
+                    this.performanceData[partnerId][rawId] = { score: currentVal, comment: '' };
+                } else {
+                    // Default 0 (N/A)
+                    this.performanceData[partnerId][rawId] = { score: 0, comment: '' };
                 }
 
                 const rowDiv = document.createElement('div');
@@ -448,35 +725,43 @@ class QualityIndexWizard {
 
                 const sliderDiv = document.createElement('div');
                 sliderDiv.className = 'criteria-content';
-                // Hier auch Unique ID nutzen
-                sliderDiv.innerHTML = this.createSliderHTML(domId, rawId, 'performance');
+                sliderDiv.innerHTML = this.createSliderHTML(domId, rawId, 'performance', currentVal);
                 rowDiv.appendChild(sliderDiv);
 
                 tableDiv.appendChild(rowDiv);
+                
+                // Textarea Wert setzen, falls vorhanden
+                setTimeout(() => {
+                    const textarea = document.getElementById(`comment_${domId}`);
+                    const container = document.getElementById(`comment_container_${domId}`);
+                    const icon = document.getElementById(`icon_${domId}`);
+                    
+                    if(textarea) textarea.value = currentComment;
+                    
+                    // Sichtbarkeit wiederherstellen (Persistenz)
+                    const isExtreme = (currentVal > 0 && currentVal <= 3) || currentVal >= 8;
+                    const hasText = currentComment.trim() !== '';
+                    
+                    if(icon) {
+                        if(isExtreme || hasText) icon.style.visibility = 'visible';
+                        else icon.style.visibility = 'hidden';
+                    }
+                    if(container && hasText) {
+                        container.style.display = 'block';
+                    }
+                }, 0);
             });
 
             groupDiv.appendChild(tableDiv);
             criteriaContainer.appendChild(groupDiv);
         });
-
-        // Gespeicherte Werte wiederherstellen
-        this.restorePartnerValues(partner.id);
         
-        // Event Listeners für neue Slider
         this.bindSliderEvents('performance');
+        this.bindCommentEvents(partnerId); // Events für Icons/Textareas
     }
 
     restorePartnerValues(partnerId) {
-        if (this.performanceData[partnerId]) {
-            Object.entries(this.performanceData[partnerId]).forEach(([rawId, value]) => {
-                const domId = 'perf_' + rawId;
-                const slider = document.getElementById(domId);
-                if (slider) {
-                    slider.value = value;
-                    this.updateSliderValue(slider);
-                }
-            });
-        }
+        // Nicht mehr nötig
     }
 
     updatePartnerNavigation() {
@@ -506,23 +791,17 @@ class QualityIndexWizard {
     }
 
     bindEvents() {
-        // Navigation Buttons
         document.getElementById('prev-btn').addEventListener('click', () => this.previousStep());
         document.getElementById('next-btn').addEventListener('click', () => this.nextStep());
         document.getElementById('submit-btn').addEventListener('click', () => this.submitSurvey());
         document.getElementById('restart-survey').addEventListener('click', () => this.restartSurvey());
 
-        // Partner Navigation
         document.getElementById('prev-partner').addEventListener('click', () => this.previousPartner());
         document.getElementById('next-partner').addEventListener('click', () => this.nextPartner());
-
-        // Error Modal
         document.getElementById('close-error').addEventListener('click', () => this.hideError());
 
-        // NEU: Info Modal Events
         const modal = document.getElementById('global-info-modal');
-        const closeBtn = document.getElementById('close-info-modal'); // ID im HTML angepasst? Check: class="info-modal-close"
-        // Fallback falls per class selektiert werden muss:
+        const closeBtn = document.getElementById('close-info-modal'); 
         const closeBtnClass = document.querySelector('.info-modal-close');
         
         if(closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
@@ -532,11 +811,9 @@ class QualityIndexWizard {
             if (e.target === modal) modal.style.display = 'none';
         });
 
-        // Global verfügbar machen für den onclick im HTML
         window.openInfoModal = (category) => this.openInfoModal(category);
     }
 
-    // NEU: Info Modal Logik
     openInfoModal(category) {
         const content = this.appTexts[category] || "<p>Information wird geladen oder ist nicht verfügbar.</p>";
         document.getElementById('info-modal-body').innerHTML = content;
@@ -566,19 +843,41 @@ class QualityIndexWizard {
     }
 
     previousPartner() {
-        if (this.currentPartnerIndex > 0) {
-            this.currentPartnerIndex--;
-            this.createPartnerEvaluationPage();
-            this.updatePartnerNavigation();
+        if (this.validatePartnerStep()) {
+            if (this.currentPartnerIndex > 0) {
+                this.currentPartnerIndex--;
+                this.createPartnerEvaluationPage();
+                this.updatePartnerNavigation();
+            }
         }
     }
 
     nextPartner() {
-        if (this.currentPartnerIndex < this.selectedPartners.length - 1) {
-            this.currentPartnerIndex++;
-            this.createPartnerEvaluationPage();
-            this.updatePartnerNavigation();
+        if (this.validatePartnerStep()) {
+            if (this.currentPartnerIndex < this.selectedPartners.length - 1) {
+                this.currentPartnerIndex++;
+                this.createPartnerEvaluationPage();
+                this.updatePartnerNavigation();
+            }
         }
+    }
+
+    // Validierung für Step 4 (Partner)
+    validatePartnerStep() {
+        const pid = this.getCurrentPartnerId();
+        const fb = this.partnerFeedback[pid];
+        
+        // Frequenz muss > 0 sein
+        if (!fb || !fb.frequency || fb.frequency === 0) {
+            this.showError("Bitte gib an, wie häufig Du mit diesem Partner zusammenarbeitest.");
+            return false;
+        }
+        // NPS muss gewählt sein (nicht -2)
+        if (fb.nps === undefined || fb.nps === -2) {
+            this.showError("Bitte gib an, ob Du den Partner weiterempfehlen würdest.");
+            return false;
+        }
+        return true;
     }
 
     validateCurrentStep() {
@@ -593,7 +892,6 @@ class QualityIndexWizard {
                     return false;
                 }
                 
-                // Persönliche Daten speichern (inkl IDs, Name, Email, Manager)
                 this.personalData = {
                     name: document.getElementById('name').value,
                     email: document.getElementById('email').value,
@@ -605,7 +903,11 @@ class QualityIndexWizard {
                 return true;
                 
             case 2:
-                // Importance-Daten sind bereits in this.importanceData gespeichert
+                const invalidImportance = Object.values(this.importanceData).some(val => val === 0);
+                if (invalidImportance) {
+                    this.showError('Bitte gewichte ALLE Kriterien. Wähle einen Wert zwischen 1 und 10.');
+                    return false;
+                }
                 return true;
                 
             case 3:
@@ -615,8 +917,8 @@ class QualityIndexWizard {
                 }
                 return true;
             case 4:
-                // Performance-Daten sind bereits gespeichert
-                return true;
+                // Letzter Check bevor es auf Step 5 geht (Submit Button ist aber separat)
+                return this.validatePartnerStep();
                 
             default:
                 return true;
@@ -624,12 +926,9 @@ class QualityIndexWizard {
     }
 
     showStep(stepNumber) {
-        // Alle Schritte verstecken
         document.querySelectorAll('.wizard-step').forEach(step => {
             step.classList.remove('active');
         });
-        
-        // Aktuellen Schritt anzeigen
         document.getElementById(`wizard-step-${stepNumber}`).classList.add('active');
     }
 
@@ -638,7 +937,6 @@ class QualityIndexWizard {
         const progressPercent = (this.currentStep / this.totalSteps) * 100;
         progressFill.style.width = `${progressPercent}%`;
         
-        // Steps aktualisieren
         for (let i = 1; i <= this.totalSteps; i++) {
             const step = document.getElementById(`step-${i}`);
             step.classList.remove('active', 'completed');
@@ -679,6 +977,9 @@ class QualityIndexWizard {
     }
 
     async submitSurvey() {
+        // Auch beim Submit den aktuellen Partner validieren
+        if (!this.validatePartnerStep()) return;
+
         this.showLoading(true);
         
         try {
@@ -691,6 +992,8 @@ class QualityIndexWizard {
                 
                 importance: this.importanceData,
                 performance: this.performanceData,
+                // NEU: Partner Feedback
+                partner_feedback: this.partnerFeedback,
                 
                 timestamp: new Date().toISOString()
             };
@@ -742,7 +1045,6 @@ class QualityIndexWizard {
     }
 }
 
-// App initialisieren wenn DOM geladen ist
 document.addEventListener('DOMContentLoaded', () => {
     new QualityIndexWizard();
 });

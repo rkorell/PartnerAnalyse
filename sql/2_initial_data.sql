@@ -1,4 +1,8 @@
 /* 2_initial_data.sql - Stammdaten (Partner, Kriterien, Hierarchie) */
+/* # Modified: 26.11.2025, 22:45 - Added TRUNCATE for partner_feedback */
+
+-- Tabellen leeren (Reihenfolge beachten wegen Foreign Keys!)
+TRUNCATE TABLE partner_feedback CASCADE;
 TRUNCATE TABLE ratings CASCADE;
 TRUNCATE TABLE participants CASCADE;
 TRUNCATE TABLE criteria CASCADE;
@@ -7,7 +11,7 @@ TRUNCATE TABLE departments CASCADE;
 TRUNCATE TABLE surveys CASCADE;
 
 -- Survey
-INSERT INTO surveys (name, start_date, is_active) VALUES ('Partner Survey 2026', CURRENT_DATE, TRUE);
+INSERT INTO surveys (name, start_date, is_active, test_mode) VALUES ('Partner Survey 2026', CURRENT_DATE, TRUE, FALSE);
 
 -- Partner
 INSERT INTO partners (name) VALUES 
@@ -19,14 +23,14 @@ INSERT INTO partners (name) VALUES
 
 -- Kriterien
 INSERT INTO criteria (category, name, description, sort_order) VALUES
-('I. Strategie, Innovation & Cisco 360 Alignment', '1. Strategisches Alignment & Cisco Mindshare', 'Bewertung, ob der Partner seine Firmenstrategie aktiv an Cisco ausrichtet...', 10),
-('I. Strategie, Innovation & Cisco 360 Alignment', '2. Investitionsbereitschaft & Zertifizierungen', 'Bewertung der Bereitschaft des Partners, vor einem konkreten Projekt in Wissen zu investieren...', 20),
-('I. Strategie, Innovation & Cisco 360 Alignment', '3. Innovationskraft (KI, Automation, Programmability)', 'Der Markt wandelt sich von Hardware zu Software/Automatisierung...', 30),
-('I. Strategie, Innovation & Cisco 360 Alignment', '4. Digitale Transformation & Cloud-Kompetenz', 'Bewertung der Fähigkeit, Kunden von klassischen On-Premise-Lösungen...', 40),
-('I. Strategie, Innovation & Cisco 360 Alignment', '5. Sustainability Engagement', 'Bewertung, wie aktiv der Partner Cisco-Nachhaltigkeitsprogramme nutzt...', 50),
-('II. Vertriebs-Performance & Marktabdeckung', '6. Marktpräsenz & Channel-Abdeckung', 'Einschätzung der Sichtbarkeit des Partners im relevanten Marktsegment...', 60),
-('II. Vertriebs-Performance & Marktabdeckung', '7. Cybersecurity-Kompetenz & -Fokus', 'Cybersecurity ist der Wachstumstreiber und im Public Sector oft K.O.-Kriterium...', 70),
-('II. Vertriebs-Performance & Marktabdeckung', '8. Neukunden-Akquise & Hunting', 'Bewertung des Willens ("Hunger"), neue Dienststellen oder Behörden zu erschließen...', 80),
+('I. Strategie, Innovation & Cisco 360 Alignment', '1. Strategisches Alignment & Cisco Mindshare', 'Bewertung, ob der Partner seine Firmenstrategie aktiv an Cisco ausrichtet oder ob Cisco nur "einer von vielen" Herstellern ist.', 10),
+('I. Strategie, Innovation & Cisco 360 Alignment', '2. Investitionsbereitschaft & Zertifizierungen', 'Bewertung der Bereitschaft des Partners, vor einem konkreten Projekt in Wissen zu investieren.', 20),
+('I. Strategie, Innovation & Cisco 360 Alignment', '3. Innovationskraft (KI, Automation, Programmability)', 'Der Markt wandelt sich von Hardware zu Software/Automatisierung.', 30),
+('I. Strategie, Innovation & Cisco 360 Alignment', '4. Digitale Transformation & Cloud-Kompetenz', 'Bewertung der Fähigkeit, Kunden von klassischen On-Premise-Lösungen in hybride oder Cloud-Modelle zu begleiten.', 40),
+('I. Strategie, Innovation & Cisco 360 Alignment', '5. Sustainability Engagement', 'Bewertung, wie aktiv der Partner Cisco-Nachhaltigkeitsprogramme nutzt.', 50),
+('II. Vertriebs-Performance & Marktabdeckung', '6. Marktpräsenz & Channel-Abdeckung', 'Einschätzung der Sichtbarkeit des Partners im relevanten Marktsegment.', 60),
+('II. Vertriebs-Performance & Marktabdeckung', '7. Cybersecurity-Kompetenz & -Fokus', 'Cybersecurity ist der Wachstumstreiber und im Public Sector oft K.O.-Kriterium.', 70),
+('II. Vertriebs-Performance & Marktabdeckung', '8. Neukunden-Akquise & Hunting', 'Bewertung des Willens ("Hunger"), neue Dienststellen oder Behörden zu erschließen.', 80),
 ('II. Vertriebs-Performance & Marktabdeckung', '9. Bestandskunden-Engagement & Rahmenvertragsmanagement', 'Bewertung der Pflege bestehender Verträge und Rahmennverträge...', 90),
 ('II. Vertriebs-Performance & Marktabdeckung', '10. Pipeline-Qualität & Forecast-Treue', 'Bewertung der Zuverlässigkeit von vertrieblichen Aussagen...', 100),
 ('III. Public Sector Kompetenz', '11. Vergaberechtliche Kompetenz & Frameworks', 'Der Partner muss die juristischen Spielregeln und Frameworks beherrschen...', 110),

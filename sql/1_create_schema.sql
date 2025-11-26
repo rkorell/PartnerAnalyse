@@ -1,4 +1,7 @@
 /* 1_create_schema.sql - Struktur ohne Daten */
+/* # Modified: 26.11.2025, 20:40 - Added partner_feedback table and comment column to ratings */
+
+DROP TABLE IF EXISTS partner_feedback CASCADE;
 DROP TABLE IF EXISTS ratings CASCADE;
 DROP TABLE IF EXISTS participants CASCADE;
 DROP TABLE IF EXISTS criteria CASCADE;
@@ -13,7 +16,8 @@ CREATE TABLE surveys (
     start_date DATE,
     end_date DATE,
     is_active BOOLEAN DEFAULT FALSE,
-    description TEXT
+    description TEXT,
+    test_mode BOOLEAN DEFAULT FALSE
 );
 
 -- 2. Abteilungen (Hierarchie)
@@ -59,8 +63,21 @@ CREATE TABLE ratings (
     criterion_id INTEGER REFERENCES criteria(id),
     partner_id INTEGER REFERENCES partners(id),
     rating_type VARCHAR(20) CHECK (rating_type IN ('importance', 'performance')),
-    score INTEGER CHECK (score BETWEEN 1 AND 10),
-    CONSTRAINT unique_vote UNIQUE (participant_id, criterion_id, partner_id, rating_type)
+    score INTEGER,
+    comment TEXT,
+    CONSTRAINT unique_vote UNIQUE (participant_id, criterion_id, partner_id, rating_type),
+    CONSTRAINT ratings_score_check CHECK ((score BETWEEN 1 AND 10) OR score IS NULL)
+);
+
+-- 7. Partner Feedback (Kopfdaten: Frequenz, NPS, Globaler Kommentar)
+CREATE TABLE partner_feedback (
+    id BIGSERIAL PRIMARY KEY,
+    participant_id INTEGER REFERENCES participants(id),
+    partner_id INTEGER REFERENCES partners(id),
+    interaction_frequency INTEGER,
+    nps_score INTEGER,
+    general_comment TEXT,
+    CONSTRAINT unique_feedback UNIQUE (participant_id, partner_id)
 );
 
 -- Indizes

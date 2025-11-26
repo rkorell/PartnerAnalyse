@@ -7,7 +7,19 @@
   # Modified: 23.11.2025, 19:15 - Echter Zoom/Entzerrung (Fadenkreuz fix in Mitte, Punkte dynamisch skaliert)
   # Modified: 23.11.2025, 19:45 - Cleanup: Median-Logik entfernt
   # Modified: 23.11.2025, 21:30 - Integration Info-Modal und App-Texte aus DB
+  # Modified: 26.11.2025, 16:00 - Added CSV Export functionality
+  # Modified: 26.11.2025, 16:30 - UX Fix: Button turns blue (primary); Excel Fix: Decimal comma
+  # Modified: 26.11.2025, 16:45 - Updated table header to "Anzahl Beurteiler"
+  # Modified: 26.11.2025, 17:00 - Show global participant count in table title
+  # Modified: 26.11.2025, 21:45 - Implemented Insights column
+  # Modified: 27.11.2025, 11:45 - Revert to Emojis, Fix NPS Colors (Text), Fix DB Grouping Error
+  # Modified: 27.11.2025, 13:30 - CONST Threshold, Max Divergence Logic, Centered Icons
+  # Modified: 27.11.2025, 14:00 - Layout Update: Wider Slots (NPS 80px, Comments 60px), Flex 2.2
+  # Modified: 27.11.2025, 14:30 - Fix: Comment Count Alignment (middle instead of top)
 */
+
+// HIER: Konfigurierbarer Schwellenwert für Konflikt-Icon
+const CONFLICT_THRESHOLD = 2.0;
 
 document.addEventListener("DOMContentLoaded", function() {
     // --- Bestehende Referenzen ---
@@ -21,6 +33,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const errorMessage = document.getElementById('error-message');
     const errorText = document.getElementById('error-text');
     const closeErrorBtn = document.getElementById('close-error');
+    const exportBtn = document.getElementById('export-btn'); 
 
     // Matrix Modal Elemente
     const matrixModal = document.getElementById('matrix-modal');
@@ -32,7 +45,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // Matrix Radio Buttons
     const matrixRadios = document.querySelectorAll('input[name="matrix-center"]');
 
-    // NEU: Info Modal Elemente und Speicher für Texte
+    // Info Modal Elemente und Speicher für Texte
     let appTexts = {};
     const infoModal = document.getElementById('global-info-modal');
     const closeInfoBtn = document.getElementById('close-info-modal');
@@ -52,13 +65,16 @@ document.addEventListener("DOMContentLoaded", function() {
     closeMatrixBtn.addEventListener('click', () => { matrixModal.style.display = 'none'; });
     window.addEventListener('click', (e) => { if (e.target === matrixModal) matrixModal.style.display = 'none'; });
 
-    // NEU: Info Modal Schließen
+    // Info Modal Schließen
     if(closeInfoBtn) closeInfoBtn.addEventListener('click', () => { infoModal.style.display = 'none'; });
     if(infoModal) infoModal.addEventListener('click', (e) => {
         if (e.target === infoModal) infoModal.style.display = 'none';
     });
 
-    // Globaler Öffner für das Info-Modal (für onclick im HTML)
+    // Export Button Event
+    if(exportBtn) exportBtn.addEventListener('click', exportToCSV);
+
+    // Globaler Öffner für das Info-Modal
     window.openInfoModal = function(category) {
         const content = appTexts[category] || "<p>Information wird geladen oder ist nicht verfügbar.</p>";
         document.getElementById('info-modal-body').innerHTML = content;
@@ -82,7 +98,6 @@ document.addEventListener("DOMContentLoaded", function() {
         fetch('php/get_data.php')
             .then(response => response.json())
             .then(data => {
-                // NEU: Texte speichern (gleich beim ersten Fetch)
                 if (data.app_texts) {
                     appTexts = data.app_texts;
                 }
@@ -111,7 +126,6 @@ document.addEventListener("DOMContentLoaded", function() {
         fetch('php/get_data.php')
             .then(response => response.json())
             .then(data => {
-                // Falls fetchSurveys schiefgeht, holen wir Texte hier zur Sicherheit auch
                 if (data.app_texts) appTexts = data.app_texts;
 
                 if (data && data.departments && departmentTreeContainer) {
@@ -134,7 +148,6 @@ document.addEventListener("DOMContentLoaded", function() {
                         }
                     });
 
-                    // Render-Funktion mit CSS-Klassen für Explorer-Look
                     function renderNode(node) {
                         const nodeDiv = document.createElement('div');
                         nodeDiv.className = 'tree-node';
@@ -245,6 +258,16 @@ document.addEventListener("DOMContentLoaded", function() {
     function hideLoader() { clearTimeout(loadingOverlay._timeout); loadingOverlay.style.display = 'none'; }
     function showError(msg) { errorText.textContent = msg; errorMessage.style.display = 'flex'; }
 
+    function setExportButtonState(enabled) {
+        if (!exportBtn) return;
+        exportBtn.disabled = !enabled;
+        if (enabled) {
+            exportBtn.classList.replace('btn-secondary', 'btn-primary');
+        } else {
+            exportBtn.classList.replace('btn-primary', 'btn-secondary');
+        }
+    }
+
     function analyseScores() {
         const surveyIds = Array.from(surveySelect.selectedOptions).map(opt => parseInt(opt.value));
         const departmentCheckboxes = departmentTreeContainer.querySelectorAll('input[type="checkbox"]:checked');
@@ -258,6 +281,8 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         resultSection.innerHTML = "";
+        setExportButtonState(false);
+        
         showLoader();
 
         fetch('php/partner_score_analyse.php', {
@@ -276,32 +301,44 @@ document.addEventListener("DOMContentLoaded", function() {
             if (Array.isArray(data) && data.length > 0) {
                 analysisData = data;
                 renderResultTable(data);
+                setExportButtonState(true);
             } else if (data && data.message) {
                 resultSection.innerHTML = `<div class="selection-info">${data.message}</div>`;
+                analysisData = [];
+                setExportButtonState(false);
             } else if (data && data.error) {
                 showError(data.error);
+                analysisData = [];
+                setExportButtonState(false);
             } else {
                 showError("Unbekanntes Antwortformat.");
+                analysisData = [];
+                setExportButtonState(false);
             }
         })
         .catch(err => {
             hideLoader();
             showError("Analyse konnte nicht durchgeführt werden.");
+            analysisData = [];
+            setExportButtonState(false);
         });
     }
 
     function renderResultTable(rows) {
         const scores = rows.map(r => r.score);
         const min = Math.min(...scores); const max = Math.max(...scores);
+        
+        const globalCount = rows.length > 0 && rows[0].global_participant_count ? rows[0].global_participant_count : 0;
 
         let html = `
-        <div class="criteria-group-title">Ergebnis: Partner Score Ranking</div>
+        <div class="criteria-group-title">Ergebnis: Partner Score Ranking (Basierend auf ${globalCount} Teilnehmern)</div>
         <div class="criteria-table">
-            <div class="criteria-row" style="background:#f8f9fa; font-weight:bold;">
+            <div class="criteria-row" style="background:#f8f9fa; font-weight:bold; display:flex; align-items:center;">
                 <div class="criteria-content" style="flex:0.3;">Rang</div>
                 <div class="criteria-content" style="flex:2;">Partner</div>
                 <div class="criteria-content" style="flex:2;">Score</div>
-                <div class="criteria-content" style="flex:1;">Anzahl Antworten</div>
+                <div class="criteria-content" style="flex:1;">Anzahl Beurteiler</div>
+                <div class="criteria-content" style="flex:2.2; text-align:center;">Insights</div>
             </div>`;
 
         rows.forEach((row, idx) => {
@@ -311,8 +348,52 @@ document.addEventListener("DOMContentLoaded", function() {
                 : interpolateColor([243, 156, 18], [46, 204, 113], (pct - 0.5) * 2);
             const rgb = `rgb(${color.join(',')})`;
 
+            // --- Insights Slots (4 Feste Plätze) ---
+            let slot1 = ''; // NPS
+            let slot2 = ''; // Comments
+            let slot3 = ''; // Action
+            let slot4 = ''; // Conflict
+
+            // 1. NPS (📣)
+            if (row.nps_score !== null && row.nps_score !== undefined) {
+                const nps = parseInt(row.nps_score);
+                let npsColor = '#e74c3c'; // Rot (<0)
+                if (nps >= 0 && nps <= 30) npsColor = '#f39c12'; // Orange
+                else if (nps > 30 && nps <= 70) npsColor = '#f1c40f'; // Gelb
+                else if (nps > 70) npsColor = '#2ecc71'; // Grün
+                
+                slot1 = `<span style="margin:0; cursor:default; font-size:1.2em; white-space:nowrap;" title="NPS Score: ${nps}">📣 <span style="font-size:0.8em; font-weight:bold; vertical-align:middle; color:${npsColor};">${nps > 0 ? '+' : ''}${nps}</span></span>`;
+            }
+
+            // 2. Kommentare (💬)
+            const commentCount = parseInt(row.comment_count || 0);
+            if (commentCount > 0) {
+                // HIER GEÄNDERT: vertical-align: middle
+                slot2 = `<span class="insight-icon" data-action="comments" data-id="${row.partner_id}" style="margin:0; cursor:pointer; font-size:1.5em;" title="${commentCount} Kommentare - Klick für Details">💬 <span style="font-size:0.6em; font-weight:bold; vertical-align:middle;">${commentCount}</span></span>`;
+            }
+
+            // 3. Action List (⚠️)
+            let hasAction = false;
+            if (row.matrix_details) {
+                hasAction = row.matrix_details.some(d => parseFloat(d.imp) >= 8.0 && parseFloat(d.perf) <= 5.0);
+            }
+            if (hasAction) {
+                slot3 = `<span class="insight-icon" data-action="action" data-id="${row.partner_id}" style="margin:0; cursor:pointer; font-size:1.5em;" title="Handlungsbedarf - Klick für Details">⚠️</span>`;
+            }
+
+            // 4. Divergenz (⚡) - NEU: Basiert auf Max Divergence > Threshold
+            const maxDiv = parseFloat(row.max_divergence || 0);
+            const cntMgr = parseInt(row.num_assessors_mgr || 0);
+            const cntTeam = parseInt(row.num_assessors_team || 0);
+            
+            if (cntMgr >= 3 && cntTeam >= 3 && maxDiv > CONFLICT_THRESHOLD) {
+                const title = `Maximale Divergenz: ${maxDiv.toFixed(1)} (Schwellenwert: ${CONFLICT_THRESHOLD})`;
+                slot4 = `<span class="insight-icon" data-action="conflict" data-id="${row.partner_id}" style="margin:0; cursor:pointer; font-size:1.5em;" title="${title}">⚡</span>`;
+            }
+
+            // HIER GEÄNDERT: Flex Anteil erhöht auf 2.2 und feste Slot-Breiten
             html += `
-            <div class="criteria-row partner-row-clickable" data-partner-id="${row.partner_id}">
+            <div class="criteria-row partner-row-clickable" data-partner-id="${row.partner_id}" style="display:flex; align-items:center;">
                 <div class="criteria-content" style="flex:0.3; text-align:center;">${idx + 1}</div>
                 <div class="criteria-content" style="flex:2; color:#3498db; cursor:pointer; font-weight:500;">${row.partner_name} ↗</div>
                 <div class="criteria-content" style="flex:2;">
@@ -320,16 +401,161 @@ document.addEventListener("DOMContentLoaded", function() {
                     <div class="score-bar-value">${row.score}</div>
                 </div>
                 <div class="criteria-content" style="flex:1; text-align:center;">${row.total_answers}</div>
+                <div class="criteria-content" style="flex:2.2; display:flex; justify-content:space-between; align-items:center; padding:5px 15px;">
+                    <div style="width:80px; text-align:left;">${slot1}</div>
+                    <div style="width:60px; text-align:center;">${slot2}</div>
+                    <div style="width:30px; text-align:center;">${slot3}</div>
+                    <div style="width:30px; text-align:center;">${slot4}</div>
+                </div>
             </div>`;
         });
         html += `</div>`;
+
+        // Footer Legende
+        html += `
+        <div class="icon-legend" style="margin-top:15px; padding:10px; background:#f8f9fa; border-radius:4px; font-size:0.9em; color:#7f8c8d;">
+            <strong style="margin-right:10px;">Legende:</strong>
+            <span style="margin-right:20px;">📣 NPS-Score</span>
+            <span style="margin-right:20px;">💬 Kommentare vorhanden</span>
+            <span style="margin-right:20px;">⚠️ Handlungsfelder (Vorschläge)</span>
+            <span>⚡ Bewertungsunterschiede Mgmt/Field</span>
+        </div>`;
+
         resultSection.innerHTML = html;
+        
         document.querySelectorAll('.partner-row-clickable').forEach(row => {
-            row.addEventListener('click', function() { openMatrix(this.getAttribute('data-partner-id')); });
+            row.addEventListener('click', function(e) {
+                if(e.target.closest('.insight-icon')) return;
+                openMatrix(this.getAttribute('data-partner-id')); 
+            });
+        });
+
+        document.querySelectorAll('.insight-icon').forEach(icon => {
+            icon.addEventListener('click', function(e) {
+                e.stopPropagation();
+                handleInsightClick(this.dataset.action, this.dataset.id);
+            });
         });
     }
 
+    function handleInsightClick(action, partnerId) {
+        const partner = analysisData.find(p => p.partner_id == partnerId);
+        if (!partner) return;
+
+        let title = "";
+        let content = "";
+
+        if (action === 'comments') {
+            title = `Kommentare zu ${partner.partner_name}`;
+            if (partner.general_comments && partner.general_comments.length > 0) {
+                content += `<h4>Allgemeines Feedback</h4><ul>`;
+                partner.general_comments.forEach(c => content += `<li>${c}</li>`);
+                content += `</ul>`;
+            }
+            if (partner.matrix_details) {
+                const specific = partner.matrix_details.filter(d => d.comments && d.comments.length > 0);
+                if (specific.length > 0) {
+                    content += `<h4>Spezifisches Feedback</h4>`;
+                    specific.forEach(d => {
+                        content += `<strong>${d.name}</strong> (I:${d.imp}/P:${d.perf})<ul>`;
+                        d.comments.forEach(c => content += `<li>${c}</li>`);
+                        content += `</ul>`;
+                    });
+                }
+            }
+        } 
+        else if (action === 'action') {
+            title = `Handlungsfelder für ${partner.partner_name}`;
+            if (partner.matrix_details) {
+                const items = partner.matrix_details.filter(d => parseFloat(d.imp) >= 8.0 && parseFloat(d.perf) <= 5.0);
+                if (items.length > 0) {
+                    content += `<table style="width:100%; text-align:left;"><tr><th>Kriterium</th><th>Wichtigkeit</th><th>Performance</th></tr>`;
+                    items.forEach(i => {
+                        content += `<tr><td>${i.name}</td><td>${i.imp}</td><td style="color:#e74c3c; font-weight:bold;">${i.perf}</td></tr>`;
+                    });
+                    content += `</table>`;
+                }
+            }
+        }
+        else if (action === 'conflict') {
+            title = `Signifikante Abweichungen: ${partner.partner_name}`;
+            // NEU: Liste der Kriterien mit hoher Divergenz
+            if (partner.matrix_details) {
+                const conflicts = partner.matrix_details.filter(d => {
+                    const mgr = parseFloat(d.perf_mgr || 0);
+                    const team = parseFloat(d.perf_team || 0);
+                    return Math.abs(mgr - team) > CONFLICT_THRESHOLD;
+                });
+                
+                if (conflicts.length > 0) {
+                    content += `<table style="width:100%; text-align:left;"><tr><th>Kriterium</th><th>Manager Ø</th><th>Team Ø</th><th>Delta</th></tr>`;
+                    conflicts.forEach(c => {
+                        const mgr = parseFloat(c.perf_mgr || 0);
+                        const team = parseFloat(c.perf_team || 0);
+                        const delta = Math.abs(mgr - team).toFixed(1);
+                        content += `<tr>
+                            <td>${c.name}</td>
+                            <td style="color:#e74c3c; font-weight:bold;">${mgr.toFixed(1)}</td>
+                            <td style="color:#3498db; font-weight:bold;">${team.toFixed(1)}</td>
+                            <td>${delta}</td>
+                        </tr>`;
+                    });
+                    content += `</table>`;
+                } else {
+                    content += `<p>Keine Kriterien gefunden, die den Schwellenwert von ${CONFLICT_THRESHOLD} überschreiten.</p>`;
+                }
+            }
+        }
+
+        const modalBody = document.getElementById('info-modal-body');
+        modalBody.innerHTML = `<h2 style="margin-top:0; border-bottom:2px solid #3498db; padding-bottom:10px;">${title}</h2>` + content;
+        document.getElementById('global-info-modal').style.display = 'flex';
+    }
+
     function interpolateColor(c1, c2, t) { return [ Math.round(c1[0] + (c2[0]-c1[0])*t), Math.round(c1[1] + (c2[1]-c1[1])*t), Math.round(c1[2] + (c2[2]-c1[2])*t) ]; }
+
+    function exportToCSV() {
+        if (!analysisData || analysisData.length === 0) return;
+
+        let csvContent = "Partner;Gesamt-Score;Anzahl Beurteiler;Kriterium (Matrix);Wichtigkeit (I);Performance (P)\n";
+
+        analysisData.forEach(partner => {
+            if (partner.matrix_details) {
+                partner.matrix_details.forEach(detail => {
+                    let row = [
+                        partner.partner_name,
+                        partner.score,
+                        partner.total_answers,
+                        detail.name, 
+                        detail.imp,
+                        detail.perf
+                    ].map((field, index) => {
+                        if (index === 1 || index === 4 || index === 5) {
+                            return field.toString().replace('.', ',');
+                        }
+                        
+                        if (typeof field === 'string') {
+                            return `"${field.replace(/"/g, '""')}"`;
+                        }
+                        return field;
+                    }).join(";");
+                    
+                    csvContent += row + "\n";
+                });
+            }
+        });
+
+        const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `partner_score_export_${new Date().toISOString().slice(0,10)}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
 
     // --- IPA Matrix Logik ---
 
@@ -352,7 +578,6 @@ document.addEventListener("DOMContentLoaded", function() {
         currentPartnerDetails = partner; 
         matrixTitle.textContent = "IPA Matrix: " + partner.partner_name;
 
-        // Reset auf "Standard"
         const radios = document.querySelectorAll('input[name="matrix-center"]');
         radios.forEach(r => { if(r.value === 'standard') r.checked = true; });
         
@@ -366,14 +591,13 @@ document.addEventListener("DOMContentLoaded", function() {
         const stats = calculateStats(currentPartnerDetails.matrix_details);
         let centerX = 5.0;
         let centerY = 5.0;
-        let maxDist = 5.0; // Standard
+        let maxDist = 5.0; 
 
         if (mode === 'mean') {
             centerX = stats.mean.perf;
             centerY = stats.mean.imp;
             maxDist = calculateMaxDeviation(currentPartnerDetails.matrix_details, centerX, centerY);
         } else {
-            // Standard: Center 5.0, Scale 5.0
             centerX = 5.0;
             centerY = 5.0;
             maxDist = 5.0;
@@ -382,7 +606,6 @@ document.addEventListener("DOMContentLoaded", function() {
         renderMatrixSVG(currentPartnerDetails.matrix_details, centerX, centerY, maxDist);
     }
 
-    // Hilfsfunktion: Maximale Abweichung für Zoom
     function calculateMaxDeviation(details, cx, cy) {
         let maxD = 0;
         details.forEach(d => {
@@ -390,15 +613,12 @@ document.addEventListener("DOMContentLoaded", function() {
             const dy = Math.abs(d.imp - cy);
             maxD = Math.max(maxD, dx, dy);
         });
-        return Math.max(maxD * 1.1, 0.5); // 10% Rand
+        return Math.max(maxD * 1.1, 0.5); 
     }
 
     function renderMatrixSVG(details, centerX, centerY, rangeRadius) {
         const size = 400;
         
-        // Mapping Funktion: Wert -> Pixel
-        // Visuelles Zentrum ist IMMER size/2
-        // Skalierung: 1 Einheit = (size/2) / rangeRadius
         const scale = (size / 2) / rangeRadius;
 
         let svg = `<svg viewBox="0 0 ${size} ${size}" class="matrix-svg">`;
@@ -418,15 +638,12 @@ document.addEventListener("DOMContentLoaded", function() {
             </text>
         `;
 
-        // Punkte zeichnen
         details.forEach(d => {
-            // Berechnung relativ zum Zentrum
             const dx = d.perf - centerX;
             const dy = d.imp - centerY; 
             
-            // Umrechnung in Pixel relativ zur Mitte
             const px = mid + (dx * scale);
-            const py = mid - (dy * scale); // SVG Y ist invertiert
+            const py = mid - (dy * scale); 
 
             svg += `<circle cx="${px}" cy="${py}" r="6" fill="#3498db" stroke="#fff" stroke-width="1"
                     class="matrix-dot" 
@@ -436,7 +653,6 @@ document.addEventListener("DOMContentLoaded", function() {
         svg += `</svg>`;
         matrixContainer.innerHTML = svg;
 
-        // Tooltips
         const dots = matrixContainer.querySelectorAll('.matrix-dot');
         dots.forEach(dot => {
             dot.addEventListener('mouseenter', () => {

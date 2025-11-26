@@ -1,15 +1,13 @@
 <?php
 /*
   DATEI: php/partner_score_analyse.php
-  Zweck: Analyse-API für Partner-Score-Berechnung mit Filter (Survey, Abteilung inkl. Subabteilungen, Manager, Mindestanzahl)
-  Erwartet: POST (application/json) mit Parametern
-    - survey_ids (Array)
-    - manager_filter ("alle", "nur_manager", "nur_nicht_manager")
-    - department_ids (Array)
-    - min_answers (Integer)
-  Antwort: JSON (Partner, Score, total_answers) oder Fehlermeldung
-  # Modified: 22.11.2025, 22:00 - Initialversion für Score-Analyse mit Filter
-  # Modified: 23.11.2025, 17:45 - Erweiterung um JSON-Details (IPA Matrix) per Eager Loading
+  Zweck: Analyse-API für Partner-Score-Berechnung mit Filter
+  # Modified: 26.11.2025, 16:45 - Change logic to count distinct participants (Assessors) instead of total ratings
+  # Modified: 26.11.2025, 17:00 - Added global_participant_count (Total Unique Assessors across all partners)
+  # Modified: 26.11.2025, 21:30 - Extended SQL for Split-Scores (Mgr/Team), NPS and Comment Counts
+  # Modified: 27.11.2025, 09:00 - Extended SQL to return actual comment texts (General & Specific)
+  # Modified: 27.11.2025, 11:45 - Fix: Cast JSON to text in GROUP BY to avoid DB error
+  # Modified: 27.11.2025, 13:30 - Calc MAX divergence per criterion and return split details in matrix_json
 */
 
 header('Content-Type: application/json');
@@ -49,11 +47,36 @@ WITH RECURSIVE subdeps AS (
   SELECT d.id FROM departments d JOIN subdeps s ON d.parent_id = s.id
 ),
 participants_filtered AS (
-  SELECT p.id
+  SELECT p.id, p.is_manager
     FROM participants p
    WHERE p.survey_id IN ($survey_id_list)
      $manager_where
      AND p.department_id IN (SELECT id FROM subdeps)
+),
+global_stats AS (
+  SELECT COUNT(DISTINCT r.participant_id) as unique_assessors_total
+    FROM ratings r
+   WHERE r.rating_type = 'performance'
+     AND r.participant_id IN (SELECT id FROM participants_filtered)
+),
+assessor_counts AS (
+  SELECT r.partner_id, 
+         COUNT(DISTINCT r.participant_id) as num_assessors,
+         COUNT(DISTINCT r.participant_id) FILTER (WHERE p.is_manager) as num_assessors_mgr,
+         COUNT(DISTINCT r.participant_id) FILTER (WHERE NOT p.is_manager) as num_assessors_team
+    FROM ratings r
+    JOIN participants_filtered p ON r.participant_id = p.id
+   WHERE r.rating_type = 'performance'
+   GROUP BY r.partner_id
+),
+feedback_stats AS (
+  SELECT f.partner_id,
+         COUNT(f.general_comment) as cnt_gen_comments,
+         JSON_AGG(f.general_comment) FILTER (WHERE f.general_comment IS NOT NULL AND trim(f.general_comment) <> '') as gen_comments_list,
+         ROUND(100.0 * (COUNT(*) FILTER (WHERE f.nps_score >= 9) - COUNT(*) FILTER (WHERE f.nps_score <= 6)) / NULLIF(COUNT(f.nps_score), 0), 0) as nps_score
+    FROM partner_feedback f
+   WHERE f.participant_id IN (SELECT id FROM participants_filtered)
+   GROUP BY f.partner_id
 ),
 importance_avg AS (
   SELECT r.criterion_id, AVG(r.score) AS importance
@@ -63,31 +86,59 @@ importance_avg AS (
    GROUP BY r.criterion_id
 ),
 performance_avg AS (
-  SELECT r.partner_id, r.criterion_id, AVG(r.score) AS performance, COUNT(*) AS num_answers
+  SELECT r.partner_id, r.criterion_id, 
+         AVG(r.score) AS performance,
+         AVG(r.score) FILTER (WHERE p.is_manager) as perf_mgr,
+         AVG(r.score) FILTER (WHERE NOT p.is_manager) as perf_team,
+         COUNT(r.comment) as cnt_spec_comments,
+         JSON_AGG(r.comment) FILTER (WHERE r.comment IS NOT NULL AND trim(r.comment) <> '') as spec_comments_list
     FROM ratings r
+    JOIN participants_filtered p ON r.participant_id = p.id
    WHERE r.rating_type = 'performance'
-     AND r.participant_id IN (SELECT id FROM participants_filtered)
    GROUP BY r.partner_id, r.criterion_id
 )
 SELECT
   pa.id         AS partner_id,
   pa.name       AS partner_name,
-  ROUND(SUM(pf.performance * ia.importance)::numeric, 2) AS score,
-  SUM(pf.num_answers) AS total_answers,
   
-  -- Hier holen wir die Details für die Matrix direkt als JSON-Array
+  -- Gesamt Score
+  ROUND(SUM(pf.performance * ia.importance)::numeric, 2) AS score,
+  
+  -- NEU: Maximale Divergenz (Manager vs Team) über alle Kriterien
+  MAX(ABS(COALESCE(pf.perf_mgr, 0) - COALESCE(pf.perf_team, 0))) AS max_divergence,
+  
+  -- Beurteiler-Zahlen
+  MAX(ac.num_assessors) AS total_answers,
+  MAX(ac.num_assessors_mgr) AS num_assessors_mgr,
+  MAX(ac.num_assessors_team) AS num_assessors_team,
+  
+  -- Insights Daten
+  MAX(fs.nps_score) as nps_score,
+  (COALESCE(SUM(pf.cnt_spec_comments), 0) + COALESCE(MAX(fs.cnt_gen_comments), 0)) as comment_count,
+  COALESCE(MAX(fs.gen_comments_list::text)::json, '[]'::json) as general_comments,
+  
+  -- Globaler Zähler
+  (SELECT unique_assessors_total FROM global_stats) AS global_participant_count,
+  
+  -- NEU: Details inkl. Split Scores für das Frontend-Modal
   json_agg(json_build_object(
       'name', c.name,
       'imp',  ROUND(ia.importance::numeric, 1),
-      'perf', ROUND(pf.performance::numeric, 1)
+      'perf', ROUND(pf.performance::numeric, 1),
+      'perf_mgr', ROUND(pf.perf_mgr::numeric, 1),
+      'perf_team', ROUND(pf.perf_team::numeric, 1),
+      'comments', pf.spec_comments_list
   )) AS matrix_details
 
 FROM performance_avg pf
 JOIN importance_avg ia ON pf.criterion_id = ia.criterion_id
 JOIN partners pa ON pa.id = pf.partner_id
 JOIN criteria c ON c.id = pf.criterion_id
+JOIN assessor_counts ac ON ac.partner_id = pa.id 
+LEFT JOIN feedback_stats fs ON fs.partner_id = pa.id 
+
 GROUP BY pa.id, pa.name
-HAVING SUM(pf.num_answers) >= :min_answers
+HAVING MAX(ac.num_assessors) >= :min_answers 
 ORDER BY score DESC
     ";
 
@@ -101,10 +152,12 @@ ORDER BY score DESC
         exit;
     }
 
-    // Nachbearbeitung: JSON-String aus Postgres in echtes PHP-Array wandeln
     foreach ($result as &$row) {
         if (isset($row['matrix_details'])) {
             $row['matrix_details'] = json_decode($row['matrix_details'], true);
+        }
+        if (isset($row['general_comments'])) {
+            $row['general_comments'] = json_decode($row['general_comments'], true);
         }
     }
     unset($row);

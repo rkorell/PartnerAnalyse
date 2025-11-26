@@ -5,6 +5,7 @@
   # Modified: 22.11.2025, 23:00 - surveys jetzt immer als Array (id, name), CI/CD für Analyse-Frontend
   # Modified: 23.11.2025, 11:35 - Aliase entfernt (Fix: Keine Umlaute/Germanismen in JSON-Keys)
   # Modified: 23.11.2025, 21:15 - App-Texte (Tooltips) aus DB laden (app_texts)
+  # Modified: 24.11.2025, 23:30 - Added test_mode flag to survey data
 */
 
 header('Content-Type: application/json');
@@ -14,11 +15,13 @@ require_once 'db_connect.php';
 try {
     // Surveys als Array
     $surveys = [];
-    $stmt = $pdo->query("SELECT id, name FROM surveys ORDER BY start_date DESC, id DESC");
+    // HIER GEÄNDERT: test_mode hinzugefügt
+    $stmt = $pdo->query("SELECT id, name, test_mode FROM surveys ORDER BY start_date DESC, id DESC");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $surveys[] = [
             'id' => intval($row['id']),
-            'name' => $row['name']
+            'name' => $row['name'],
+            'test_mode' => $row['test_mode'] === true || $row['test_mode'] === 't' || $row['test_mode'] === 1
         ];
     }
 
@@ -51,17 +54,15 @@ try {
         ];
     }
 
-    // NEU: App Texte laden
+    // App Texte laden
     $app_texts = [];
     try {
-        // Wir prüfen vorsichtig, ob die Tabelle existiert/gefüllt ist
         $stmt = $pdo->query("SELECT category, content FROM app_texts");
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $app_texts[$row['category']] = $row['content'];
         }
     } catch (Exception $e) {
-        // Fallback: Wenn Tabelle fehlt, leeres Array (Frontend zeigt dann Platzhalter oder nichts)
-        // Man könnte hier auch Default-Texte hardcoden, aber wir nutzen die DB.
+        // Fallback
     }
 
     echo json_encode([
@@ -69,7 +70,7 @@ try {
         'partners'    => $partners,
         'criteria'    => $criteria,
         'departments' => $departments,
-        'app_texts'   => $app_texts // Neue Property
+        'app_texts'   => $app_texts
     ]);
 } catch (Exception $e) {
     http_response_code(500);

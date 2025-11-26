@@ -34,6 +34,8 @@ MANIFEST
 
 # SECURITY! - database connection information
 php/db_connect.php
+php/MagicMirrorModuleStats.php
+
 
 # Installer logs
 pip-log.txt
