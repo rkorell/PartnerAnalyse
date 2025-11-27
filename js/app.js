@@ -7,6 +7,7 @@
 // # Modified: 27.11.2025, 13:00 - Added XSS protection (escapeHtml) for user inputs
 // # Modified: 27.11.2025, 14:05 - DOM performance optimization (AP 5a): Pre-render all partner views, only toggle visibility. (INKLUSIVE bindEvents FIX)
 // # Modified: 27.11.2025, 14:15 - FIX: Missing Submit button (Regression from AP 5a). Added missing updateNavigationButtons call.
+// # Modified: 27.11.2025, 14:30 - Centralized configuration via config.js (AP 6)
 
 class QualityIndexWizard {
     constructor() {
@@ -377,7 +378,7 @@ class QualityIndexWizard {
         let iconHTML = '';
         if (type === 'performance') {
             // Icon erscheint bei <= 3 oder >= 8
-            const isExtreme = (initialValue > 0 && initialValue <= 3) || initialValue >= 8;
+            const isExtreme = (initialValue > 0 && initialValue <= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MIN) || initialValue >= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MAX;
             const visibility = isExtreme ? 'visible' : 'hidden';
             iconHTML = `<span class="comment-icon" id="icon_${domId}" style="visibility:${visibility}; cursor:pointer; font-size:1.2em; margin-left:10px;" title="Kommentar hinzufügen">📝</span>`;
         }
@@ -506,7 +507,7 @@ class QualityIndexWizard {
 
         if (type === 'nps') {
             let text = "Bitte wählen...";
-            if (value === -2) {
+            if (value === CONFIG.WIZARD.NPS_RANGES.NA_VALUE) {
                 slider.classList.add('slider-neutral');
             } else {
                 slider.classList.remove('slider-neutral');
@@ -537,12 +538,14 @@ class QualityIndexWizard {
             if (valueDisplay) valueDisplay.textContent = value;
             
             if (type === 'importance') {
-                if (value <= 2) tooltipText = `${value} - ist mir eher unwichtig`;
-                else if (value >= 8) tooltipText = `${value} - ist mir extrem wichtig`;
+                // HIER GEÄNDERT: Verwende CONFIG
+                if (value <= CONFIG.WIZARD.IMPORTANCE_TOOLTIP_THRESHOLD.MIN) tooltipText = `${value} - ist mir eher unwichtig`;
+                else if (value >= CONFIG.WIZARD.IMPORTANCE_TOOLTIP_THRESHOLD.MAX) tooltipText = `${value} - ist mir extrem wichtig`;
                 else tooltipText = `${value} - wichtig`;
             } else {
-                if (value <= 2) tooltipText = `${value} - erfüllt der Partner sehr schlecht`;
-                else if (value >= 8) tooltipText = `${value} - erfüllt der Partner sehr gut`;
+                // HIER GEÄNDERT: Verwende CONFIG
+                if (value <= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MIN) tooltipText = `${value} - erfüllt der Partner sehr schlecht`;
+                else if (value >= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MAX) tooltipText = `${value} - erfüllt der Partner sehr gut`;
                 else tooltipText = `${value} - neutral`;
             }
             if (tooltip) tooltip.textContent = tooltipText;
@@ -574,7 +577,8 @@ class QualityIndexWizard {
                 
                 if (icon) {
                     // Extremwert Check (<=3 oder >=8) UND Wert > 0 (N/A zählt nicht als extrem in dem Sinne)
-                    const isExtreme = (value > 0 && value <= 3) || value >= 8;
+                    // HIER GEÄNDERT: Verwende CONFIG
+                    const isExtreme = (value > 0 && value <= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MIN) || value >= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MAX;
                     
                     // Persistenz-Check: Ist Text drin?
                     const hasText = textarea && textarea.value.trim() !== '';
@@ -705,7 +709,7 @@ class QualityIndexWizard {
             // Test Mode Werte oder Default
             this.partnerFeedback[partnerId] = {
                 frequency: this.isTestMode ? (Math.floor(Math.random() * 4) + 1) : 0,
-                nps: this.isTestMode ? (Math.floor(Math.random() * 11)) : -2,
+                nps: this.isTestMode ? (Math.floor(Math.random() * 11)) : CONFIG.WIZARD.NPS_RANGES.NA_VALUE, // HIER GEÄNDERT: Verwende CONFIG
                 general_comment: ""
             };
         }
@@ -719,7 +723,7 @@ class QualityIndexWizard {
                 <div class="form-row">
                     <div class="form-group">
                         <label>Wie häufig arbeitest Du mit ${this.escapeHtml(partner.name)} zusammen? *</label>
-                        ${this.createHeaderSliderHTML(`freq_${partnerId}`, 'frequency', pf.frequency, 0, 4, {1:"Selten", 2:"Monatlich / Gelegentlich", 4:"Täglich / Intensiv"})}
+                        ${this.createHeaderSliderHTML(`freq_${partnerId}`, 'frequency', pf.frequency, 0, CONFIG.WIZARD.FREQUENCY_MAX, {1:"Selten", 2:"Monatlich / Gelegentlich", 4:"Täglich / Intensiv"})}
                     </div>
                     <div class="form-group">
                         <label>Generelles Feedback (optional):</label>
@@ -729,7 +733,7 @@ class QualityIndexWizard {
                 <div class="form-row" style="margin-top:20px;">
                     <div class="form-group" style="width:100%;">
                         <label>Würdest Du ${this.escapeHtml(partner.name)} weiterempfehlen? (NPS) *</label>
-                        ${this.createHeaderSliderHTML(`nps_${partnerId}`, 'nps', pf.nps, -2, 10, {})}
+                        ${this.createHeaderSliderHTML(`nps_${partnerId}`, 'nps', pf.nps, CONFIG.WIZARD.NPS_RANGES.NA_VALUE, 10, {})}
                     </div>
                 </div>
             </div>
@@ -869,7 +873,7 @@ class QualityIndexWizard {
             return false;
         }
         // NPS muss gewählt sein (nicht -2)
-        if (fb.nps === undefined || fb.nps === -2) {
+        if (fb.nps === undefined || fb.nps === CONFIG.WIZARD.NPS_RANGES.NA_VALUE) {
             this.showError(`Bitte gib für Partner ${currentPartner.name} an, ob Du den Partner weiterempfehlen würdest.`);
             return false;
         }

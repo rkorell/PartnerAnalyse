@@ -3,9 +3,11 @@
   Zweck: JS-Logik für Partner Score Analyse
   # Modified: 27.11.2025, 15:30 - Layout Clean-Up: Removed Rank Column, Aligned Score Bar & Value horizontally
   # Modified: 27.11.2025, 13:00 - Added XSS protection (escapeHtml) for user inputs
+  # Modified: 27.11.2025, 14:30 - Centralized configuration via config.js (AP 6)
 */
 
-const CONFLICT_THRESHOLD = 2.0;
+// HIER GEÄNDERT: Entfernung der hardcodierten Konstante, da sie jetzt aus config.js kommt
+// const CONFLICT_THRESHOLD = 2.0;
 
 // NEU: Hilfsfunktion gegen XSS (Global oder im Scope)
 function escapeHtml(text) {
@@ -372,13 +374,15 @@ document.addEventListener("DOMContentLoaded", function() {
             const cntMgr = parseInt(row.num_assessors_mgr || 0);
             const cntTeam = parseInt(row.num_assessors_team || 0);
             
-            if (cntMgr >= 3 && cntTeam >= 3 && maxDiv > CONFLICT_THRESHOLD) {
-                const title = `Maximale Divergenz: ${maxDiv.toFixed(1)} (Schwellenwert: ${CONFLICT_THRESHOLD})`;
+            // HIER GEÄNDERT: Verwende CONFIG
+            const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
+            
+            if (cntMgr >= 3 && cntTeam >= 3 && maxDiv > conflictThreshold) {
+                const title = `Maximale Divergenz: ${maxDiv.toFixed(1)} (Schwellenwert: ${conflictThreshold})`;
                 slot4 = `<span class="insight-icon" data-action="conflict" data-id="${row.partner_id}" style="margin:0; cursor:pointer; font-size:1.5em;" title="${title}">⚡</span>`;
             }
 
             // HIER GEÄNDERT: Score-Zelle als Flex-Container (Row), Balken flex:1, Value feste Breite
-            // UND: escapeHtml für partner_name
             html += `
             <div class="criteria-row partner-row-clickable" data-partner-id="${row.partner_id}" style="display:flex; align-items:center;">
                 <div class="criteria-content" style="flex:0 0 300px; color:#3498db; cursor:pointer; font-weight:500;">${escapeHtml(row.partner_name)} ↗</div>
@@ -472,10 +476,13 @@ document.addEventListener("DOMContentLoaded", function() {
         else if (action === 'conflict') {
             title = `Signifikante Abweichungen: ${escapeHtml(partner.partner_name)}`;
             if (partner.matrix_details) {
+                // HIER GEÄNDERT: Verwende CONFIG
+                const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
+
                 const conflicts = partner.matrix_details.filter(d => {
                     const mgr = parseFloat(d.perf_mgr || 0);
                     const team = parseFloat(d.perf_team || 0);
-                    return Math.abs(mgr - team) > CONFLICT_THRESHOLD;
+                    return Math.abs(mgr - team) > conflictThreshold;
                 });
                 
                 if (conflicts.length > 0) {
@@ -493,7 +500,8 @@ document.addEventListener("DOMContentLoaded", function() {
                     });
                     content += `</table>`;
                 } else {
-                    content += `<p>Keine Kriterien gefunden, die den Schwellenwert von ${CONFLICT_THRESHOLD} überschreiten.</p>`;
+                    // HIER GEÄNDERT: Verwende conflictThreshold
+                    content += `<p>Keine Kriterien gefunden, die den Schwellenwert von ${conflictThreshold} überschreiten.</p>`;
                 }
             }
         }
@@ -503,7 +511,7 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById('global-info-modal').style.display = 'flex';
     }
 
-    function interpolateColor(c1, c2, t) { return [ Math.round(c1[0] + (c2[0]-c1[0])*t), Math.round(c1[1] + (c2[1]-c1[1])*t), Math.round(c1[2] + (c2[2]-c1[2])*t) ]; }
+    function interpolateColor(c1, c2, t) { return [ Math.round(c1[0] + (c2[0]-c1[0])*t), Math.round(c1[1] + (c2[1]-c1[1])*t), Math.round(c1[2] + (c2[2]-c2[2])*t) ]; }
 
     function exportToCSV() {
         if (!analysisData || analysisData.length === 0) return;

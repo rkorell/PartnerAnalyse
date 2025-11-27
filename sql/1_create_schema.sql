@@ -1,5 +1,6 @@
 /* 1_create_schema.sql - Struktur ohne Daten */
 /* # Modified: 26.11.2025, 20:40 - Added partner_feedback table and comment column to ratings */
+/* # Modified: 27.11.2025, 13:50 - Added critical indices for analysis query performance (AP 5) */
 
 DROP TABLE IF EXISTS partner_feedback CASCADE;
 DROP TABLE IF EXISTS ratings CASCADE;
@@ -83,3 +84,8 @@ CREATE TABLE partner_feedback (
 -- Indizes
 CREATE INDEX idx_partner_active ON partners(active);
 CREATE INDEX idx_survey_active ON surveys(is_active);
+
+-- NEUE INDIZES FÜR ANALYSE-QUERIES (AP 5)
+CREATE INDEX idx_ratings_participant ON ratings(participant_id);
+CREATE INDEX idx_ratings_partner_type ON ratings(partner_id, rating_type);
+CREATE INDEX idx_feedback_partner ON partner_feedback(partner_id);
