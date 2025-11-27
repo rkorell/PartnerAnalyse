@@ -18,8 +18,8 @@ export const CONFIG = {
         // Schwellenwerte für die Anzeige des Kommentar-Icons (Performance)
         // Hartcodiert in app.js: <= 3 ODER >= 8
         PERFORMANCE_COMMENT_THRESHOLD: {
-            MIN: 3, 
-            MAX: 8 
+            MIN: 1, 
+            MAX: 10 
         },
         
         // Schwellenwerte für die Tooltips (Importance)
