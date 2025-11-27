@@ -8,6 +8,7 @@
   # Modified: 27.11.2025, 09:00 - Extended SQL to return actual comment texts (General & Specific)
   # Modified: 27.11.2025, 11:45 - Fix: Cast JSON to text in GROUP BY to avoid DB error
   # Modified: 27.11.2025, 13:30 - Calc MAX divergence per criterion and return split details in matrix_json
+  # Modified: 27.11.2025, 12:30 - Fix SQL Injection (Prepared Statements)
 */
 
 header('Content-Type: application/json');
@@ -32,24 +33,27 @@ if (empty($survey_ids) || empty($department_ids)) {
     exit;
 }
 
-$department_id_list = implode(',', array_map('intval', $department_ids));
-$survey_id_list     = implode(',', array_map('intval', $survey_ids));
+// HIER GEÄNDERT: Platzhalter (?) generieren statt Werte direkt einzufügen
+$dept_placeholders = implode(',', array_fill(0, count($department_ids), '?'));
+$survey_placeholders = implode(',', array_fill(0, count($survey_ids), '?'));
 
 $manager_where = "";
 if ($manager_filter === "nur_manager") $manager_where = "AND p.is_manager = TRUE";
 else if ($manager_filter === "nur_nicht_manager") $manager_where = "AND p.is_manager = FALSE";
 
 try {
+    // SQL mit Platzhaltern
+    // Hinweis: :min_answers wurde durch ? ersetzt, um Parameter-Mischmasch zu vermeiden
     $sql = "
 WITH RECURSIVE subdeps AS (
-  SELECT id FROM departments WHERE id IN ($department_id_list)
+  SELECT id FROM departments WHERE id IN ($dept_placeholders)
   UNION ALL
   SELECT d.id FROM departments d JOIN subdeps s ON d.parent_id = s.id
 ),
 participants_filtered AS (
   SELECT p.id, p.is_manager
     FROM participants p
-   WHERE p.survey_id IN ($survey_id_list)
+   WHERE p.survey_id IN ($survey_placeholders)
      $manager_where
      AND p.department_id IN (SELECT id FROM subdeps)
 ),
@@ -138,13 +142,29 @@ JOIN assessor_counts ac ON ac.partner_id = pa.id
 LEFT JOIN feedback_stats fs ON fs.partner_id = pa.id 
 
 GROUP BY pa.id, pa.name
-HAVING MAX(ac.num_assessors) >= :min_answers 
+HAVING MAX(ac.num_assessors) >= ? 
 ORDER BY score DESC
     ";
 
+    // HIER GEÄNDERT: Parameter-Array aufbauen (Reihenfolge muss exakt zum SQL passen!)
+    $params = [];
+    
+    // 1. Departments (für subdeps IN Clause)
+    foreach ($department_ids as $id) {
+        $params[] = intval($id);
+    }
+
+    // 2. Surveys (für participants_filtered IN Clause)
+    foreach ($survey_ids as $id) {
+        $params[] = intval($id);
+    }
+    
+    // 3. Min Answers (für HAVING Clause)
+    $params[] = $min_answers;
+
     $stmt = $pdo->prepare($sql);
-    $stmt->bindValue(':min_answers', $min_answers, PDO::PARAM_INT);
-    $stmt->execute();
+    // Prepared Statement ausführen
+    $stmt->execute($params);
     $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     if (!$result) {
