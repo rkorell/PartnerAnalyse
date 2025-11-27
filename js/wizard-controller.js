@@ -2,6 +2,7 @@
   Datei: js/wizard-controller.js
   Zweck: Kernlogik der Quality Index Datenerfassung (ehemals QualityIndexWizard in app.js)
   # Created: 27.11.2025, 14:50 - Extracted core logic from app.js (AP 8)
+  # Modified: 27.11.2025, 15:30 - Removed unused 'restorePartnerValues' method (Dead Code Cleanup - AP 9)
 */
 
 import { CONFIG } from './config.js';
