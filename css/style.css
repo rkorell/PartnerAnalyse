@@ -1,5 +1,6 @@
 /* Modified: November 21, 2025, 20:47 - Vollständiges CSS für Cisco Partner Quality Index Wizard erstellt */
 /* # Modified: 24.11.2025, 23:30 - Added .slider-neutral for N/A state */
+/* # Modified: 27.11.2025, 18:00 - AP 14: Added utility classes to replace inline JS styles */
 
 /* Reset und Grundlagen */
 * {
@@ -937,4 +938,167 @@ input[type=range].slider-neutral {
 
 .info-modal-content li {
     margin-bottom: 8px;
+}
+
+/* =========================================
+   NEU (AP 14): Utility Classes für JS-Generiertes HTML
+   Zweck: Ablösung der Inline-Styles in score_analyse.js / wizard-data-view.js
+   ========================================= */
+
+/* Score Analyse: Tabelle Header & Rows */
+.score-table-header {
+    background: #f8f9fa;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+}
+
+.score-table-row {
+    display: flex;
+    align-items: center;
+}
+
+/* Spaltenbreiten (Flex) */
+.col-partner {
+    flex: 0 0 300px;
+}
+
+.col-partner-link {
+    color: #3498db;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.col-score-graph {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    padding-right: 10px;
+}
+
+.col-count {
+    flex: 0 0 110px;
+    text-align: center;
+}
+
+.col-insights {
+    flex: 0 0 260px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 10px;
+}
+
+/* Score Bar Balken Wrapper (in score-table-row) */
+.score-bar-wrapper {
+    flex: 1;
+    margin: 0;
+    height: 16px;
+    background: #ecf0f1;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.score-bar-text {
+    margin-left: 10px;
+    min-width: 40px;
+    text-align: right;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+/* Insight Slots */
+.insight-slot-nps {
+    width: 80px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.insight-slot-icon {
+    width: 60px;
+    text-align: center;
+}
+
+.insight-slot-mini {
+    width: 30px;
+    text-align: center;
+}
+
+/* Insight Icons Styling */
+.nps-display {
+    margin: 0; 
+    cursor: default; 
+    font-size: 1.2em; 
+    white-space: nowrap;
+}
+
+.nps-value {
+    font-size: 0.8em; 
+    font-weight: bold; 
+    vertical-align: middle;
+}
+
+.action-icon {
+    margin: 0; 
+    cursor: pointer; 
+    font-size: 1.5em;
+}
+
+.action-count {
+    font-size: 0.6em; 
+    font-weight: bold; 
+    vertical-align: middle;
+}
+
+/* Wizard Header Slider Labels */
+.slider-value-label {
+    min-width: 200px; 
+    text-align: left; 
+    margin-left: 15px;
+}
+
+/* Comment Container */
+.comment-container {
+    display: none; /* JS toggles this */
+    margin-top: 10px; 
+    padding-left: 20px;
+}
+
+.comment-textarea {
+    width: 100%; 
+    height: 60px; 
+    padding: 5px; 
+    border-radius: 4px; 
+    border: 1px solid #ccc;
+}
+
+.comment-textarea-large {
+    width: 100%; 
+    height: 80px; 
+    padding: 10px; 
+    border: 2px solid #ddd; 
+    border-radius: 8px; 
+    resize: vertical;
+}
+
+.partner-header-box {
+    background: #fff; 
+    padding: 20px; 
+    border-radius: 8px; 
+    border: 1px solid #ecf0f1; 
+    margin-bottom: 30px;
+}
+
+/* Icon Legend */
+.icon-legend-box {
+    margin-top: 15px; 
+    padding: 10px; 
+    background: #f8f9fa; 
+    border-radius: 4px; 
+    font-size: 0.9em; 
+    color: #7f8c8d;
+}
+
+.legend-item {
+    margin-right: 20px;
 }

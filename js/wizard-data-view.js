@@ -4,6 +4,8 @@
   # Created: 27.11.2025, 15:40 - Extracted Rendering Logic from wizard-controller.js (AP 10)
   # Modified: 27.11.2025, 15:50 - Moved all Slider/Input Handler Logic from controller (AP 10 Deep Refactoring)
   # Modified: 27.11.2025, 17:45 - Refactoring: Deduplicated slider HTML generation and fixed tooltip toggle (AP 13)
+  # Modified: 27.11.2025, 18:00 - CSS Cleanup (AP 14): Replaced inline styles with CSS classes.
+  # Modified: 27.11.2025, 18:30 - FIX: Critical Regression (AP 15). Data Setters were inside 'else' block, preventing '0' (N/A) from being saved.
 */
 
 import { CONFIG } from './config.js';
@@ -28,7 +30,6 @@ export class DataView {
         return grouped;
     }
 
-    // FIX: Show/Hide Logik korrigiert
     showSliderTooltip(slider, show = true) {
         const tooltip = document.getElementById(`tooltip_${slider.id}`);
         if (tooltip) {
@@ -36,7 +37,6 @@ export class DataView {
         }
     }
 
-    // NEU (AP 13): Zentrale Methode zur Generierung des Slider-HTMLs
     _generateSliderMarkup(domId, type, min, max, value, extraClass, displayValue, rawId = null) {
         const critAttr = rawId ? `data-crit-id="${rawId}"` : '';
         return `
@@ -125,7 +125,6 @@ export class DataView {
         }, 10);
     }
     
-    // Refactored: Nutzt jetzt _generateSliderMarkup
     createHeaderSliderHTML(domId, type, initialValue, min, max, labels) {
         let extraClass = 'slider-neutral';
         let displayValue = 'Bitte wählen...';
@@ -151,12 +150,11 @@ export class DataView {
         return `
             <div class="slider-container">
                 ${sliderHTML}
-                <span class="slider-value" id="value_${domId}" style="min-width:200px; text-align:left; margin-left:15px;">${displayValue}</span>
+                <span class="slider-value slider-value-label" id="value_${domId}">${displayValue}</span>
             </div>
         `;
     }
 
-    // Refactored: Nutzt jetzt _generateSliderMarkup
     createSliderHTML(domId, rawId, type, initialValue = 0) {
         const extraClass = initialValue === 0 ? 'slider-neutral' : '';
         const displayValue = initialValue === 0 ? 'N/A' : initialValue;
@@ -178,7 +176,7 @@ export class DataView {
                 <span class="slider-value" id="value_${domId}">${displayValue}</span>
                 ${iconHTML}
             </div>
-            ${type === 'performance' ? `<div id="comment_container_${domId}" style="display:none; margin-top:10px; padding-left:20px;"><textarea id="comment_${domId}" placeholder="[FREIWILLIG: Warum diese Bewertung?]" style="width:100%; height:60px; padding:5px; border-radius:4px; border:1px solid #ccc;"></textarea></div>` : ''}
+            ${type === 'performance' ? `<div id="comment_container_${domId}" class="comment-container"><textarea id="comment_${domId}" class="comment-textarea" placeholder="[FREIWILLIG: Warum diese Bewertung?]"></textarea></div>` : ''}
         `;
     }
     
@@ -198,7 +196,7 @@ export class DataView {
 
         const headerHTML = `
             <h3>Bewertung: ${this.callbacks.escapeHtml(partner.name)}</h3>
-            <div class="partner-header" style="background:#fff; padding:20px; border-radius:8px; border:1px solid #ecf0f1; margin-bottom:30px;">
+            <div class="partner-header-box">
                 <div class="form-row">
                     <div class="form-group">
                         <label>Wie häufig arbeitest Du mit ${this.callbacks.escapeHtml(partner.name)} zusammen? *</label>
@@ -206,7 +204,7 @@ export class DataView {
                     </div>
                     <div class="form-group">
                         <label>Generelles Feedback (optional):</label>
-                        <textarea id="gen_comment_${partnerId}" placeholder="[FREIWILLIG: Dein generelles Feedback]" style="width:100%; height:80px; padding:10px; border:2px solid #ddd; border-radius:8px; resize:vertical;">${initialComment}</textarea>
+                        <textarea id="gen_comment_${partnerId}" class="comment-textarea-large" placeholder="[FREIWILLIG: Dein generelles Feedback]">${initialComment}</textarea>
                     </div>
                 </div>
                 <div class="form-row" style="margin-top:20px;">
@@ -258,8 +256,8 @@ export class DataView {
                 const sliderAndCommentHTML = `
                     <div class="criteria-content">
                         ${this.createSliderHTML(domId, rawId, 'performance', currentVal)}
-                        <div id="comment_container_${domId}" style="display:${currentComment.trim() !== '' ? 'block' : 'none'}; margin-top:10px; padding-left:20px;">
-                            <textarea id="comment_${domId}" placeholder="[FREIWILLIG: Warum diese Bewertung?]" style="width:100%; height:60px; padding:5px; border-radius:4px; border:1px solid #ccc;">${escapedComment}</textarea>
+                        <div id="comment_container_${domId}" class="comment-container" style="display:${currentComment.trim() !== '' ? 'block' : 'none'};">
+                            <textarea id="comment_${domId}" class="comment-textarea" placeholder="[FREIWILLIG: Warum diese Bewertung?]">${escapedComment}</textarea>
                         </div>
                     </div>`;
 
@@ -297,7 +295,7 @@ export class DataView {
             });
             
             slider.addEventListener('mouseout', (e) => {
-                this.showSliderTooltip(e.target, false); // Verstecken (Fix)
+                this.showSliderTooltip(e.target, false); 
             });
         });
     }
@@ -343,6 +341,7 @@ export class DataView {
         
         let tooltipText = `${value} - Neutral`;
         
+        // 1. Visuelle Logik (Grau/Bunt)
         if (value === 0) {
             slider.classList.add('slider-neutral');
             if (valueDisplay) valueDisplay.textContent = 'N/A';
@@ -350,38 +349,56 @@ export class DataView {
         } else {
             slider.classList.remove('slider-neutral');
             if (valueDisplay) valueDisplay.textContent = value;
-            
-            if (type === 'importance') {
+        }
+
+        // HIER GEÄNDERT: Speicherlogik (Callbacks) aus dem if/else Block geholt.
+        // Die Daten müssen IMMER gespeichert werden, auch wenn value == 0 ist!
+        
+        if (type === 'importance') {
+            if (value > 0) { // Tooltip Text nur wenn > 0 sinnvoll
                 if (value <= CONFIG.WIZARD.IMPORTANCE_TOOLTIP_THRESHOLD.MIN) tooltipText = `${value} - ist mir eher unwichtig`;
                 else if (value >= CONFIG.WIZARD.IMPORTANCE_TOOLTIP_THRESHOLD.MAX) tooltipText = `${value} - ist mir extrem wichtig`;
                 else tooltipText = `${value} - wichtig`;
-                
-                this.callbacks.setImportance(rawId, value);
-            } else if (type === 'performance') {
+            }
+            // CRITICAL FIX: Speichern muss immer passieren
+            this.callbacks.setImportance(rawId, value);
+
+        } else if (type === 'performance') {
+            if (value > 0) {
                 if (value <= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MIN) tooltipText = `${value} - erfüllt der Partner sehr schlecht`;
                 else if (value >= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MAX) tooltipText = `${value} - erfüllt der Partner sehr gut`;
                 else tooltipText = `${value} - neutral`;
+            }
+            
+            // CRITICAL FIX: Speichern muss immer passieren
+            const partnerId = this.callbacks.getCurrentPartnerId(); 
+            if (partnerId) {
+                this.callbacks.setPerformance(partnerId, rawId, value, undefined);
+            }
 
-                const partnerId = this.callbacks.getCurrentPartnerId(); 
-                if (partnerId) {
-                    this.callbacks.setPerformance(partnerId, rawId, value, undefined);
-                }
-            } else if (type === 'frequency') {
-                const labels = {1: "Selten / Einmalig", 2: "Monatlich / Gelegentlich", 3: "Wöchentlich / Regelmäßig", 4: "Täglich / Intensiv"};
-                tooltipText = labels[value] || "Bitte wählen...";
-                this.callbacks.setFeedback(this.callbacks.getCurrentPartnerId(), 'frequency', value);
-            } else if (type === 'nps') {
-                if (value === CONFIG.WIZARD.NPS_RANGES.NA_VALUE) tooltipText = "Bitte wählen...";
-                else if (value === -1) tooltipText = "Möchte ich nicht bewerten";
+        } else if (type === 'frequency') {
+            const labels = {1: "Selten / Einmalig", 2: "Monatlich / Gelegentlich", 3: "Wöchentlich / Regelmäßig", 4: "Täglich / Intensiv"};
+            tooltipText = labels[value] || "Bitte wählen...";
+            this.callbacks.setFeedback(this.callbacks.getCurrentPartnerId(), 'frequency', value);
+
+        } else if (type === 'nps') {
+            if (value === CONFIG.WIZARD.NPS_RANGES.NA_VALUE) {
+                tooltipText = "Bitte wählen...";
+                // Auch hier: Visuelle Klasse muss ggf. gesetzt werden, wenn es die spezielle N/A Value ist
+                slider.classList.add('slider-neutral');
+                if (valueDisplay) valueDisplay.textContent = tooltipText;
+            } else {
+                slider.classList.remove('slider-neutral'); // Sicherstellen, dass es nicht grau ist
+                if (value === -1) tooltipText = "Möchte ich nicht bewerten";
                 else if (value === 0) tooltipText = "0 - Auf keinen Fall";
                 else if (value >= 1 && value <= 3) tooltipText = value + " - Eher nicht";
                 else if (value >= 4 && value <= 6) tooltipText = value + " - Eher schon";
                 else if (value >= 7 && value <= 10) tooltipText = value + " - Auf jeden Fall";
-
-                this.callbacks.setFeedback(this.callbacks.getCurrentPartnerId(), 'nps', value);
             }
-            if (tooltip) tooltip.textContent = tooltipText;
+            this.callbacks.setFeedback(this.callbacks.getCurrentPartnerId(), 'nps', value);
         }
+        
+        if (tooltip && value !== 0) tooltip.textContent = tooltipText;
 
         if (type === 'performance') {
             const partnerId = this.callbacks.getCurrentPartnerId(); 

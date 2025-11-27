@@ -7,6 +7,8 @@
   # Modified: 27.11.2025, 14:45 - FIX: Memory Leaks & Race Condition via Event Delegation (AP 7)
   # Modified: 27.11.2025, 15:15 - FIX: Analysis failure (AP 8 regression). Converted to ES6 module import.
   # Modified: 27.11.2025, 17:00 - Performance Optimization (AP 12): Implemented Lazy Loading for details. 
+  # Modified: 27.11.2025, 18:00 - CSS Cleanup (AP 14): Replaced inline styles with CSS classes.
+  # Modified: 27.11.2025, 18:35 - Code Quality: Converted snake_case DB fields to camelCase in frontend logic (AP 16).
 */
 
 import { CONFIG } from './config.js';
@@ -48,10 +50,8 @@ document.addEventListener("DOMContentLoaded", function() {
     const infoModal = document.getElementById('global-info-modal');
     const closeInfoBtn = document.getElementById('close-info-modal');
 
-    let analysisData = [];
+    let analysisData = []; // Beinhaltet jetzt die camelCase Felder
     let currentPartnerDetails = null;
-    
-    // NEU: Speichert die Filter-Parameter der letzten erfolgreichen Analyse
     let currentFilterState = null; 
 
     fetchSurveys();
@@ -94,14 +94,12 @@ document.addEventListener("DOMContentLoaded", function() {
         const insightIcon = e.target.closest('.insight-icon');
         if (insightIcon) {
             e.stopPropagation();
-            // Async Handler aufrufen
             handleInsightClickAsync(insightIcon.dataset.action, insightIcon.dataset.id);
             return;
         }
 
         const partnerRow = e.target.closest('.partner-row-clickable');
         if (partnerRow) {
-            // Async Handler aufrufen
             openMatrixAsync(partnerRow.getAttribute('data-partner-id'));
             return;
         }
@@ -126,7 +124,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }, true);
 
 
-    function fetchSurveys() { /* ... (bleibt gleich) ... */ 
+    function fetchSurveys() { 
         fetch('php/get_data.php')
             .then(response => response.json())
             .then(data => {
@@ -149,7 +147,7 @@ document.addEventListener("DOMContentLoaded", function() {
             });
     }
 
-    function fetchDepartments() { /* ... (bleibt gleich) ... */
+    function fetchDepartments() {
         fetch('php/get_data.php')
             .then(response => response.json())
             .then(data => {
@@ -170,7 +168,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         else if (deptMap[dep.parent_id]) deptMap[dep.parent_id].children.push(dep);
                     });
                     
-                    function renderNode(node) { /* ... (Tree-Logik bleibt gleich) ... */ 
+                    function renderNode(node) { 
                         const nodeDiv = document.createElement('div');
                         nodeDiv.className = 'tree-node';
                         const headerDiv = document.createElement('div');
@@ -259,7 +257,7 @@ document.addEventListener("DOMContentLoaded", function() {
     function hideLoader() { clearTimeout(loadingOverlay._timeout); loadingOverlay.style.display = 'none'; }
     function showError(msg) { errorText.textContent = msg; errorMessage.style.display = 'flex'; }
 
-    function setExportButtonState(enabled) { /* ... (bleibt gleich) ... */ 
+    function setExportButtonState(enabled) { 
         if (!exportBtn) return;
         exportBtn.disabled = !enabled;
         if (enabled) {
@@ -281,7 +279,6 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
 
-        // State speichern für spätere Detail-Requests
         currentFilterState = {
             survey_ids: surveyIds,
             manager_filter: managerFilter,
@@ -304,8 +301,23 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(data => {
             hideLoader();
             if (Array.isArray(data) && data.length > 0) {
-                analysisData = data; // Das sind jetzt die "Light"-Daten
-                renderResultTable(data);
+                // HIER GEÄNDERT: Konvertierung von snake_case zu camelCase (AP 16)
+                analysisData = data.map(row => ({
+                    partnerId: row.partner_id,
+                    partnerName: row.partner_name,
+                    score: row.score,
+                    totalAnswers: row.total_answers,
+                    globalParticipantCount: row.global_participant_count,
+                    npsScore: row.nps_score,
+                    commentCount: row.comment_count,
+                    maxDivergence: row.max_divergence,
+                    hasActionItem: row.has_action_item,
+                    numAssessorsMgr: row.num_assessors_mgr,
+                    numAssessorsTeam: row.num_assessors_team
+                    // matrix_details und general_comments sind hier nicht enthalten und werden on-demand geladen
+                }));
+
+                renderResultTable(analysisData);
                 setExportButtonState(true);
             } else if (data && data.message) {
                 resultSection.innerHTML = `<div class="selection-info">${data.message}</div>`;
@@ -333,16 +345,17 @@ document.addEventListener("DOMContentLoaded", function() {
         const scores = rows.map(r => r.score);
         const min = Math.min(...scores); const max = Math.max(...scores);
         
-        const globalCount = rows.length > 0 && rows[0].global_participant_count ? rows[0].global_participant_count : 0;
+        // HIER GEÄNDERT: Verwende camelCase
+        const globalCount = rows.length > 0 && rows[0].globalParticipantCount ? rows[0].globalParticipantCount : 0;
 
         let html = `
         <div class="criteria-group-title">Ergebnis: Partner Score Ranking (Basierend auf ${globalCount} Teilnehmern)</div>
         <div class="criteria-table">
-            <div class="criteria-row" style="background:#f8f9fa; font-weight:bold; display:flex; align-items:center;">
-                <div class="criteria-content" style="flex:0 0 300px;">Partner</div>
-                <div class="criteria-content" style="flex:1 1 auto;">Score</div>
-                <div class="criteria-content" style="flex:0 0 110px; text-align:center;">Anzahl Beurteiler</div>
-                <div class="criteria-content" style="flex:0 0 260px; text-align:center;">Insights</div>
+            <div class="criteria-row score-table-header">
+                <div class="criteria-content col-partner">Partner</div>
+                <div class="criteria-content col-score-graph">Score</div>
+                <div class="criteria-content col-count">Anzahl Beurteiler</div>
+                <div class="criteria-content col-insights" style="text-align:center;">Insights</div>
             </div>`;
 
         rows.forEach((row, idx) => {
@@ -359,69 +372,72 @@ document.addEventListener("DOMContentLoaded", function() {
             let slot4 = ''; 
 
             // 1. NPS
-            if (row.nps_score !== null && row.nps_score !== undefined) {
-                const nps = parseInt(row.nps_score);
+            // HIER GEÄNDERT: Verwende camelCase
+            if (row.npsScore !== null && row.npsScore !== undefined) {
+                const nps = parseInt(row.npsScore);
                 let npsColor = '#e74c3c'; 
                 if (nps >= 0 && nps <= 30) npsColor = '#f39c12'; 
                 else if (nps > 30 && nps <= 70) npsColor = '#f1c40f'; 
                 else if (nps > 70) npsColor = '#2ecc71'; 
                 
-                slot1 = `<span style="margin:0; cursor:default; font-size:1.2em; white-space:nowrap;" title="NPS Score: ${nps}">📣 <span style="font-size:0.8em; font-weight:bold; vertical-align:middle; color:${npsColor};">${nps > 0 ? '+' : ''}${nps}</span></span>`;
+                slot1 = `<span class="nps-display" title="NPS Score: ${nps}">📣 <span class="nps-value" style="color:${npsColor};">${nps > 0 ? '+' : ''}${nps}</span></span>`;
             }
 
             // 2. Kommentare (Flag/Count)
-            const commentCount = parseInt(row.comment_count || 0);
+            // HIER GEÄNDERT: Verwende camelCase
+            const commentCount = parseInt(row.commentCount || 0);
             if (commentCount > 0) {
-                slot2 = `<span class="insight-icon" data-action="comments" data-id="${row.partner_id}" style="margin:0; cursor:pointer; font-size:1.5em;" title="${commentCount} Kommentare - Klick für Details">💬 <span style="font-size:0.6em; font-weight:bold; vertical-align:middle;">${commentCount}</span></span>`;
+                slot2 = `<span class="insight-icon action-icon" data-action="comments" data-id="${row.partnerId}" title="${commentCount} Kommentare - Klick für Details">💬 <span class="action-count">${commentCount}</span></span>`;
             }
 
             // 3. Action List (Flag aus SQL)
-            // HIER GEÄNDERT: Wir prüfen das SQL-Flag 'has_action_item' statt durch ein Array zu iterieren
-            if (parseInt(row.has_action_item) === 1) {
-                slot3 = `<span class="insight-icon" data-action="action" data-id="${row.partner_id}" style="margin:0; cursor:pointer; font-size:1.5em;" title="Handlungsbedarf - Klick für Details">⚠️</span>`;
+            // HIER GEÄNDERT: Verwende camelCase
+            if (parseInt(row.hasActionItem) === 1) {
+                slot3 = `<span class="insight-icon action-icon" data-action="action" data-id="${row.partnerId}" title="Handlungsbedarf - Klick für Details">⚠️</span>`;
             }
 
             // 4. Divergenz (Metrik aus SQL)
-            const maxDiv = parseFloat(row.max_divergence || 0);
-            const cntMgr = parseInt(row.num_assessors_mgr || 0);
-            const cntTeam = parseInt(row.num_assessors_team || 0);
+            // HIER GEÄNDERT: Verwende camelCase
+            const maxDiv = parseFloat(row.maxDivergence || 0);
+            const cntMgr = parseInt(row.numAssessorsMgr || 0);
+            const cntTeam = parseInt(row.numAssessorsTeam || 0);
             
             const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
             
             if (cntMgr >= 3 && cntTeam >= 3 && maxDiv > conflictThreshold) {
                 const title = `Maximale Divergenz: ${maxDiv.toFixed(1)} (Schwellenwert: ${conflictThreshold})`;
-                slot4 = `<span class="insight-icon" data-action="conflict" data-id="${row.partner_id}" style="margin:0; cursor:pointer; font-size:1.5em;" title="${title}">⚡</span>`;
+                slot4 = `<span class="insight-icon action-icon" data-action="conflict" data-id="${row.partnerId}" title="${title}">⚡</span>`;
             }
 
             html += `
-            <div class="criteria-row partner-row-clickable" data-partner-id="${row.partner_id}" style="display:flex; align-items:center;">
-                <div class="criteria-content" style="flex:0 0 300px; color:#3498db; cursor:pointer; font-weight:500;">${escapeHtml(row.partner_name)} ↗</div>
+            <div class="criteria-row partner-row-clickable score-table-row" data-partner-id="${row.partnerId}">
+                <div class="criteria-content col-partner col-partner-link">${escapeHtml(row.partnerName)} ↗</div>
                 
-                <div class="criteria-content" style="flex:1 1 auto; display:flex; align-items:center; padding-right:10px;">
-                    <div class="score-bar-bg" style="flex:1; margin:0; height:16px; background:#ecf0f1; border-radius:8px; overflow:hidden;">
+                <div class="criteria-content col-score-graph">
+                    <div class="score-bar-wrapper">
                         <div class="score-bar-fill" style="height:100%; width:${Math.round(pct*90)+10}%; background:${rgb}; transition:width 0.5s;"></div>
                     </div>
-                    <div class="score-bar-value" style="margin-left:10px; min-width:40px; text-align:right; font-weight:bold; color:#2c3e50;">${row.score}</div>
+                    <div class="score-bar-text">${row.score}</div>
                 </div>
                 
-                <div class="criteria-content" style="flex:0 0 110px; text-align:center;">${row.total_answers}</div>
+                <div class="criteria-content col-count">${row.totalAnswers}</div>
                 
-                <div class="criteria-content" style="flex:0 0 260px; display:flex; justify-content:space-between; align-items:center; padding:5px 10px;">
-                    <div style="width:80px; text-align:left; white-space:nowrap;">${slot1}</div>
-                    <div style="width:60px; text-align:center;">${slot2}</div>
-                    <div style="width:30px; text-align:center;">${slot3}</div>
-                    <div style="width:30px; text-align:center;">${slot4}</div>
+                <div class="criteria-content col-insights">
+                    <div class="insight-slot-nps">${slot1}</div>
+                    <div class="insight-slot-icon">${slot2}</div>
+                    <div class="insight-slot-mini">${slot3}</div>
+                    <div class="insight-slot-mini">${slot4}</div>
                 </div>
             </div>`;
         });
         html += `</div>`;
 
         html += `
-        <div class="icon-legend" style="margin-top:15px; padding:10px; background:#f8f9fa; border-radius:4px; font-size:0.9em; color:#7f8c8d;">
+        <div class="icon-legend-box">
             <strong style="margin-right:10px;">Legende:</strong>
-            <span style="margin-right:20px;">📣 NPS-Score</span>
-            <span style="margin-right:20px;">💬 Kommentare vorhanden</span>
-            <span style="margin-right:20px;">⚠️ Handlungsfelder (Vorschläge)</span>
+            <span class="legend-item">📣 NPS-Score</span>
+            <span class="legend-item">💬 Kommentare vorhanden</span>
+            <span class="legend-item">⚠️ Handlungsfelder (Vorschläge)</span>
             <span>⚡ Bewertungsunterschiede Mgmt/Field</span>
         </div>`;
 
@@ -442,7 +458,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     ...currentFilterState,
-                    partner_id: partner.partner_id
+                    partner_id: partner.partnerId // HIER GEÄNDERT: Verwende camelCase
                 })
             });
             
@@ -450,7 +466,7 @@ document.addEventListener("DOMContentLoaded", function() {
             
             if (details.error) throw new Error(details.error);
 
-            // Daten mergen
+            // Daten mergen (matrix_details und general_comments kommen snake_case vom Detail-API, werden gemergt)
             partner.matrix_details = details.matrix_details;
             partner.general_comments = details.general_comments;
             
@@ -464,19 +480,18 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     async function handleInsightClickAsync(action, partnerId) {
-        let partner = analysisData.find(p => p.partner_id == partnerId);
+        let partner = analysisData.find(p => p.partnerId == partnerId); // HIER GEÄNDERT: Verwende camelCase
         if (!partner) return;
 
-        // Sicherstellen, dass Details da sind
         partner = await ensurePartnerDetails(partner);
         if (!partner) return;
 
-        // Ab hier Logik wie früher, da partner jetzt matrix_details hat
         let title = "";
         let content = "";
 
+        // HIER GEÄNDERT: Verwende partner.partnerName
         if (action === 'comments') {
-            title = `Kommentare zu ${escapeHtml(partner.partner_name)}`;
+            title = `Kommentare zu ${escapeHtml(partner.partnerName)}`;
             if (partner.general_comments && partner.general_comments.length > 0) {
                 content += `<h4>Allgemeines Feedback</h4><ul>`;
                 partner.general_comments.forEach(c => content += `<li>${escapeHtml(c)}</li>`);
@@ -495,7 +510,8 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         } 
         else if (action === 'action') {
-            title = `Handlungsfelder für ${escapeHtml(partner.partner_name)}`;
+            // HIER GEÄNDERT: Verwende partner.partnerName
+            title = `Handlungsfelder für ${escapeHtml(partner.partnerName)}`;
             if (partner.matrix_details) {
                 const items = partner.matrix_details.filter(d => parseFloat(d.imp) >= 8.0 && parseFloat(d.perf) <= 5.0);
                 if (items.length > 0) {
@@ -508,10 +524,15 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
         else if (action === 'conflict') {
-            title = `Signifikante Abweichungen: ${escapeHtml(partner.partner_name)}`;
+            // HIER GEÄNDERT: Verwende partner.partnerName und maxDivergence (wird in analysisData gespeichert)
+            title = `Signifikante Abweichungen: ${escapeHtml(partner.partnerName)}`;
+            
+            // Die Divergenz muss für die Anzeige im Modal neu berechnet werden, da die Details nicht auf oberster Ebene sind
+            const partnerListRow = analysisData.find(p => p.partnerId == partnerId); 
+            const maxDiv = partnerListRow ? partnerListRow.maxDivergence : 0;
+            
             if (partner.matrix_details) {
                 const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
-
                 const conflicts = partner.matrix_details.filter(d => {
                     const mgr = parseFloat(d.perf_mgr || 0);
                     const team = parseFloat(d.perf_team || 0);
@@ -547,19 +568,17 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function exportToCSV() {
         if (!analysisData || analysisData.length === 0) return;
-        // ACHTUNG: Export funktioniert nur für bereits geladene Details.
-        // Das ist ein Kompromiss. Eine vollständige Implementierung würde hier alle Details nachladen.
-        // Für jetzt exportieren wir das, was wir haben.
         
         let csvContent = "Partner;Gesamt-Score;Anzahl Beurteiler;Kriterium (Matrix);Wichtigkeit (I);Performance (P)\n";
 
+        // ACHTUNG: Export muss jetzt über den camelCase Namen iterieren
         analysisData.forEach(partner => {
             if (partner.matrix_details) {
                 partner.matrix_details.forEach(detail => {
                     let row = [
-                        partner.partner_name,
+                        partner.partnerName,
                         partner.score,
-                        partner.total_answers,
+                        partner.totalAnswers,
                         detail.name, 
                         detail.imp,
                         detail.perf
@@ -589,8 +608,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // --- IPA Matrix Logik ---
-
-    function calculateStats(details) {
+    function calculateStats(details) { /* ... (bleibt gleich) ... */
         const imps = details.map(d => parseFloat(d.imp));
         const perfs = details.map(d => parseFloat(d.perf));
         const sumImp = imps.reduce((a,b) => a+b, 0);
@@ -599,15 +617,14 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     async function openMatrixAsync(partnerId) {
-        let partner = analysisData.find(p => p.partner_id == partnerId);
+        let partner = analysisData.find(p => p.partnerId == partnerId); // HIER GEÄNDERT: Verwende camelCase
         if (!partner) return;
 
-        // Details nachladen
         partner = await ensurePartnerDetails(partner);
         if (!partner || !partner.matrix_details) return;
 
         currentPartnerDetails = partner; 
-        matrixTitle.textContent = "IPA Matrix: " + partner.partner_name;
+        matrixTitle.textContent = "IPA Matrix: " + partner.partnerName; // HIER GEÄNDERT: Verwende camelCase
 
         const radios = document.querySelectorAll('input[name="matrix-center"]');
         radios.forEach(r => { if(r.value === 'standard') r.checked = true; });
@@ -616,7 +633,7 @@ document.addEventListener("DOMContentLoaded", function() {
         matrixModal.style.display = 'flex';
     }
 
-    function updateMatrixView(mode) {
+    function updateMatrixView(mode) { /* ... (bleibt gleich) ... */
         if (!currentPartnerDetails) return;
         const stats = calculateStats(currentPartnerDetails.matrix_details);
         let centerX = 5.0;
@@ -630,7 +647,7 @@ document.addEventListener("DOMContentLoaded", function() {
         renderMatrixSVG(currentPartnerDetails.matrix_details, centerX, centerY, maxDist);
     }
 
-    function calculateMaxDeviation(details, cx, cy) {
+    function calculateMaxDeviation(details, cx, cy) { /* ... (bleibt gleich) ... */
         let maxD = 0;
         details.forEach(d => {
             const dx = d.perf - cx;
@@ -640,7 +657,7 @@ document.addEventListener("DOMContentLoaded", function() {
         return Math.max(maxD * 1.1, 0.5); 
     }
 
-    function renderMatrixSVG(details, centerX, centerY, rangeRadius) {
+    function renderMatrixSVG(details, centerX, centerY, rangeRadius) { /* ... (bleibt gleich) ... */
         const size = 400;
         const scale = (size / 2) / rangeRadius;
         let svg = `<svg viewBox="0 0 ${size} ${size}" class="matrix-svg">`;
