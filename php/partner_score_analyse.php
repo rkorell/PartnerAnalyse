@@ -9,6 +9,7 @@
   # Modified: 27.11.2025, 11:45 - Fix: Cast JSON to text in GROUP BY to avoid DB error
   # Modified: 27.11.2025, 13:30 - Calc MAX divergence per criterion and return split details in matrix_json
   # Modified: 27.11.2025, 12:30 - Fix SQL Injection (Prepared Statements)
+  # Modified: 27.11.2025, 13:45 - Suppress detailed DB error message for security
 */
 
 header('Content-Type: application/json');
@@ -185,7 +186,9 @@ ORDER BY score DESC
     echo json_encode($result);
 
 } catch (Exception $e) {
+    // HIER GEÄNDERT: Detaillierte Fehlermeldung entfernt
+    // log $e->getMessage()
     http_response_code(500);
-    echo json_encode(["error" => "Datenbankfehler: " . $e->getMessage()]);
+    echo json_encode(["error" => "Fehler bei der Analyse-Abfrage."]);
 }
 ?>

@@ -6,6 +6,7 @@
   # Modified: 23.11.2025, 11:35 - Aliase entfernt (Fix: Keine Umlaute/Germanismen in JSON-Keys)
   # Modified: 23.11.2025, 21:15 - App-Texte (Tooltips) aus DB laden (app_texts)
   # Modified: 24.11.2025, 23:30 - Added test_mode flag to survey data
+  # Modified: 27.11.2025, 13:45 - Suppress detailed DB error message for security
 */
 
 header('Content-Type: application/json');
@@ -73,8 +74,10 @@ try {
         'app_texts'   => $app_texts
     ]);
 } catch (Exception $e) {
+    // HIER GEÄNDERT: Detaillierte Fehlermeldung entfernt
+    // log $e->getMessage()
     http_response_code(500);
-    echo json_encode(['error' => 'Fehler beim Laden der Daten: ' . $e->getMessage()]);
+    echo json_encode(['error' => 'Fehler beim Laden der Konfigurationsdaten.']);
     exit;
 }
 ?>
