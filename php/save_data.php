@@ -4,6 +4,7 @@
    # Modified: 24.11.2025, 23:45 - Handle 0 as NULL for performance ratings
    # Modified: 26.11.2025, 20:50 - Added support for comments and partner_feedback table (NPS/Frequency)
    # Modified: 27.11.2025, 13:30 - Strict Backend Input Validation (Range Check, Type Check, Fail-Fast)
+   # Modified: 27.11.2025, 13:50 - Safer transaction handling (check inTransaction before rollback) (AP 5)
 */
 header('Content-Type: application/json');
 require 'db_connect.php';
@@ -97,7 +98,7 @@ if (isset($input['performance']) && is_array($input['performance'])) {
 if (isset($input['partner_feedback']) && is_array($input['partner_feedback'])) {
     foreach ($input['partner_feedback'] as $partnerId => $fb) {
         
-        // Frequency check (0-4)
+        // Frequency check (0-4 validiert)
         $freq = $fb['frequency'] ?? 0; // Frontend sendet 0 für "Bitte wählen..."
         if (!validateIntRange($freq, 0, 4)) {
             http_response_code(400);
@@ -105,7 +106,7 @@ if (isset($input['partner_feedback']) && is_array($input['partner_feedback'])) {
             exit;
         }
 
-        // NPS check (-2 to 10)
+        // NPS check (-2 to 10 validiert)
         $nps = $fb['nps'] ?? -2; // Frontend sendet -2 für "Bitte wählen..."
         if (!validateIntRange($nps, -2, 10)) {
             http_response_code(400);
@@ -199,8 +200,10 @@ try {
     echo json_encode(['status' => 'success', 'id' => $participantId]);
 
 } catch (Exception $e) {
-    // Fehlerbehandlung: Neutrales Rollback
-    $pdo->rollBack();
+    // HIER GEÄNDERT: Rollback nur, wenn Transaktion noch aktiv ist
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     http_response_code(500);
     // Neutralere Fehlermeldung, um DB-Details nicht preiszugeben
     echo json_encode(['error' => 'Speicherfehler auf dem Server. Bitte überprüfe die Eingaben oder versuche es später erneut.']);
