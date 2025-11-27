@@ -11,13 +11,22 @@
   # Modified: 27.11.2025, 12:30 - Fix SQL Injection (Prepared Statements)
   # Modified: 27.11.2025, 13:45 - Suppress detailed DB error message for security
   # Modified: 27.11.2025, 16:00 - Security Fix: Required db_connect.php via absolute, private path (AP 11)
+  # Modified: 27.11.2025, 16:15 - FIX: Added file_exists check for robust require_once handling (AP 11 Fix)
   # Modified: 27.11.2025, 16:30 - Final FIX: require_once moved into try-block for stable error handling (AP 11 Final Fix)
+  # Modified: 27.11.2025, 17:00 - Performance Optimization (AP 12): "Smart Aggregation". Removed expensive JSON_AGG. Now returns only scores, counts and flags.
 */
 
 header('Content-Type: application/json');
 
-// HIER GEÄNDERT: Definieren des absoluten Pfades außerhalb des Webroot
 define('DB_CONFIG_PATH', '/etc/partneranalyse/db_connect.php');
+
+if (!file_exists(DB_CONFIG_PATH)) {
+    http_response_code(500);
+    echo json_encode(["error" => "Interner Serverfehler (Konfiguration nicht gefunden)."]);
+    exit;
+}
+
+require_once DB_CONFIG_PATH;
 
 $input = json_decode(file_get_contents('php://input'), true);
 
@@ -38,7 +47,6 @@ if (empty($survey_ids) || empty($department_ids)) {
     exit;
 }
 
-// HIER GEÄNDERT: Platzhalter (?) generieren statt Werte direkt einzufügen
 $dept_placeholders = implode(',', array_fill(0, count($department_ids), '?'));
 $survey_placeholders = implode(',', array_fill(0, count($survey_ids), '?'));
 
@@ -46,12 +54,11 @@ $manager_where = "";
 if ($manager_filter === "nur_manager") $manager_where = "AND p.is_manager = TRUE";
 else if ($manager_filter === "nur_nicht_manager") $manager_where = "AND p.is_manager = FALSE";
 
-// WICHTIG: require_once ist jetzt im try-Block, um PHP-Fatal-Errors abzufangen
 try {
     require_once DB_CONFIG_PATH;
 
-    // SQL mit Platzhaltern
-    // Hinweis: :min_answers wurde durch ? ersetzt, um Parameter-Mischmasch zu vermeiden
+    // OPTIMIERTE QUERY: Keine JSON-Aggregation mehr!
+    // Berechnet Flags (has_action_item) und Metriken (max_divergence) direkt.
     $sql = "
 WITH RECURSIVE subdeps AS (
   SELECT id FROM departments WHERE id IN ($dept_placeholders)
@@ -84,7 +91,7 @@ assessor_counts AS (
 feedback_stats AS (
   SELECT f.partner_id,
          COUNT(f.general_comment) as cnt_gen_comments,
-         JSON_AGG(f.general_comment) FILTER (WHERE f.general_comment IS NOT NULL AND trim(f.general_comment) <> '') as gen_comments_list,
+         -- HIER ENTFERNT: JSON_AGG für General Comments (Performance)
          ROUND(100.0 * (COUNT(*) FILTER (WHERE f.nps_score >= 9) - COUNT(*) FILTER (WHERE f.nps_score <= 6)) / NULLIF(COUNT(f.nps_score), 0), 0) as nps_score
     FROM partner_feedback f
    WHERE f.participant_id IN (SELECT id FROM participants_filtered)
@@ -102,8 +109,8 @@ performance_avg AS (
          AVG(r.score) AS performance,
          AVG(r.score) FILTER (WHERE p.is_manager) as perf_mgr,
          AVG(r.score) FILTER (WHERE NOT p.is_manager) as perf_team,
-         COUNT(r.comment) as cnt_spec_comments,
-         JSON_AGG(r.comment) FILTER (WHERE r.comment IS NOT NULL AND trim(r.comment) <> '') as spec_comments_list
+         COUNT(r.comment) as cnt_spec_comments
+         -- HIER ENTFERNT: JSON_AGG für Specific Comments (Performance)
     FROM ratings r
     JOIN participants_filtered p ON r.participant_id = p.id
    WHERE r.rating_type = 'performance'
@@ -116,36 +123,28 @@ SELECT
   -- Gesamt Score
   ROUND(SUM(pf.performance * ia.importance)::numeric, 2) AS score,
   
-  -- NEU: Maximale Divergenz (Manager vs Team) über alle Kriterien
+  -- Indikator ⚡: Maximale Divergenz
   MAX(ABS(COALESCE(pf.perf_mgr, 0) - COALESCE(pf.perf_team, 0))) AS max_divergence,
   
+  -- Indikator ⚠️: Action Item Flag (Direkte SQL Berechnung statt JSON-Parsing im Frontend)
+  -- Prüft: Gibt es EIN Kriterium mit Wichtigkeit >= 8.0 UND Performance <= 5.0?
+  MAX(CASE WHEN ia.importance >= 8.0 AND pf.performance <= 5.0 THEN 1 ELSE 0 END) as has_action_item,
+
   -- Beurteiler-Zahlen
   MAX(ac.num_assessors) AS total_answers,
   MAX(ac.num_assessors_mgr) AS num_assessors_mgr,
   MAX(ac.num_assessors_team) AS num_assessors_team,
   
-  -- Insights Daten
+  -- Insights Daten (Nur Zahlen/Flags)
   MAX(fs.nps_score) as nps_score,
   (COALESCE(SUM(pf.cnt_spec_comments), 0) + COALESCE(MAX(fs.cnt_gen_comments), 0)) as comment_count,
-  COALESCE(MAX(fs.gen_comments_list::text)::json, '[]'::json) as general_comments,
   
   -- Globaler Zähler
-  (SELECT unique_assessors_total FROM global_stats) AS global_participant_count,
-  
-  -- NEU: Details inkl. Split Scores für das Frontend-Modal
-  json_agg(json_build_object(
-      'name', c.name,
-      'imp',  ROUND(ia.importance::numeric, 1),
-      'perf', ROUND(pf.performance::numeric, 1),
-      'perf_mgr', ROUND(pf.perf_mgr::numeric, 1),
-      'perf_team', ROUND(pf.perf_team::numeric, 1),
-      'comments', pf.spec_comments_list
-  )) AS matrix_details
+  (SELECT unique_assessors_total FROM global_stats) AS global_participant_count
 
 FROM performance_avg pf
 JOIN importance_avg ia ON pf.criterion_id = ia.criterion_id
 JOIN partners pa ON pa.id = pf.partner_id
-JOIN criteria c ON c.id = pf.criterion_id
 JOIN assessor_counts ac ON ac.partner_id = pa.id 
 LEFT JOIN feedback_stats fs ON fs.partner_id = pa.id 
 
@@ -154,24 +153,12 @@ HAVING MAX(ac.num_assessors) >= ?
 ORDER BY score DESC
     ";
 
-    // HIER GEÄNDERT: Parameter-Array aufbauen (Reihenfolge muss exakt zum SQL passen!)
     $params = [];
-    
-    // 1. Departments (für subdeps IN Clause)
-    foreach ($department_ids as $id) {
-        $params[] = intval($id);
-    }
-
-    // 2. Surveys (für participants_filtered IN Clause)
-    foreach ($survey_ids as $id) {
-        $params[] = intval($id);
-    }
-    
-    // 3. Min Answers (für HAVING Clause)
+    foreach ($department_ids as $id) $params[] = intval($id);
+    foreach ($survey_ids as $id) $params[] = intval($id);
     $params[] = $min_answers;
 
     $stmt = $pdo->prepare($sql);
-    // Prepared Statement ausführen
     $stmt->execute($params);
     $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -180,20 +167,12 @@ ORDER BY score DESC
         exit;
     }
 
-    foreach ($result as &$row) {
-        if (isset($row['matrix_details'])) {
-            $row['matrix_details'] = json_decode($row['matrix_details'], true);
-        }
-        if (isset($row['general_comments'])) {
-            $row['general_comments'] = json_decode($row['general_comments'], true);
-        }
-    }
-    unset($row);
-
     echo json_encode($result);
 
 } catch (Exception $e) {
-    // log $e->getMessage()
+    if (isset($pdo) && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     http_response_code(500);
     echo json_encode(["error" => "Fehler bei der Analyse-Abfrage."]);
 }
