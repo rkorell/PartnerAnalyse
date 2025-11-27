@@ -2,9 +2,21 @@
   Datei: /var/www/html/js/score_analyse.js
   Zweck: JS-Logik für Partner Score Analyse
   # Modified: 27.11.2025, 15:30 - Layout Clean-Up: Removed Rank Column, Aligned Score Bar & Value horizontally
+  # Modified: 27.11.2025, 13:00 - Added XSS protection (escapeHtml) for user inputs
 */
 
 const CONFLICT_THRESHOLD = 2.0;
+
+// NEU: Hilfsfunktion gegen XSS (Global oder im Scope)
+function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
 document.addEventListener("DOMContentLoaded", function() {
     const surveySelect = document.getElementById('survey-filter');
@@ -366,9 +378,10 @@ document.addEventListener("DOMContentLoaded", function() {
             }
 
             // HIER GEÄNDERT: Score-Zelle als Flex-Container (Row), Balken flex:1, Value feste Breite
+            // UND: escapeHtml für partner_name
             html += `
             <div class="criteria-row partner-row-clickable" data-partner-id="${row.partner_id}" style="display:flex; align-items:center;">
-                <div class="criteria-content" style="flex:0 0 300px; color:#3498db; cursor:pointer; font-weight:500;">${row.partner_name} ↗</div>
+                <div class="criteria-content" style="flex:0 0 300px; color:#3498db; cursor:pointer; font-weight:500;">${escapeHtml(row.partner_name)} ↗</div>
                 
                 <div class="criteria-content" style="flex:1 1 auto; display:flex; align-items:center; padding-right:10px;">
                     <div class="score-bar-bg" style="flex:1; margin:0; height:16px; background:#ecf0f1; border-radius:8px; overflow:hidden;">
@@ -423,10 +436,11 @@ document.addEventListener("DOMContentLoaded", function() {
         let content = "";
 
         if (action === 'comments') {
-            title = `Kommentare zu ${partner.partner_name}`;
+            title = `Kommentare zu ${escapeHtml(partner.partner_name)}`;
             if (partner.general_comments && partner.general_comments.length > 0) {
                 content += `<h4>Allgemeines Feedback</h4><ul>`;
-                partner.general_comments.forEach(c => content += `<li>${c}</li>`);
+                // HIER GEÄNDERT: escapeHtml
+                partner.general_comments.forEach(c => content += `<li>${escapeHtml(c)}</li>`);
                 content += `</ul>`;
             }
             if (partner.matrix_details) {
@@ -434,28 +448,29 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (specific.length > 0) {
                     content += `<h4>Spezifisches Feedback</h4>`;
                     specific.forEach(d => {
-                        content += `<strong>${d.name}</strong> (I:${d.imp}/P:${d.perf})<ul>`;
-                        d.comments.forEach(c => content += `<li>${c}</li>`);
+                        content += `<strong>${escapeHtml(d.name)}</strong> (I:${d.imp}/P:${d.perf})<ul>`;
+                        // HIER GEÄNDERT: escapeHtml
+                        d.comments.forEach(c => content += `<li>${escapeHtml(c)}</li>`);
                         content += `</ul>`;
                     });
                 }
             }
         } 
         else if (action === 'action') {
-            title = `Handlungsfelder für ${partner.partner_name}`;
+            title = `Handlungsfelder für ${escapeHtml(partner.partner_name)}`;
             if (partner.matrix_details) {
                 const items = partner.matrix_details.filter(d => parseFloat(d.imp) >= 8.0 && parseFloat(d.perf) <= 5.0);
                 if (items.length > 0) {
                     content += `<table style="width:100%; text-align:left;"><tr><th>Kriterium</th><th>Wichtigkeit</th><th>Performance</th></tr>`;
                     items.forEach(i => {
-                        content += `<tr><td>${i.name}</td><td>${i.imp}</td><td style="color:#e74c3c; font-weight:bold;">${i.perf}</td></tr>`;
+                        content += `<tr><td>${escapeHtml(i.name)}</td><td>${i.imp}</td><td style="color:#e74c3c; font-weight:bold;">${i.perf}</td></tr>`;
                     });
                     content += `</table>`;
                 }
             }
         }
         else if (action === 'conflict') {
-            title = `Signifikante Abweichungen: ${partner.partner_name}`;
+            title = `Signifikante Abweichungen: ${escapeHtml(partner.partner_name)}`;
             if (partner.matrix_details) {
                 const conflicts = partner.matrix_details.filter(d => {
                     const mgr = parseFloat(d.perf_mgr || 0);
@@ -470,7 +485,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         const team = parseFloat(c.perf_team || 0);
                         const delta = Math.abs(mgr - team).toFixed(1);
                         content += `<tr>
-                            <td>${c.name}</td>
+                            <td>${escapeHtml(c.name)}</td>
                             <td style="color:#e74c3c; font-weight:bold;">${mgr.toFixed(1)}</td>
                             <td style="color:#3498db; font-weight:bold;">${team.toFixed(1)}</td>
                             <td>${delta}</td>
@@ -621,9 +636,10 @@ document.addEventListener("DOMContentLoaded", function() {
             const px = mid + (dx * scale);
             const py = mid - (dy * scale); 
 
+            // HIER GEÄNDERT: escapeHtml für data-name
             svg += `<circle cx="${px}" cy="${py}" r="6" fill="#3498db" stroke="#fff" stroke-width="1"
                     class="matrix-dot" 
-                    data-name="${d.name}" data-imp="${d.imp}" data-perf="${d.perf}" />`;
+                    data-name="${escapeHtml(d.name)}" data-imp="${d.imp}" data-perf="${d.perf}" />`;
         });
         
         svg += `</svg>`;

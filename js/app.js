@@ -4,6 +4,7 @@
 // # Modified: 24.11.2025, 23:10 - Implemented Test-Mode, N/A Slider State (0), Importance Validation
 // # Modified: 26.11.2025, 21:15 - Added Partner Header (Freq, NPS, GenComment) and Per-Criteria Comments
 // # Modified: 27.11.2025, 10:15 - Changed GenComment to Textarea, Updated Placeholders
+// # Modified: 27.11.2025, 13:00 - Added XSS protection (escapeHtml) for user inputs
 
 class QualityIndexWizard {
     constructor() {
@@ -30,6 +31,17 @@ class QualityIndexWizard {
         this.personalData = {};
         
         this.init();
+    }
+
+    // NEU: Hilfsfunktion gegen XSS
+    escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 
     async init() {
@@ -548,9 +560,10 @@ class QualityIndexWizard {
             const checkboxDiv = document.createElement('div');
             checkboxDiv.className = 'partner-checkbox' + (isSelected ? ' selected' : '');
             
+            // HIER GEÄNDERT: escapeHtml für Partner Name
             checkboxDiv.innerHTML = `
-                <input type="checkbox" id="partner_${index}" value="${partner.id}" data-name="${partner.name}" ${isSelected ? 'checked' : ''}>
-                <label for="partner_${index}">${partner.name}</label>
+                <input type="checkbox" id="partner_${index}" value="${partner.id}" data-name="${this.escapeHtml(partner.name)}" ${isSelected ? 'checked' : ''}>
+                <label for="partner_${index}">${this.escapeHtml(partner.name)}</label>
             `;
             
             const checkbox = checkboxDiv.querySelector('input');
@@ -584,7 +597,7 @@ class QualityIndexWizard {
             .filter(cb => cb.checked)
             .map(cb => ({
                 id: cb.value,
-                name: cb.dataset.name
+                name: cb.dataset.name // Das ist bereits escaped/safe aus DOM
             }));
         
         document.getElementById('selected-partners-count').textContent = this.selectedPartners.length;
@@ -623,23 +636,23 @@ class QualityIndexWizard {
         const pf = this.partnerFeedback[partnerId];
 
         // HTML Aufbau: Header (Freq, Comment, NPS) dann Kriterien
-        // HIER GEÄNDERT: Textarea für General Comment + Placeholder
+        // HIER GEÄNDERT: Textarea für General Comment + Placeholder und Name ESCAPED
         const headerHTML = `
-            <h3>Bewertung: ${partner.name}</h3>
+            <h3>Bewertung: ${this.escapeHtml(partner.name)}</h3>
             <div class="partner-header" style="background:#fff; padding:20px; border-radius:8px; border:1px solid #ecf0f1; margin-bottom:30px;">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Wie häufig arbeitest Du mit ${partner.name} zusammen? *</label>
+                        <label>Wie häufig arbeitest Du mit ${this.escapeHtml(partner.name)} zusammen? *</label>
                         ${this.createHeaderSliderHTML(`freq_${partnerId}`, 'frequency', pf.frequency, 0, 4, {1:"Selten", 2:"Monatlich", 3:"Wöchentlich", 4:"Täglich"})}
                     </div>
                     <div class="form-group">
                         <label>Generelles Feedback (optional):</label>
-                        <textarea id="gen_comment_${partnerId}" placeholder="[FREIWILLIG: Dein generelles Feedback]" style="width:100%; height:80px; padding:10px; border:2px solid #ddd; border-radius:8px; resize:vertical;">${pf.general_comment || ''}</textarea>
+                        <textarea id="gen_comment_${partnerId}" placeholder="[FREIWILLIG: Dein generelles Feedback]" style="width:100%; height:80px; padding:10px; border:2px solid #ddd; border-radius:8px; resize:vertical;">${this.escapeHtml(pf.general_comment || '')}</textarea>
                     </div>
                 </div>
                 <div class="form-row" style="margin-top:20px;">
                     <div class="form-group" style="width:100%;">
-                        <label>Würdest Du ${partner.name} weiterempfehlen? (NPS) *</label>
+                        <label>Würdest Du ${this.escapeHtml(partner.name)} weiterempfehlen? (NPS) *</label>
                         ${this.createHeaderSliderHTML(`nps_${partnerId}`, 'nps', pf.nps, -2, 10, {})}
                     </div>
                 </div>
