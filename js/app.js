@@ -5,6 +5,8 @@
 // # Modified: 26.11.2025, 21:15 - Added Partner Header (Freq, NPS, GenComment) and Per-Criteria Comments
 // # Modified: 27.11.2025, 10:15 - Changed GenComment to Textarea, Updated Placeholders
 // # Modified: 27.11.2025, 13:00 - Added XSS protection (escapeHtml) for user inputs
+// # Modified: 27.11.2025, 14:05 - DOM performance optimization (AP 5a): Pre-render all partner views, only toggle visibility. (INKLUSIVE bindEvents FIX)
+// # Modified: 27.11.2025, 14:15 - FIX: Missing Submit button (Regression from AP 5a). Added missing updateNavigationButtons call.
 
 class QualityIndexWizard {
     constructor() {
@@ -63,6 +65,45 @@ class QualityIndexWizard {
             this.showError('Fehler beim Laden der Konfigurationsdaten: ' + error.message);
         }
     }
+
+    // HIER GEFEHLT: Bindet alle Event-Listener an die Buttons und Modal-Trigger
+    bindEvents() {
+        document.getElementById('prev-btn').addEventListener('click', () => this.previousStep());
+        document.getElementById('next-btn').addEventListener('click', () => this.nextStep());
+        document.getElementById('submit-btn').addEventListener('click', () => this.submitSurvey());
+        document.getElementById('restart-survey').addEventListener('click', () => this.restartSurvey());
+
+        document.getElementById('prev-partner').addEventListener('click', () => this.previousPartner());
+        document.getElementById('next-partner').addEventListener('click', () => this.nextPartner());
+        document.getElementById('close-error').addEventListener('click', () => this.hideError());
+
+        const modal = document.getElementById('global-info-modal');
+        const closeBtn = document.getElementById('close-info-modal'); 
+        const closeBtnClass = document.querySelector('.info-modal-close');
+        
+        if(closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+        else if(closeBtnClass) closeBtnClass.addEventListener('click', () => { modal.style.display = 'none'; });
+
+        if(modal) modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.style.display = 'none';
+        });
+
+        // Macht die Funktion global für den onclick-Handler im HTML
+        window.openInfoModal = (category) => this.openInfoModal(category);
+    }
+    
+    openInfoModal(category) {
+        const modal = document.getElementById('global-info-modal');
+        const body = document.getElementById('info-modal-body');
+        
+        const content = this.appTexts[category] || "Keine Informationen verfügbar.";
+        
+        // HIER GEÄNDERT: Anzeigen von Markdown-Inhalten mit einfachen Zeilenumbrüchen
+        body.innerHTML = content.replace(/\n/g, '<br>');
+        
+        modal.style.display = 'flex';
+    }
+
 
     insertLogo() {
         const header = document.querySelector('.header h1');
@@ -389,10 +430,13 @@ class QualityIndexWizard {
     // Event-Handling für Kommentare
     bindCommentEvents(partnerId) {
         // Suche alle Icons und Textareas auf der aktuellen Seite
-        const icons = document.querySelectorAll('.comment-icon');
+        // HIER GEÄNDERT: Wir suchen nur im aktuell sichtbaren Partner-View
+        const currentView = document.getElementById(`partner-view-${partnerId}`);
+
+        const icons = currentView.querySelectorAll('.comment-icon');
         icons.forEach(icon => {
             icon.addEventListener('click', (e) => {
-                const domId = e.target.id.replace('icon_', ''); // z.B. perf_10
+                const domId = e.target.id.replace('icon_', ''); // z.B. perf_10_1
                 const container = document.getElementById(`comment_container_${domId}`);
                 if (container) {
                     container.style.display = 'block';
@@ -402,27 +446,30 @@ class QualityIndexWizard {
             });
         });
 
-        const textareas = document.querySelectorAll('textarea[id^="comment_perf_"]');
+        const textareas = currentView.querySelectorAll('textarea[id^="comment_perf_"]');
         textareas.forEach(area => {
             area.addEventListener('input', (e) => {
-                const domId = e.target.id.replace('comment_', ''); // perf_10
-                const rawId = domId.replace('perf_', '');
+                const domId = e.target.id.replace('comment_', ''); // perf_10_1
+                const parts = domId.split('_');
+                const rawId = parts[1]; // Criterion ID
+                const pId = parts[2]; // Partner ID
+
                 const val = e.target.value;
                 
                 // Speichern im Datenobjekt
-                if (!this.performanceData[partnerId]) this.performanceData[partnerId] = {};
-                if (!this.performanceData[partnerId][rawId]) {
+                if (!this.performanceData[pId]) this.performanceData[pId] = {};
+                if (!this.performanceData[pId][rawId]) {
                     // Fallback, falls Score noch nicht gesetzt (sollte nicht passieren)
-                    this.performanceData[partnerId][rawId] = { score: 0, comment: val };
+                    this.performanceData[pId][rawId] = { score: 0, comment: val };
                 } else {
                     // Existierendes Objekt oder Wert updaten
-                    let entry = this.performanceData[partnerId][rawId];
+                    let entry = this.performanceData[pId][rawId];
                     if (typeof entry !== 'object') {
                         entry = { score: entry, comment: val };
                     } else {
                         entry.comment = val;
                     }
-                    this.performanceData[partnerId][rawId] = entry;
+                    this.performanceData[pId][rawId] = entry;
                 }
             });
         });
@@ -507,15 +554,18 @@ class QualityIndexWizard {
         } else {
             const partnerId = this.getCurrentPartnerId(); 
             if (partnerId) {
-                // Struktur für Performance: Objekt {score, comment} oder Zahl (alt)
-                // Wir stellen sicher, dass es ein Objekt ist, wenn wir es schreiben
+                // Strukturierung der ID für Speicherung
+                const partnerCritId = domId.split('_').slice(1).join('_'); // Entfernt nur das 'perf_' Präfix
+                const rawCritId = partnerCritId.split('_')[0]; 
+                
+                // Struktur für Performance: Objekt {score, comment}
                 if (!this.performanceData[partnerId]) this.performanceData[partnerId] = {};
                 
-                let current = this.performanceData[partnerId][rawId];
+                let current = this.performanceData[partnerId][rawCritId];
                 let comment = '';
                 if (current && typeof current === 'object') comment = current.comment;
                 
-                this.performanceData[partnerId][rawId] = { score: value, comment: comment };
+                this.performanceData[partnerId][rawCritId] = { score: value, comment: comment };
 
                 // Icon Logik
                 const icon = document.getElementById(`icon_${domId}`);
@@ -607,21 +657,47 @@ class QualityIndexWizard {
             nextBtn.disabled = this.selectedPartners.length === 0;
         }
     }
+    
+    getCurrentPartnerId() {
+        if (this.selectedPartners.length > 0 && this.currentPartnerIndex >= 0) {
+            return this.selectedPartners[this.currentPartnerIndex].id;
+        }
+        return null;
+    }
 
+    // HIER GEÄNDERT: Funktion pre-rendert jetzt ALLE Views beim ersten Aufruf
     setupPerformanceEvaluation() {
-        const container = document.getElementById('performance-container');
-        container.innerHTML = '';
+        const container = document.getElementById('partner-views-container');
+        container.innerHTML = ''; // Container einmal leeren
         
         if (this.selectedPartners.length === 0) return;
         
+        let allViewsHTML = '';
+        // Alle Partner-Views vor-rendern 
+        this.selectedPartners.forEach(partner => {
+            allViewsHTML += this.renderPartnerView(partner);
+        });
+        container.innerHTML = allViewsHTML;
+
+        // HIER GEÄNDERT: Events NACH dem innerHTML setzen binden
+        this.selectedPartners.forEach(partner => {
+            this.bindSliderEvents('frequency');
+            this.bindSliderEvents('nps');
+            this.bindSliderEvents('performance');
+            this.bindCommentEvents(partner.id); 
+            
+            // Listener für General Comment muss hier neu gebunden werden
+            document.getElementById(`gen_comment_${partner.id}`).addEventListener('input', (e) => {
+                this.partnerFeedback[partner.id].general_comment = e.target.value;
+            });
+        });
+        
         this.currentPartnerIndex = 0;
-        this.createPartnerEvaluationPage();
-        this.updatePartnerNavigation();
+        this.showPartnerEvaluationPage(0); // Ersten Partner anzeigen
     }
 
-    createPartnerEvaluationPage() {
-        const container = document.getElementById('performance-container');
-        const partner = this.selectedPartners[this.currentPartnerIndex];
+    // HIER NEU: Rendert den kompletten Partner-View als HTML-String (wird nur 1x pro Partner aufgerufen)
+    renderPartnerView(partner) {
         const partnerId = partner.id;
 
         // Initiale Datenstrukturen sicherstellen
@@ -634,20 +710,20 @@ class QualityIndexWizard {
             };
         }
         const pf = this.partnerFeedback[partnerId];
+        const initialComment = this.escapeHtml(pf.general_comment || '');
 
-        // HTML Aufbau: Header (Freq, Comment, NPS) dann Kriterien
-        // HIER GEÄNDERT: Textarea für General Comment + Placeholder und Name ESCAPED
+        // Header (Freq, Comment, NPS)
         const headerHTML = `
             <h3>Bewertung: ${this.escapeHtml(partner.name)}</h3>
             <div class="partner-header" style="background:#fff; padding:20px; border-radius:8px; border:1px solid #ecf0f1; margin-bottom:30px;">
                 <div class="form-row">
                     <div class="form-group">
                         <label>Wie häufig arbeitest Du mit ${this.escapeHtml(partner.name)} zusammen? *</label>
-                        ${this.createHeaderSliderHTML(`freq_${partnerId}`, 'frequency', pf.frequency, 0, 4, {1:"Selten", 2:"Monatlich", 3:"Wöchentlich", 4:"Täglich"})}
+                        ${this.createHeaderSliderHTML(`freq_${partnerId}`, 'frequency', pf.frequency, 0, 4, {1:"Selten", 2:"Monatlich / Gelegentlich", 4:"Täglich / Intensiv"})}
                     </div>
                     <div class="form-group">
                         <label>Generelles Feedback (optional):</label>
-                        <textarea id="gen_comment_${partnerId}" placeholder="[FREIWILLIG: Dein generelles Feedback]" style="width:100%; height:80px; padding:10px; border:2px solid #ddd; border-radius:8px; resize:vertical;">${this.escapeHtml(pf.general_comment || '')}</textarea>
+                        <textarea id="gen_comment_${partnerId}" placeholder="[FREIWILLIG: Dein generelles Feedback]" style="width:100%; height:80px; padding:10px; border:2px solid #ddd; border-radius:8px; resize:vertical;">${initialComment}</textarea>
                     </div>
                 </div>
                 <div class="form-row" style="margin-top:20px;">
@@ -658,46 +734,25 @@ class QualityIndexWizard {
                 </div>
             </div>
             <hr style="margin-bottom:30px; border:0; border-top:1px solid #eee;">
-            <div id="performance-criteria-container"></div>
-        `;
-        
-        container.innerHTML = headerHTML;
-        
-        // Event Listener für Generelles Feedback
-        document.getElementById(`gen_comment_${partnerId}`).addEventListener('input', (e) => {
-            this.partnerFeedback[partnerId].general_comment = e.target.value;
-        });
+            <div id="performance-criteria-container-${partnerId}">`; // Eindeutige ID
 
-        // Event Listener für Header Slider
-        this.bindSliderEvents('frequency');
-        this.bindSliderEvents('nps');
-
-        // Kriterien aufbauen
-        const criteriaContainer = document.getElementById('performance-criteria-container');
+        let criteriaHTML = '';
         const groupedCriteria = this.groupCriteria();
 
         Object.entries(groupedCriteria).forEach(([groupName, criteria]) => {
-            const groupDiv = document.createElement('div');
-            groupDiv.className = 'criteria-group';
-
-            const titleDiv = document.createElement('div');
-            titleDiv.className = 'criteria-group-title';
-            titleDiv.textContent = groupName;
-            groupDiv.appendChild(titleDiv);
-
-            const tableDiv = document.createElement('div');
-            tableDiv.className = 'criteria-table';
+            criteriaHTML += `<div class="criteria-group">
+                <div class="criteria-group-title">${groupName}</div>
+                <div class="criteria-table">`;
 
             criteria.forEach((criterion) => {
                 const rawId = criterion.id;
-                const domId = 'perf_' + rawId;
+                const domId = 'perf_' + rawId + '_' + partnerId; // Eindeutige ID pro Partner/Kriterium
                 
                 // Initiale Datenlogik
                 if (!this.performanceData[partnerId]) {
                     this.performanceData[partnerId] = {};
                 }
                 
-                // Wert holen (kann Zahl oder Objekt sein)
                 let storedData = this.performanceData[partnerId][rawId];
                 let currentVal = 0;
                 let currentComment = '';
@@ -707,160 +762,74 @@ class QualityIndexWizard {
                         currentVal = storedData.score;
                         currentComment = storedData.comment || '';
                     } else {
-                        currentVal = storedData;
+                        currentVal = storedData; // Fallback für alte Datenstruktur
                     }
                 } else if (this.isTestMode) {
                     currentVal = Math.floor(Math.random() * 10) + 1; 
-                    // Testmodus speichert initial als Objekt
+                    // Setze die volle Objektstruktur, um Konsistenz zu gewährleisten
                     this.performanceData[partnerId][rawId] = { score: currentVal, comment: '' };
                 } else {
-                    // Default 0 (N/A)
                     this.performanceData[partnerId][rawId] = { score: 0, comment: '' };
                 }
 
-                const rowDiv = document.createElement('div');
-                rowDiv.className = 'criteria-row';
+                // XSS-Schutz für Kommentar in Textarea
+                const escapedComment = this.escapeHtml(currentComment);
+                
+                // Dynamisch generierte Slider und Kommentar-Container
+                const sliderAndCommentHTML = `
+                    <div class="criteria-content">
+                        ${this.createSliderHTML(domId, rawId, 'performance', currentVal)}
+                        <div id="comment_container_${domId}" style="display:${currentComment.trim() !== '' ? 'block' : 'none'}; margin-top:10px; padding-left:20px;">
+                            <textarea id="comment_${domId}" placeholder="[FREIWILLIG: Warum diese Bewertung?]" style="width:100%; height:60px; padding:5px; border-radius:4px; border:1px solid #ccc;">${escapedComment}</textarea>
+                        </div>
+                    </div>`;
 
-                const infoDiv = document.createElement('div');
-                infoDiv.className = 'criteria-info';
-                
-                const nameDiv = document.createElement('div');
-                nameDiv.className = 'criteria-name';
-                nameDiv.textContent = criterion.name;
-                
-                const descDiv = document.createElement('div');
-                descDiv.className = 'criteria-description';
-                descDiv.textContent = criterion.description;
-                
-                infoDiv.appendChild(nameDiv);
-                infoDiv.appendChild(descDiv);
-                rowDiv.appendChild(infoDiv);
-
-                const sliderDiv = document.createElement('div');
-                sliderDiv.className = 'criteria-content';
-                sliderDiv.innerHTML = this.createSliderHTML(domId, rawId, 'performance', currentVal);
-                rowDiv.appendChild(sliderDiv);
-
-                tableDiv.appendChild(rowDiv);
-                
-                // Textarea Wert setzen, falls vorhanden
-                setTimeout(() => {
-                    const textarea = document.getElementById(`comment_${domId}`);
-                    const container = document.getElementById(`comment_container_${domId}`);
-                    const icon = document.getElementById(`icon_${domId}`);
-                    
-                    if(textarea) textarea.value = currentComment;
-                    
-                    // Sichtbarkeit wiederherstellen (Persistenz)
-                    const isExtreme = (currentVal > 0 && currentVal <= 3) || currentVal >= 8;
-                    const hasText = currentComment.trim() !== '';
-                    
-                    if(icon) {
-                        if(isExtreme || hasText) icon.style.visibility = 'visible';
-                        else icon.style.visibility = 'hidden';
-                    }
-                    if(container && hasText) {
-                        container.style.display = 'block';
-                    }
-                }, 0);
+                criteriaHTML += `
+                <div class="criteria-row">
+                    <div class="criteria-info">
+                        <div class="criteria-name">${criterion.name}</div>
+                        <div class="criteria-description">${criterion.description}</div>
+                    </div>
+                    ${sliderAndCommentHTML}
+                </div>`;
             });
 
-            groupDiv.appendChild(tableDiv);
-            criteriaContainer.appendChild(groupDiv);
+            criteriaHTML += `</div></div>`;
         });
         
-        this.bindSliderEvents('performance');
-        this.bindCommentEvents(partnerId); // Events für Icons/Textareas
+        return `<div id="partner-view-${partnerId}" style="display: none;">
+            ${headerHTML}
+            ${criteriaHTML}
+        </div></div>`;
     }
 
-    restorePartnerValues(partnerId) {
-        // Nicht mehr nötig
-    }
-
-    updatePartnerNavigation() {
-        const prevBtn = document.getElementById('prev-partner');
-        const nextBtn = document.getElementById('next-partner');
-        const progress = document.getElementById('partner-progress');
-        
-        prevBtn.disabled = this.currentPartnerIndex === 0;
-        nextBtn.disabled = this.currentPartnerIndex === this.selectedPartners.length - 1;
-        
-        progress.textContent = `Partner ${this.currentPartnerIndex + 1} von ${this.selectedPartners.length}`;
-        
-        const wizardNextBtn = document.getElementById('next-btn');
-        const submitBtn = document.getElementById('submit-btn');
-        
-        if (this.currentPartnerIndex === this.selectedPartners.length - 1) {
-            wizardNextBtn.style.display = 'none';
-            submitBtn.style.display = 'inline-flex';
-        } else {
-            wizardNextBtn.style.display = 'inline-flex';
-            submitBtn.style.display = 'none';
-        }
-    }
-
-    getCurrentPartnerId() {
-        return this.selectedPartners[this.currentPartnerIndex].id;
-    }
-
-    bindEvents() {
-        document.getElementById('prev-btn').addEventListener('click', () => this.previousStep());
-        document.getElementById('next-btn').addEventListener('click', () => this.nextStep());
-        document.getElementById('submit-btn').addEventListener('click', () => this.submitSurvey());
-        document.getElementById('restart-survey').addEventListener('click', () => this.restartSurvey());
-
-        document.getElementById('prev-partner').addEventListener('click', () => this.previousPartner());
-        document.getElementById('next-partner').addEventListener('click', () => this.nextPartner());
-        document.getElementById('close-error').addEventListener('click', () => this.hideError());
-
-        const modal = document.getElementById('global-info-modal');
-        const closeBtn = document.getElementById('close-info-modal'); 
-        const closeBtnClass = document.querySelector('.info-modal-close');
-        
-        if(closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
-        else if(closeBtnClass) closeBtnClass.addEventListener('click', () => { modal.style.display = 'none'; });
-
-        if(modal) modal.addEventListener('click', (e) => {
-            if (e.target === modal) modal.style.display = 'none';
+    // HIER NEU: Zeigt den Partner-View an der gegebenen Index-Stelle an
+    showPartnerEvaluationPage(index) {
+        // Alle Views ausblenden
+        document.querySelectorAll('#partner-views-container > div').forEach(view => {
+            view.style.display = 'none';
         });
 
-        window.openInfoModal = (category) => this.openInfoModal(category);
-    }
+        const partner = this.selectedPartners[index];
+        if (!partner) return;
 
-    openInfoModal(category) {
-        const content = this.appTexts[category] || "<p>Information wird geladen oder ist nicht verfügbar.</p>";
-        document.getElementById('info-modal-body').innerHTML = content;
-        document.getElementById('global-info-modal').style.display = 'flex';
-    }
-
-    previousStep() {
-        if (this.currentStep > 1) {
-            this.currentStep--;
-            this.showStep(this.currentStep);
-            this.updateProgress();
-            this.updateNavigationButtons();
+        const currentView = document.getElementById(`partner-view-${partner.id}`);
+        if (currentView) {
+            currentView.style.display = 'block';
         }
+        
+        this.currentPartnerIndex = index;
+        this.updatePartnerNavigation();
+        
+        // FIX für Missing Submit Button (Bug aus AP 5a)
+        this.updateNavigationButtons();
     }
 
-    nextStep() {
-        if (this.validateCurrentStep()) {
-            if (this.currentStep === 3) {
-                this.setupPerformanceEvaluation();
-            }
-            
-            this.currentStep++;
-            this.showStep(this.currentStep);
-            this.updateProgress();
-            this.updateNavigationButtons();
-        }
-    }
 
     previousPartner() {
         if (this.validatePartnerStep()) {
             if (this.currentPartnerIndex > 0) {
-                this.currentPartnerIndex--;
-                this.createPartnerEvaluationPage();
-                this.updatePartnerNavigation();
+                this.showPartnerEvaluationPage(this.currentPartnerIndex - 1);
             }
         }
     }
@@ -868,30 +837,77 @@ class QualityIndexWizard {
     nextPartner() {
         if (this.validatePartnerStep()) {
             if (this.currentPartnerIndex < this.selectedPartners.length - 1) {
-                this.currentPartnerIndex++;
-                this.createPartnerEvaluationPage();
-                this.updatePartnerNavigation();
+                this.showPartnerEvaluationPage(this.currentPartnerIndex + 1);
             }
         }
+    }
+    
+    updatePartnerNavigation() {
+        const totalPartners = this.selectedPartners.length;
+        const currentNum = this.currentPartnerIndex + 1;
+        
+        document.getElementById('partner-progress').textContent = `Partner ${currentNum} von ${totalPartners}`;
+        
+        document.getElementById('prev-partner').disabled = this.currentPartnerIndex === 0;
+        document.getElementById('next-partner').disabled = this.currentPartnerIndex === totalPartners - 1;
     }
 
     // Validierung für Step 4 (Partner)
     validatePartnerStep() {
-        const pid = this.getCurrentPartnerId();
+        const currentPartner = this.selectedPartners[this.currentPartnerIndex];
+        if (!currentPartner) {
+            this.showError("Interner Fehler: Partner-Daten fehlen.");
+            return false;
+        }
+        
+        const pid = currentPartner.id; 
         const fb = this.partnerFeedback[pid];
         
         // Frequenz muss > 0 sein
         if (!fb || !fb.frequency || fb.frequency === 0) {
-            this.showError("Bitte gib an, wie häufig Du mit diesem Partner zusammenarbeitest.");
+            this.showError(`Bitte gib für Partner ${currentPartner.name} an, wie häufig Du mit diesem Partner zusammenarbeitest.`);
             return false;
         }
         // NPS muss gewählt sein (nicht -2)
         if (fb.nps === undefined || fb.nps === -2) {
-            this.showError("Bitte gib an, ob Du den Partner weiterempfehlen würdest.");
+            this.showError(`Bitte gib für Partner ${currentPartner.name} an, ob Du den Partner weiterempfehlen würdest.`);
             return false;
         }
         return true;
     }
+    
+    // Wizard Navigation
+    previousStep() {
+        if (this.currentStep > 1) {
+            this.currentStep--;
+            this.showStep(this.currentStep);
+            this.updateProgress();
+            this.updateNavigationButtons();
+            
+            // Sonderfall: Wenn von Step 4 zurück zu Step 3
+            if (this.currentStep === 3) {
+                // Partner-View-Container leeren, da der DOM beim Zurückgehen nicht gebraucht wird
+                document.getElementById('partner-views-container').innerHTML = '';
+            }
+        }
+    }
+
+    nextStep() {
+        if (!this.validateCurrentStep()) return;
+        
+        if (this.currentStep < this.totalSteps) {
+            this.currentStep++;
+            this.showStep(this.currentStep);
+            this.updateProgress();
+            this.updateNavigationButtons();
+            
+            // Sonderfall: Vorbereitung für Step 4
+            if (this.currentStep === 4) {
+                this.setupPerformanceEvaluation();
+            }
+        }
+    }
+
 
     validateCurrentStep() {
         switch (this.currentStep) {
@@ -916,6 +932,7 @@ class QualityIndexWizard {
                 return true;
                 
             case 2:
+                // Prüft auf 0
                 const invalidImportance = Object.values(this.importanceData).some(val => val === 0);
                 if (invalidImportance) {
                     this.showError('Bitte gewichte ALLE Kriterien. Wähle einen Wert zwischen 1 und 10.');
@@ -930,8 +947,14 @@ class QualityIndexWizard {
                 }
                 return true;
             case 4:
-                // Letzter Check bevor es auf Step 5 geht (Submit Button ist aber separat)
-                return this.validatePartnerStep();
+                // Wenn man beim letzten Partner auf "Weiter" klickt, muss er validieren
+                if (this.currentPartnerIndex === this.selectedPartners.length - 1) {
+                    return this.validatePartnerStep();
+                } else {
+                    // Andernfalls einfach zum nächsten Partner gehen (wird in nextPartner() geprüft)
+                    this.nextPartner(); 
+                    return false; // Verhindert, dass der Wizard weitergeht
+                }
                 
             default:
                 return true;
@@ -970,8 +993,15 @@ class QualityIndexWizard {
         prevBtn.disabled = this.currentStep === 1;
         
         if (this.currentStep === 4) {
-            nextBtn.style.display = 'none';
-            submitBtn.style.display = 'inline-flex';
+            const isLastPartner = this.currentPartnerIndex === this.selectedPartners.length - 1;
+            
+            if (isLastPartner) {
+                nextBtn.style.display = 'none';
+                submitBtn.style.display = 'inline-flex';
+            } else {
+                nextBtn.style.display = 'inline-flex';
+                submitBtn.style.display = 'none';
+            }
         } else if (this.currentStep === 5) {
             prevBtn.style.display = 'none';
             nextBtn.style.display = 'none';
@@ -985,6 +1015,7 @@ class QualityIndexWizard {
         if (this.currentStep === 3) {
             nextBtn.disabled = this.selectedPartners.length === 0;
         } else {
+            // Wird in validateCurrentStep und updatePartnerNavigation gehandhabt
             nextBtn.disabled = false;
         }
     }
@@ -996,16 +1027,29 @@ class QualityIndexWizard {
         this.showLoading(true);
         
         try {
+            // Strukturierung der Performance Daten für das Backend
+            const performanceData = {};
+            for (const partnerId in this.performanceData) {
+                performanceData[partnerId] = {};
+                for (const critId in this.performanceData[partnerId]) {
+                    const data = this.performanceData[partnerId][critId];
+                    // Das Backend erwartet entweder ein Objekt {score, comment} oder nur den Score (Legacy)
+                    // Wir schicken das Objekt, da wir Kommentare speichern wollen
+                    performanceData[partnerId][critId] = data; 
+                }
+            }
+
             const surveyData = {
                 survey_id: this.surveyId,
+                // final_dept_id ist die tiefste Ebene (Team/Area/Dept)
                 department_id: this.personalData.final_dept_id, 
                 name: this.personalData.name,
                 email: this.personalData.email,
                 is_manager: this.personalData.is_manager,
                 
                 importance: this.importanceData,
-                performance: this.performanceData,
-                // NEU: Partner Feedback
+                performance: performanceData,
+                // Partner Feedback
                 partner_feedback: this.partnerFeedback,
                 
                 timestamp: new Date().toISOString()
@@ -1019,7 +1063,7 @@ class QualityIndexWizard {
             
             const result = await response.json();
             
-            if (result.status === 'success' || result.id) {
+            if (response.ok && (result.status === 'success' || result.id)) {
                 this.currentStep = 5;
                 this.showStep(this.currentStep);
                 this.updateProgress();
@@ -1030,6 +1074,7 @@ class QualityIndexWizard {
             
         } catch (error) {
             console.error('Fehler beim Speichern:', error);
+            // Nutze die Fehlermeldung vom Backend, falls vorhanden, sonst Fallback
             this.showError('Fehler beim Speichern der Daten: ' + error.message);
         } finally {
             this.showLoading(false);
@@ -1059,5 +1104,6 @@ class QualityIndexWizard {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Da hier keine Fehlerbehandlung mehr nötig ist, starten wir den Wizard
     new QualityIndexWizard();
 });
