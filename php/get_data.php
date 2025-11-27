@@ -7,13 +7,19 @@
   # Modified: 23.11.2025, 21:15 - App-Texte (Tooltips) aus DB laden (app_texts)
   # Modified: 24.11.2025, 23:30 - Added test_mode flag to survey data
   # Modified: 27.11.2025, 13:45 - Suppress detailed DB error message for security
+  # Modified: 27.11.2025, 16:00 - Security Fix: Required db_connect.php via absolute, private path (AP 11)
+  # Modified: 27.11.2025, 16:30 - Final FIX: require_once moved into try-block for stable error handling (AP 11 Final Fix)
 */
 
 header('Content-Type: application/json');
 
-require_once 'db_connect.php';
+// HIER GEÄNDERT: Definieren des absoluten Pfades außerhalb des Webroot
+define('DB_CONFIG_PATH', '/etc/partneranalyse/db_connect.php');
 
+// WICHTIG: require_once ist jetzt im try-Block, um PHP-Fatal-Errors abzufangen
 try {
+    require_once DB_CONFIG_PATH;
+    
     // Surveys als Array
     $surveys = [];
     // HIER GEÄNDERT: test_mode hinzugefügt
@@ -74,7 +80,6 @@ try {
         'app_texts'   => $app_texts
     ]);
 } catch (Exception $e) {
-    // HIER GEÄNDERT: Detaillierte Fehlermeldung entfernt
     // log $e->getMessage()
     http_response_code(500);
     echo json_encode(['error' => 'Fehler beim Laden der Konfigurationsdaten.']);

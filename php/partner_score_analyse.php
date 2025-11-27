@@ -10,10 +10,14 @@
   # Modified: 27.11.2025, 13:30 - Calc MAX divergence per criterion and return split details in matrix_json
   # Modified: 27.11.2025, 12:30 - Fix SQL Injection (Prepared Statements)
   # Modified: 27.11.2025, 13:45 - Suppress detailed DB error message for security
+  # Modified: 27.11.2025, 16:00 - Security Fix: Required db_connect.php via absolute, private path (AP 11)
+  # Modified: 27.11.2025, 16:30 - Final FIX: require_once moved into try-block for stable error handling (AP 11 Final Fix)
 */
 
 header('Content-Type: application/json');
-require_once 'db_connect.php';
+
+// HIER GEÄNDERT: Definieren des absoluten Pfades außerhalb des Webroot
+define('DB_CONFIG_PATH', '/etc/partneranalyse/db_connect.php');
 
 $input = json_decode(file_get_contents('php://input'), true);
 
@@ -42,7 +46,10 @@ $manager_where = "";
 if ($manager_filter === "nur_manager") $manager_where = "AND p.is_manager = TRUE";
 else if ($manager_filter === "nur_nicht_manager") $manager_where = "AND p.is_manager = FALSE";
 
+// WICHTIG: require_once ist jetzt im try-Block, um PHP-Fatal-Errors abzufangen
 try {
+    require_once DB_CONFIG_PATH;
+
     // SQL mit Platzhaltern
     // Hinweis: :min_answers wurde durch ? ersetzt, um Parameter-Mischmasch zu vermeiden
     $sql = "
@@ -186,7 +193,6 @@ ORDER BY score DESC
     echo json_encode($result);
 
 } catch (Exception $e) {
-    // HIER GEÄNDERT: Detaillierte Fehlermeldung entfernt
     // log $e->getMessage()
     http_response_code(500);
     echo json_encode(["error" => "Fehler bei der Analyse-Abfrage."]);

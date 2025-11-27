@@ -5,9 +5,13 @@
    # Modified: 26.11.2025, 20:50 - Added support for comments and partner_feedback table (NPS/Frequency)
    # Modified: 27.11.2025, 13:30 - Strict Backend Input Validation (Range Check, Type Check, Fail-Fast)
    # Modified: 27.11.2025, 13:50 - Safer transaction handling (check inTransaction before rollback) (AP 5)
+   # Modified: 27.11.2025, 16:00 - Security Fix: Required db_connect.php via absolute, private path (AP 11)
+   # Modified: 27.11.2025, 16:30 - Final FIX: require_once moved into try-block for stable error handling (AP 11 Final Fix)
 */
 header('Content-Type: application/json');
-require 'db_connect.php';
+
+// HIER GEÄNDERT: Definieren des absoluten Pfades außerhalb des Webroot
+define('DB_CONFIG_PATH', '/etc/partneranalyse/db_connect.php');
 
 $input = json_decode(file_get_contents('php://input'), true);
 
@@ -86,7 +90,7 @@ if (isset($input['performance']) && is_array($input['performance'])) {
             
             // Performance Score muss 0-10 sein
             if (!validateIntRange($val, 0, 10)) {
-                http_response_code(400);
+                http_response_code(4_00);
                 echo json_encode(['error' => "Ungültiger Performance-Score für Partner {$partnerId} / Kriterium {$critId}. Erlaubt: 0-10."]);
                 exit;
             }
@@ -118,7 +122,10 @@ if (isset($input['partner_feedback']) && is_array($input['partner_feedback'])) {
 
 // --- SPEICHERUNG (Start der Transaktion) ---
 
+// WICHTIG: require_once ist jetzt im try-Block, um PHP-Fatal-Errors abzufangen
 try {
+    require_once DB_CONFIG_PATH;
+
     $pdo->beginTransaction();
 
     // 1. Teilnehmer anlegen (Verwendet trim-ed Name/Email und validierte IDs)
@@ -201,7 +208,7 @@ try {
 
 } catch (Exception $e) {
     // HIER GEÄNDERT: Rollback nur, wenn Transaktion noch aktiv ist
-    if ($pdo->inTransaction()) {
+    if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
     http_response_code(500);

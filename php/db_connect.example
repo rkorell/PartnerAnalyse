@@ -1,7 +1,8 @@
 <?php
 /* DATEI: php/db_connect.php
+   Zweck: Datenbankverbindung mit strikter Fehlerweiterleitung
    # Modified: 22.11.2025 - Datenbankverbindung
-   # Modified: 27.11.2025, 13:45 - Suppress detailed DB connection error message for security
+   # Modified: 27.11.2025, 16:30 - Final FIX: Removed internal try/catch block to ensure error propagation to calling script for clean handling (AP 11 Fix)
 */
 $host = 'localhost';
 $db   = 'partner_analyse';
@@ -15,13 +16,5 @@ $options = [
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     PDO::ATTR_EMULATE_PREPARES   => false,
 ];
-try {
-    $pdo = new PDO($dsn);
-} catch (\PDOException $e) {
-    // HIER GEÄNDERT: Detaillierte Fehlermeldung entfernt, nur generische Info an User
-    // In einer Produktivumgebung müsste $e->getMessage() in ein Logfile geschrieben werden.
-    http_response_code(500);
-    echo json_encode(["error" => "Interner Fehler beim Aufbau der Datenbankverbindung."]);
-    exit;
-}
-?>
+// WICHTIG: Keine interne Fehlerbehandlung. Die Ausnahme wird an das aufrufende Skript weitergeleitet.
+$pdo = new PDO($dsn);
