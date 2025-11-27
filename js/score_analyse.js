@@ -5,7 +5,10 @@
   # Modified: 27.11.2025, 13:00 - Added XSS protection (escapeHtml) for user inputs
   # Modified: 27.11.2025, 14:30 - Centralized configuration via config.js (AP 6)
   # Modified: 27.11.2025, 14:45 - FIX: Memory Leaks & Race Condition via Event Delegation (AP 7)
+  # Modified: 27.11.2025, 15:15 - FIX: Analysis failure (AP 8 regression). Converted to ES6 module import.
 */
+
+import { CONFIG } from './config.js'; // NEU: Importiere CONFIG
 
 // NEU: Hilfsfunktion gegen XSS (Global oder im Scope)
 function escapeHtml(text) {
@@ -631,8 +634,8 @@ document.addEventListener("DOMContentLoaded", function() {
     function calculateMaxDeviation(details, cx, cy) {
         let maxD = 0;
         details.forEach(d => {
-            const dx = d.perf - cx;
-            const dy = d.imp - cy;
+            const dx = Math.abs(d.perf - cx);
+            const dy = Math.abs(d.imp - cy);
             maxD = Math.max(maxD, dx, dy);
         });
         return Math.max(maxD * 1.1, 0.5); 

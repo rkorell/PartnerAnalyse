@@ -1,10 +1,11 @@
 /*
   Datei: js/config.js
   Zweck: Zentrale Konfigurationsdatei für alle Magic Numbers und Schwellenwerte
-  # Created: 27.11.2025, 14:25 - Centralized application constants (AP 6)
+  # Created: 27.11.2025, 14:30 - Centralized application constants (AP 6)
+  # Modified: 27.11.2025, 14:50 - Changed to ES6 module export (AP 8)
 */
 
-const CONFIG = {
+export const CONFIG = {
     // --- Konfiguration für den Analyse-Dashboard (score_analyse.js) ---
     ANALYSIS: {
         // Schwellenwert für die maximale Divergenz (Konflikt) zwischen Manager und Team.
@@ -30,8 +31,8 @@ const CONFIG = {
         
         // NPS-Kategorisierung (Promoter, Detractor)
         NPS_RANGES: {
-            // NOTE: Die tatsächlichen NPS-Kategorien (z.B. 7/8 = Passive) werden in app.js abgeleitet.
-            NA_VALUE: -2 // Wert für "Bitte wählen"
+            // Wert für "Bitte wählen"
+            NA_VALUE: -2 
         },
         
         // Frequenz-Werte (für Validierung)
