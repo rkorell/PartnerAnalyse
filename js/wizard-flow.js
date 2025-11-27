@@ -2,6 +2,7 @@
   Datei: js/wizard-flow.js
   Zweck: Logik für Navigation, Validierung und Step-Flow
   # Created: 27.11.2025, 15:40 - Extracted Flow and Validation Logic from wizard-controller.js (AP 10)
+  # Modified: 27.11.2025, 15:50 - Minor update to use explicit callbacks (AP 10 Deep Refactoring)
 */
 
 import { CONFIG } from './config.js';
