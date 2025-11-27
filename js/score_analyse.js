@@ -4,10 +4,8 @@
   # Modified: 27.11.2025, 15:30 - Layout Clean-Up: Removed Rank Column, Aligned Score Bar & Value horizontally
   # Modified: 27.11.2025, 13:00 - Added XSS protection (escapeHtml) for user inputs
   # Modified: 27.11.2025, 14:30 - Centralized configuration via config.js (AP 6)
+  # Modified: 27.11.2025, 14:45 - FIX: Memory Leaks & Race Condition via Event Delegation (AP 7)
 */
-
-// HIER GEÄNDERT: Entfernung der hardcodierten Konstante, da sie jetzt aus config.js kommt
-// const CONFLICT_THRESHOLD = 2.0;
 
 // NEU: Hilfsfunktion gegen XSS (Global oder im Scope)
 function escapeHtml(text) {
@@ -82,6 +80,46 @@ document.addEventListener("DOMContentLoaded", function() {
         e.preventDefault();
         analyseScores();
     });
+
+    // HIER NEU: Event Delegation für die Ergebnistabelle (AP 7)
+    // Nur EIN Listener auf dem statischen resultSection Container, um Memory Leaks zu vermeiden.
+    resultSection.addEventListener('click', function(e) {
+        // 1. Check Insight Icons
+        const insightIcon = e.target.closest('.insight-icon');
+        if (insightIcon) {
+            e.stopPropagation();
+            handleInsightClick(insightIcon.dataset.action, insightIcon.dataset.id);
+            return;
+        }
+
+        // 2. Check Partner Row (wenn nicht gerade auf ein Icon geklickt wurde)
+        const partnerRow = e.target.closest('.partner-row-clickable');
+        if (partnerRow) {
+            openMatrix(partnerRow.getAttribute('data-partner-id'));
+            return;
+        }
+    });
+
+    // HIER NEU: Event Delegation für Matrix Dot Tooltips (AP 7)
+    // Wir hängen die Listener an den statischen matrixContainer
+    matrixContainer.addEventListener('mouseenter', function(e) {
+        const dot = e.target.closest('.matrix-dot');
+        if (dot) {
+            const name = dot.getAttribute('data-name');
+            const i = dot.getAttribute('data-imp');
+            const p = dot.getAttribute('data-perf');
+            matrixTooltip.textContent = `${name} (I: ${i} / P: ${p})`;
+            matrixTooltip.style.display = 'block';
+        }
+    }, true); // Use capture phase for reliability
+
+    matrixContainer.addEventListener('mouseleave', function(e) {
+        // Prüft, ob der Mauszeiger zu einem Element außerhalb des Dots wechselt
+        if (!e.relatedTarget || !e.relatedTarget.closest('.matrix-dot')) {
+             matrixTooltip.style.display = 'none';
+        }
+    }, true);
+
 
     function fetchSurveys() {
         fetch('php/get_data.php')
@@ -374,7 +412,6 @@ document.addEventListener("DOMContentLoaded", function() {
             const cntMgr = parseInt(row.num_assessors_mgr || 0);
             const cntTeam = parseInt(row.num_assessors_team || 0);
             
-            // HIER GEÄNDERT: Verwende CONFIG
             const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
             
             if (cntMgr >= 3 && cntTeam >= 3 && maxDiv > conflictThreshold) {
@@ -417,19 +454,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         resultSection.innerHTML = html;
         
-        document.querySelectorAll('.partner-row-clickable').forEach(row => {
-            row.addEventListener('click', function(e) {
-                if(e.target.closest('.insight-icon')) return;
-                openMatrix(this.getAttribute('data-partner-id')); 
-            });
-        });
-
-        document.querySelectorAll('.insight-icon').forEach(icon => {
-            icon.addEventListener('click', function(e) {
-                e.stopPropagation();
-                handleInsightClick(this.dataset.action, this.dataset.id);
-            });
-        });
+        // HIER ENTFERNT: Die alten, ineffizienten Event Listener Loops wurden durch Event Delegation (oben in DOMContentLoaded) ersetzt.
     }
 
     function handleInsightClick(action, partnerId) {
@@ -476,7 +501,6 @@ document.addEventListener("DOMContentLoaded", function() {
         else if (action === 'conflict') {
             title = `Signifikante Abweichungen: ${escapeHtml(partner.partner_name)}`;
             if (partner.matrix_details) {
-                // HIER GEÄNDERT: Verwende CONFIG
                 const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
 
                 const conflicts = partner.matrix_details.filter(d => {
@@ -500,7 +524,6 @@ document.addEventListener("DOMContentLoaded", function() {
                     });
                     content += `</table>`;
                 } else {
-                    // HIER GEÄNDERT: Verwende conflictThreshold
                     content += `<p>Keine Kriterien gefunden, die den Schwellenwert von ${conflictThreshold} überschreiten.</p>`;
                 }
             }
@@ -608,8 +631,8 @@ document.addEventListener("DOMContentLoaded", function() {
     function calculateMaxDeviation(details, cx, cy) {
         let maxD = 0;
         details.forEach(d => {
-            const dx = Math.abs(d.perf - cx);
-            const dy = Math.abs(d.imp - cy);
+            const dx = d.perf - cx;
+            const dy = d.imp - cy;
             maxD = Math.max(maxD, dx, dy);
         });
         return Math.max(maxD * 1.1, 0.5); 
@@ -652,16 +675,8 @@ document.addEventListener("DOMContentLoaded", function() {
         
         svg += `</svg>`;
         matrixContainer.innerHTML = svg;
-
-        const dots = matrixContainer.querySelectorAll('.matrix-dot');
-        dots.forEach(dot => {
-            dot.addEventListener('mouseenter', () => {
-                const name = dot.getAttribute('data-name');
-                const i = dot.getAttribute('data-imp');
-                const p = dot.getAttribute('data-perf');
-                matrixTooltip.textContent = `${name} (I: ${i} / P: ${p})`;
-                matrixTooltip.style.display = 'block';
-            });
-        });
+        
+        // HIER ENTFERNT: Die alten, ineffizienten Event Listener Loops für Tooltips (AP 7)
+        // Die neuen Event Delegation Listener sind in DOMContentLoaded definiert.
     }
 });
