@@ -1,28 +1,12 @@
 /*
   Datei: /var/www/html/js/score_analyse.js
-  Zweck: JS-Logik für Partner Score Analyse (Collapsing-Tree, Filter, API, Heatmap, IPA Matrix)
-  # Modified: 23.11.2025, 17:00 - Nutzung der neuen CSS-Klassen
-  # Modified: 23.11.2025, 17:45 - Integration IPA-Matrix (Modal, SVG, Tooltip)
-  # Modified: 23.11.2025, 18:30 - Dynamische Zentrierung (Mean/Median) für Matrix implementiert
-  # Modified: 23.11.2025, 19:15 - Echter Zoom/Entzerrung (Fadenkreuz fix in Mitte, Punkte dynamisch skaliert)
-  # Modified: 23.11.2025, 19:45 - Cleanup: Median-Logik entfernt
-  # Modified: 23.11.2025, 21:30 - Integration Info-Modal und App-Texte aus DB
-  # Modified: 26.11.2025, 16:00 - Added CSV Export functionality
-  # Modified: 26.11.2025, 16:30 - UX Fix: Button turns blue (primary); Excel Fix: Decimal comma
-  # Modified: 26.11.2025, 16:45 - Updated table header to "Anzahl Beurteiler"
-  # Modified: 26.11.2025, 17:00 - Show global participant count in table title
-  # Modified: 26.11.2025, 21:45 - Implemented Insights column
-  # Modified: 27.11.2025, 11:45 - Revert to Emojis, Fix NPS Colors (Text), Fix DB Grouping Error
-  # Modified: 27.11.2025, 13:30 - CONST Threshold, Max Divergence Logic, Centered Icons
-  # Modified: 27.11.2025, 14:00 - Layout Update: Wider Slots (NPS 80px, Comments 60px), Flex 2.2
-  # Modified: 27.11.2025, 14:30 - Fix: Comment Count Alignment (middle instead of top)
+  Zweck: JS-Logik für Partner Score Analyse
+  # Modified: 27.11.2025, 15:30 - Layout Clean-Up: Removed Rank Column, Aligned Score Bar & Value horizontally
 */
 
-// HIER: Konfigurierbarer Schwellenwert für Konflikt-Icon
 const CONFLICT_THRESHOLD = 2.0;
 
 document.addEventListener("DOMContentLoaded", function() {
-    // --- Bestehende Referenzen ---
     const surveySelect = document.getElementById('survey-filter');
     const departmentTreeContainer = document.getElementById('department-collapsing-tree');
     const minAnswersSlider = document.getElementById('min-answers-slider');
@@ -35,46 +19,37 @@ document.addEventListener("DOMContentLoaded", function() {
     const closeErrorBtn = document.getElementById('close-error');
     const exportBtn = document.getElementById('export-btn'); 
 
-    // Matrix Modal Elemente
     const matrixModal = document.getElementById('matrix-modal');
     const closeMatrixBtn = document.getElementById('close-matrix');
     const matrixContainer = document.getElementById('matrix-container');
     const matrixTitle = document.getElementById('matrix-title');
     const matrixTooltip = document.getElementById('matrix-tooltip');
     
-    // Matrix Radio Buttons
     const matrixRadios = document.querySelectorAll('input[name="matrix-center"]');
 
-    // Info Modal Elemente und Speicher für Texte
     let appTexts = {};
     const infoModal = document.getElementById('global-info-modal');
     const closeInfoBtn = document.getElementById('close-info-modal');
 
-    // Globale Daten
     let analysisData = [];
     let currentPartnerDetails = null; 
 
     fetchSurveys();
     fetchDepartments();
 
-    // Event Listeners
     minAnswersSlider.addEventListener('input', () => { minAnswersValue.textContent = minAnswersSlider.value; });
     closeErrorBtn.addEventListener('click', () => { errorMessage.style.display = 'none'; });
     
-    // Matrix Modal Schließen
     closeMatrixBtn.addEventListener('click', () => { matrixModal.style.display = 'none'; });
     window.addEventListener('click', (e) => { if (e.target === matrixModal) matrixModal.style.display = 'none'; });
 
-    // Info Modal Schließen
     if(closeInfoBtn) closeInfoBtn.addEventListener('click', () => { infoModal.style.display = 'none'; });
     if(infoModal) infoModal.addEventListener('click', (e) => {
         if (e.target === infoModal) infoModal.style.display = 'none';
     });
 
-    // Export Button Event
     if(exportBtn) exportBtn.addEventListener('click', exportToCSV);
 
-    // Globaler Öffner für das Info-Modal
     window.openInfoModal = function(category) {
         const content = appTexts[category] || "<p>Information wird geladen oder ist nicht verfügbar.</p>";
         document.getElementById('info-modal-body').innerHTML = content;
@@ -330,15 +305,15 @@ document.addEventListener("DOMContentLoaded", function() {
         
         const globalCount = rows.length > 0 && rows[0].global_participant_count ? rows[0].global_participant_count : 0;
 
+        // HIER GEÄNDERT: Rang entfernt, Score-Zelle als Flex-Row definiert
         let html = `
         <div class="criteria-group-title">Ergebnis: Partner Score Ranking (Basierend auf ${globalCount} Teilnehmern)</div>
         <div class="criteria-table">
             <div class="criteria-row" style="background:#f8f9fa; font-weight:bold; display:flex; align-items:center;">
-                <div class="criteria-content" style="flex:0.3;">Rang</div>
-                <div class="criteria-content" style="flex:2;">Partner</div>
-                <div class="criteria-content" style="flex:2;">Score</div>
-                <div class="criteria-content" style="flex:1;">Anzahl Beurteiler</div>
-                <div class="criteria-content" style="flex:2.2; text-align:center;">Insights</div>
+                <div class="criteria-content" style="flex:0 0 300px;">Partner</div>
+                <div class="criteria-content" style="flex:1 1 auto;">Score</div>
+                <div class="criteria-content" style="flex:0 0 110px; text-align:center;">Anzahl Beurteiler</div>
+                <div class="criteria-content" style="flex:0 0 260px; text-align:center;">Insights</div>
             </div>`;
 
         rows.forEach((row, idx) => {
@@ -348,19 +323,19 @@ document.addEventListener("DOMContentLoaded", function() {
                 : interpolateColor([243, 156, 18], [46, 204, 113], (pct - 0.5) * 2);
             const rgb = `rgb(${color.join(',')})`;
 
-            // --- Insights Slots (4 Feste Plätze) ---
-            let slot1 = ''; // NPS
-            let slot2 = ''; // Comments
-            let slot3 = ''; // Action
-            let slot4 = ''; // Conflict
+            // --- Insights Slots ---
+            let slot1 = ''; 
+            let slot2 = ''; 
+            let slot3 = ''; 
+            let slot4 = ''; 
 
             // 1. NPS (📣)
             if (row.nps_score !== null && row.nps_score !== undefined) {
                 const nps = parseInt(row.nps_score);
-                let npsColor = '#e74c3c'; // Rot (<0)
-                if (nps >= 0 && nps <= 30) npsColor = '#f39c12'; // Orange
-                else if (nps > 30 && nps <= 70) npsColor = '#f1c40f'; // Gelb
-                else if (nps > 70) npsColor = '#2ecc71'; // Grün
+                let npsColor = '#e74c3c'; 
+                if (nps >= 0 && nps <= 30) npsColor = '#f39c12'; 
+                else if (nps > 30 && nps <= 70) npsColor = '#f1c40f'; 
+                else if (nps > 70) npsColor = '#2ecc71'; 
                 
                 slot1 = `<span style="margin:0; cursor:default; font-size:1.2em; white-space:nowrap;" title="NPS Score: ${nps}">📣 <span style="font-size:0.8em; font-weight:bold; vertical-align:middle; color:${npsColor};">${nps > 0 ? '+' : ''}${nps}</span></span>`;
             }
@@ -368,7 +343,6 @@ document.addEventListener("DOMContentLoaded", function() {
             // 2. Kommentare (💬)
             const commentCount = parseInt(row.comment_count || 0);
             if (commentCount > 0) {
-                // HIER GEÄNDERT: vertical-align: middle
                 slot2 = `<span class="insight-icon" data-action="comments" data-id="${row.partner_id}" style="margin:0; cursor:pointer; font-size:1.5em;" title="${commentCount} Kommentare - Klick für Details">💬 <span style="font-size:0.6em; font-weight:bold; vertical-align:middle;">${commentCount}</span></span>`;
             }
 
@@ -381,7 +355,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 slot3 = `<span class="insight-icon" data-action="action" data-id="${row.partner_id}" style="margin:0; cursor:pointer; font-size:1.5em;" title="Handlungsbedarf - Klick für Details">⚠️</span>`;
             }
 
-            // 4. Divergenz (⚡) - NEU: Basiert auf Max Divergence > Threshold
+            // 4. Divergenz (⚡)
             const maxDiv = parseFloat(row.max_divergence || 0);
             const cntMgr = parseInt(row.num_assessors_mgr || 0);
             const cntTeam = parseInt(row.num_assessors_team || 0);
@@ -391,18 +365,22 @@ document.addEventListener("DOMContentLoaded", function() {
                 slot4 = `<span class="insight-icon" data-action="conflict" data-id="${row.partner_id}" style="margin:0; cursor:pointer; font-size:1.5em;" title="${title}">⚡</span>`;
             }
 
-            // HIER GEÄNDERT: Flex Anteil erhöht auf 2.2 und feste Slot-Breiten
+            // HIER GEÄNDERT: Score-Zelle als Flex-Container (Row), Balken flex:1, Value feste Breite
             html += `
             <div class="criteria-row partner-row-clickable" data-partner-id="${row.partner_id}" style="display:flex; align-items:center;">
-                <div class="criteria-content" style="flex:0.3; text-align:center;">${idx + 1}</div>
-                <div class="criteria-content" style="flex:2; color:#3498db; cursor:pointer; font-weight:500;">${row.partner_name} ↗</div>
-                <div class="criteria-content" style="flex:2;">
-                    <div class="score-bar-bg"><div class="score-bar-fill" style="width:${Math.round(pct*90)+10}%; background:${rgb};"></div></div>
-                    <div class="score-bar-value">${row.score}</div>
+                <div class="criteria-content" style="flex:0 0 300px; color:#3498db; cursor:pointer; font-weight:500;">${row.partner_name} ↗</div>
+                
+                <div class="criteria-content" style="flex:1 1 auto; display:flex; align-items:center; padding-right:10px;">
+                    <div class="score-bar-bg" style="flex:1; margin:0; height:16px; background:#ecf0f1; border-radius:8px; overflow:hidden;">
+                        <div class="score-bar-fill" style="height:100%; width:${Math.round(pct*90)+10}%; background:${rgb}; transition:width 0.5s;"></div>
+                    </div>
+                    <div class="score-bar-value" style="margin-left:10px; min-width:40px; text-align:right; font-weight:bold; color:#2c3e50;">${row.score}</div>
                 </div>
-                <div class="criteria-content" style="flex:1; text-align:center;">${row.total_answers}</div>
-                <div class="criteria-content" style="flex:2.2; display:flex; justify-content:space-between; align-items:center; padding:5px 15px;">
-                    <div style="width:80px; text-align:left;">${slot1}</div>
+                
+                <div class="criteria-content" style="flex:0 0 110px; text-align:center;">${row.total_answers}</div>
+                
+                <div class="criteria-content" style="flex:0 0 260px; display:flex; justify-content:space-between; align-items:center; padding:5px 10px;">
+                    <div style="width:80px; text-align:left; white-space:nowrap;">${slot1}</div>
                     <div style="width:60px; text-align:center;">${slot2}</div>
                     <div style="width:30px; text-align:center;">${slot3}</div>
                     <div style="width:30px; text-align:center;">${slot4}</div>
@@ -411,7 +389,6 @@ document.addEventListener("DOMContentLoaded", function() {
         });
         html += `</div>`;
 
-        // Footer Legende
         html += `
         <div class="icon-legend" style="margin-top:15px; padding:10px; background:#f8f9fa; border-radius:4px; font-size:0.9em; color:#7f8c8d;">
             <strong style="margin-right:10px;">Legende:</strong>
@@ -479,7 +456,6 @@ document.addEventListener("DOMContentLoaded", function() {
         }
         else if (action === 'conflict') {
             title = `Signifikante Abweichungen: ${partner.partner_name}`;
-            // NEU: Liste der Kriterien mit hoher Divergenz
             if (partner.matrix_details) {
                 const conflicts = partner.matrix_details.filter(d => {
                     const mgr = parseFloat(d.perf_mgr || 0);
