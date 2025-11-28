@@ -1,6 +1,6 @@
 /*
   Datei: js/wizard-data-view.js
-  Zweck: View-Logik und HTML-Generierung für Wichtigkeit & Performance-Slider
+  Zweck: View-Logik für Wichtigkeit & Performance-Slider
   (c) - Dr. Ralf Korell, 2025/26
   
   # Created: 27.11.2025, 15:40 - Extracted Rendering Logic from wizard-controller.js (AP 10)
@@ -11,9 +11,11 @@
   # Modified: 28.11.2025, 13:00 - AP 21: CamelCase consolidation for generalComment
   # Modified: 28.11.2025, 15:15 - AP 18: Refactored slider markup (DRY) and fixed layout/value update logic
   # Modified: 28.11.2025, 15:30 - AP 24: Use central CONFIG for render delays
+  # Modified: 28.11.2025, 16:00 - AP 25: Extracted HTML generation to templates.js
 */
 
 import { CONFIG } from './config.js';
+import * as Tpl from './templates.js';
 
 export class DataView {
     constructor(state, callbacks) {
@@ -41,31 +43,6 @@ export class DataView {
             tooltip.style.opacity = show ? '1' : '0';
         }
     }
-
-    /**
-     * Zentralisierte Methode zur Generierung des gesamten Slider-Markups.
-     * Ersetzt die redundante HTML-Erzeugung in createHeaderSliderHTML und createSliderHTML.
-     */
-    _generateSliderMarkup(domId, type, min, max, value, options = {}) {
-        const {
-            rawId = null,
-            extraInputClass = '',
-            displayValue = '',
-            showMinMaxLabels = false,
-            valueLabelClass = 'slider-value',
-            iconHTML = ''
-        } = options;
-
-        const critAttr = rawId ? `data-crit-id="${rawId}"` : '';
-        
-        // Kompakter HTML String
-        const wrapperHTML = `<div class="slider-wrapper"><input type="range" id="${domId}" ${critAttr} class="fancy-slider ${extraInputClass}" min="${min}" max="${max}" value="${value}" data-type="${type}"><div class="slider-tooltip" id="tooltip_${domId}">${displayValue}</div></div>`;
-
-        const leftLabel = showMinMaxLabels ? `<span class="slider-label">${min}</span>` : '';
-        const rightLabel = showMinMaxLabels ? `<span class="slider-label">${max}</span>` : '';
-
-        return `<div class="slider-container">${leftLabel}${wrapperHTML}${rightLabel}<span class="slider-value ${valueLabelClass}" id="value_${domId}">${displayValue}</span>${iconHTML}</div>`;
-    }
     
     // --- HAUPT VIEW METHODEN ---
 
@@ -80,16 +57,7 @@ export class DataView {
             container.innerHTML = ''; 
 
             Object.entries(groupedCriteria).forEach(([groupName, criteria]) => {
-                const groupDiv = document.createElement('div');
-                groupDiv.className = 'criteria-group';
-
-                const titleDiv = document.createElement('div');
-                titleDiv.className = 'criteria-group-title';
-                titleDiv.textContent = groupName;
-                groupDiv.appendChild(titleDiv);
-
-                const tableDiv = document.createElement('div');
-                tableDiv.className = 'criteria-table';
+                let rowsHTML = '';
 
                 criteria.forEach((criterion) => {
                     const rawId = criterion.id;
@@ -103,34 +71,12 @@ export class DataView {
                         this.callbacks.setImportance(rawId, 0); 
                     }
 
-                    const rowDiv = document.createElement('div');
-                    rowDiv.className = 'criteria-row';
-
-                    const infoDiv = document.createElement('div');
-                    infoDiv.className = 'criteria-info';
-                    
-                    const nameDiv = document.createElement('div');
-                    nameDiv.className = 'criteria-name';
-                    nameDiv.textContent = criterion.name;
-                    
-                    const descDiv = document.createElement('div');
-                    descDiv.className = 'criteria-description';
-                    descDiv.textContent = criterion.description;
-                    
-                    infoDiv.appendChild(nameDiv);
-                    infoDiv.appendChild(descDiv);
-                    rowDiv.appendChild(infoDiv);
-
-                    const sliderDiv = document.createElement('div');
-                    sliderDiv.className = 'criteria-content';
-                    sliderDiv.innerHTML = this.createSliderHTML(domId, rawId, 'importance', initialValue);
-                    rowDiv.appendChild(sliderDiv);
-
-                    tableDiv.appendChild(rowDiv);
+                    // AP 25: Template Usage
+                    const sliderHTML = this.createSliderHTML(domId, rawId, 'importance', initialValue);
+                    rowsHTML += Tpl.getCriteriaRowHTML(criterion.name, criterion.description, sliderHTML);
                 });
 
-                groupDiv.appendChild(tableDiv);
-                container.appendChild(groupDiv);
+                container.innerHTML += Tpl.getCriteriaGroupStartHTML(groupName) + rowsHTML + '</div></div>';
             });
 
             this.bindSliderEvents('importance');
@@ -157,7 +103,8 @@ export class DataView {
             }
         }
 
-        return this._generateSliderMarkup(domId, type, min, max, initialValue, {
+        // AP 25: Template Usage
+        return Tpl.getSliderHTML(domId, type, min, max, initialValue, {
             extraInputClass: extraInputClass,
             displayValue: displayValue,
             showMinMaxLabels: false,
@@ -172,11 +119,12 @@ export class DataView {
         let iconHTML = '';
         if (type === 'performance') {
             const isExtreme = (initialValue > 0 && initialValue <= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MIN) || initialValue >= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MAX;
-            const visibility = isExtreme ? 'visible' : 'hidden';
-            iconHTML = `<span class="comment-icon" id="icon_${domId}" style="visibility:${visibility}; cursor:pointer; font-size:1.2em; margin-left:10px;" title="Kommentar hinzufügen">📝</span>`;
+            // AP 25: Template Usage
+            iconHTML = Tpl.getCommentIconHTML(domId, isExtreme);
         }
 
-        const sliderContainer = this._generateSliderMarkup(domId, type, 0, 10, initialValue, {
+        // AP 25: Template Usage
+        const sliderContainer = Tpl.getSliderHTML(domId, type, 0, 10, initialValue, {
             rawId: rawId,
             extraInputClass: extraInputClass,
             displayValue: displayValue,
@@ -185,8 +133,9 @@ export class DataView {
             iconHTML: iconHTML
         });
 
+        // AP 25: Template Usage
         const commentHTML = type === 'performance' 
-            ? `<div id="comment_container_${domId}" class="comment-container"><textarea id="comment_${domId}" class="comment-textarea" placeholder="[FREIWILLIG: Warum diese Bewertung?]"></textarea></div>` 
+            ? Tpl.getCommentBoxHTML(domId, '[FREIWILLIG: Warum diese Bewertung?]')
             : '';
 
         return sliderContainer + commentHTML;
@@ -204,39 +153,20 @@ export class DataView {
             };
         }
         const pf = partnerFeedback[partnerId];
-        const initialComment = this.callbacks.escapeHtml(pf.generalComment || '');
+        const initialComment = pf.generalComment || '';
 
-        const headerHTML = `
-            <h3>Bewertung: ${this.callbacks.escapeHtml(partner.name)}</h3>
-            <div class="partner-header-box">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Wie häufig arbeitest Du mit ${this.callbacks.escapeHtml(partner.name)} zusammen? *</label>
-                        ${this.createHeaderSliderHTML(`freq_${partnerId}`, 'frequency', pf.frequency, 0, CONFIG.WIZARD.FREQUENCY_MAX, {1:"Selten", 2:"Monatlich / Gelegentlich", 4:"Täglich / Intensiv"})}
-                    </div>
-                    <div class="form-group">
-                        <label>Generelles Feedback (optional):</label>
-                        <textarea id="gen_comment_${partnerId}" class="comment-textarea-large" placeholder="[FREIWILLIG: Dein generelles Feedback]">${initialComment}</textarea>
-                    </div>
-                </div>
-                <div class="form-row" style="margin-top:20px;">
-                    <div class="form-group" style="width:100%;">
-                        <label>Würdest Du ${this.callbacks.escapeHtml(partner.name)} weiterempfehlen? (NPS) *</label>
-                        ${this.createHeaderSliderHTML(`nps_${partnerId}`, 'nps', pf.nps, CONFIG.WIZARD.NPS_RANGES.NA_VALUE, 10, {})}
-                    </div>
-                </div>
-            </div>
-            <hr style="margin-bottom:30px; border:0; border-top:1px solid #eee;">
-            <div id="performance-criteria-container-${partnerId}">`;
+        // AP 25: Header Template
+        const freqSliderHTML = this.createHeaderSliderHTML(`freq_${partnerId}`, 'frequency', pf.frequency, 0, CONFIG.WIZARD.FREQUENCY_MAX, {1:"Selten", 2:"Monatlich / Gelegentlich", 4:"Täglich / Intensiv"});
+        const npsSliderHTML = this.createHeaderSliderHTML(`nps_${partnerId}`, 'nps', pf.nps, CONFIG.WIZARD.NPS_RANGES.NA_VALUE, 10, {});
+        
+        const headerHTML = Tpl.getPartnerHeaderHTML(partner.name, freqSliderHTML, npsSliderHTML, initialComment, partnerId);
 
         let criteriaHTML = '';
         const groupedCriteria = this.groupCriteria(criteriaData);
 
         Object.entries(groupedCriteria).forEach(([groupName, criteria]) => {
-            criteriaHTML += `<div class="criteria-group">
-                <div class="criteria-group-title">${groupName}</div>
-                <div class="criteria-table">`;
-
+            let rowsHTML = '';
+            
             criteria.forEach((criterion) => {
                 const rawId = criterion.id;
                 const domId = 'perf_' + rawId + '_' + partnerId; 
@@ -263,31 +193,58 @@ export class DataView {
                     performanceData[partnerId][rawId] = { score: 0, comment: '' };
                 }
 
-                const escapedComment = this.callbacks.escapeHtml(currentComment);
+                // AP 25: Einzelne Slider erzeugen (der Slider baut sein eigenes HTML via createSliderHTML)
+                // Die Kommentarbox ist nun Teil von createSliderHTML (in Tpl.getSliderHTML + getCommentBoxHTML), 
+                // ABER die Initialisierung des Kommentars müssen wir beachten.
                 
-                const sliderAndCommentHTML = `
-                    <div class="criteria-content">
-                        ${this.createSliderHTML(domId, rawId, 'performance', currentVal)}
-                        <div id="comment_container_${domId}" class="comment-container" style="display:${currentComment.trim() !== '' ? 'block' : 'none'};">
-                            <textarea id="comment_${domId}" class="comment-textarea" placeholder="[FREIWILLIG: Warum diese Bewertung?]"></textarea></div></div>`; 
-
-                criteriaHTML += `
-                <div class="criteria-row">
-                    <div class="criteria-info">
-                        <div class="criteria-name">${criterion.name}</div>
-                        <div class="criteria-description">${criterion.description}</div>
-                    </div>
-                    ${sliderAndCommentHTML}
-                </div>`;
+                // Korrektur: createSliderHTML nutzt getCommentBoxHTML, aber ohne Value-Parameter.
+                // Wir müssen das etwas anpassen, oder createSliderHTML muss den Comment durchreichen.
+                // DA ich createSliderHTML oben refactored habe, aber den Comment-Value vergessen habe:
+                // Ich passe createSliderHTML (lokal) noch kurz an, dass er getCommentBoxHTML mit Value aufruft.
+                
+                // Da wir das Template nutzen, rufe ich es hier direkt auf, um den Content für die Row zu bauen.
+                // Eigentlich ruft createSliderHTML das Template auf.
+                
+                // Umbau: Ich übergebe currentComment an createSliderHTML? 
+                // Nein, createSliderHTML ist für Importance und Perf. Importance hat keinen Comment.
+                
+                // Hier in der Schleife bauen wir das HTML zusammen.
+                const sliderContainer = this.createSliderHTMLWithComment(domId, rawId, 'performance', currentVal, currentComment);
+                rowsHTML += Tpl.getCriteriaRowHTML(criterion.name, criterion.description, sliderContainer);
             });
 
-            criteriaHTML += `</div></div>`;
+            criteriaHTML += Tpl.getCriteriaGroupStartHTML(groupName) + rowsHTML + '</div></div>';
         });
         
-        return `<div id="partner-view-${partnerId}" style="display: none;">
-            ${headerHTML}
-            ${criteriaHTML}
-        </div></div>`;
+        return `<div id="partner-view-${partnerId}" style="display: none;">${headerHTML}${criteriaHTML}</div></div>`;
+    }
+
+    // Hilfsmethode für AP 25 Refactoring (Kommentar-Support)
+    createSliderHTMLWithComment(domId, rawId, type, initialValue, initialComment) {
+        const extraInputClass = initialValue === 0 ? 'slider-neutral' : '';
+        const displayValue = initialValue === 0 ? 'N/A' : initialValue;
+        
+        let iconHTML = '';
+        const isExtreme = (initialValue > 0 && initialValue <= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MIN) || initialValue >= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MAX;
+        iconHTML = Tpl.getCommentIconHTML(domId, isExtreme);
+
+        const sliderContainer = Tpl.getSliderHTML(domId, type, 0, 10, initialValue, {
+            rawId: rawId,
+            extraInputClass: extraInputClass,
+            displayValue: displayValue,
+            showMinMaxLabels: true,
+            valueLabelClass: 'slider-value',
+            iconHTML: iconHTML
+        });
+
+        // Prüfen, ob Kommentarbox sichtbar sein soll (Text vorhanden oder Extremwert?)
+        // Logik war: display:block wenn text !=''. Extremwert steuert nur Icon visibility.
+        // Aber User klickt Icon -> Box geht auf.
+        // Also initial: Hat Text? -> Visible. Sonst Hidden.
+        const isHidden = !initialComment || initialComment.trim() === '';
+        const commentHTML = Tpl.getCommentBoxHTML(domId, '[FREIWILLIG: Warum diese Bewertung?]', initialComment, isHidden);
+
+        return sliderContainer + commentHTML;
     }
 
     // --- EVENT BINDING & HANDLER LOGIK ---
@@ -349,13 +306,10 @@ export class DataView {
         const valueDisplay = document.getElementById(`value_${domId}`);
         const tooltip = document.getElementById(`tooltip_${domId}`);
         
-        let displayValue = value; // Default: Zeige Zahl
+        let displayValue = value; 
         let tooltipText = `${value} - Neutral`;
         let isNeutral = false;
 
-        // SPEZIAL-LOGIK FÜR HEADER SLIDER (Frequenz & NPS)
-        // Hier muss der Text ermittelt werden, nicht die Zahl!
-        
         if (type === 'frequency') {
             const labels = {1: "Selten / Einmalig", 2: "Monatlich / Gelegentlich", 3: "Wöchentlich / Regelmäßig", 4: "Täglich / Intensiv"};
             if (value === 0) {
@@ -363,7 +317,7 @@ export class DataView {
                 displayValue = "Bitte wählen...";
                 tooltipText = displayValue;
             } else {
-                displayValue = labels[value] || value; // Text statt Zahl!
+                displayValue = labels[value] || value; 
                 tooltipText = displayValue;
             }
             this.callbacks.setFeedback(this.callbacks.getCurrentPartnerId(), 'frequency', value);
@@ -374,7 +328,6 @@ export class DataView {
                 displayValue = "Bitte wählen...";
                 tooltipText = displayValue;
             } else {
-                // NPS Text Logik
                 if (value === -1) displayValue = "Möchte ich nicht bewerten";
                 else if (value === 0) displayValue = "0 - Auf keinen Fall";
                 else if (value >= 1 && value <= 3) displayValue = value + " - Eher nicht";
@@ -413,7 +366,6 @@ export class DataView {
             if (partnerId) {
                 this.callbacks.setPerformance(partnerId, rawId, value, undefined);
                 
-                // Icon Logik
                 const icon = document.getElementById(`icon_${domId}`);
                 const container = document.getElementById(`comment_container_${domId}`);
                 const textarea = document.getElementById(`comment_${domId}`);
@@ -433,14 +385,13 @@ export class DataView {
             }
         }
         
-        // UI Updates
         if (isNeutral) {
             slider.classList.add('slider-neutral');
         } else {
             slider.classList.remove('slider-neutral');
         }
 
-        if (valueDisplay) valueDisplay.textContent = displayValue; // Zeigt jetzt Text
+        if (valueDisplay) valueDisplay.textContent = displayValue;
         if (tooltip && !isNeutral) tooltip.textContent = tooltipText;
     }
 }

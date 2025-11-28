@@ -15,10 +15,12 @@
   # Modified: 28.11.2025, 12:46 - FIX (AP 20): Use visibility instead of display for Matrix tooltip to prevent layout jumping.
   # Modified: 28.11.2025, 13:00 - AP 21: CamelCase consolidation for matrixDetails and generalComments
   # Modified: 28.11.2025, 15:45 - AP 24 FIX: Use central CONFIG/utils AND restored missing exportToCSV function
+  # Modified: 28.11.2025, 16:00 - AP 25: Extracted HTML generation to templates.js
 */
 
 import { CONFIG } from './config.js';
 import { escapeHtml, toggleGlobalLoader, interpolateColor } from './utils.js';
+import * as Tpl from './templates.js';
 
 document.addEventListener("DOMContentLoaded", function() {
     // ... (Selektoren)
@@ -100,7 +102,6 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // --- FIX AP 20: Event Handler für Tooltip ---
     matrixContainer.addEventListener('mouseenter', function(e) {
         const dot = e.target.closest('.matrix-dot');
         if (dot) {
@@ -148,6 +149,10 @@ document.addEventListener("DOMContentLoaded", function() {
             .then(data => {
                 if (data.app_texts) appTexts = data.app_texts;
                 if (data && data.departments && departmentTreeContainer) {
+                    // Tree Render Logic (bleibt hier, da sehr spezifisch mit Event-Listenern)
+                    // Könnte man auch refactorn, aber Template-Fokus lag auf den Strings.
+                    // Ich lasse den komplexen Tree-Code hier, da er DOM Elemente erzeugt und nicht HTML-Strings.
+                    // Das passt nicht ganz ins Template-String-Konzept von AP 25.
                     departmentTreeContainer.innerHTML = '';
                     const departments = data.departments.map(dep => ({
                         ...dep,
@@ -280,7 +285,6 @@ document.addEventListener("DOMContentLoaded", function() {
 
         resultSection.innerHTML = "";
         setExportButtonState(false);
-        // AP 24: Nutzung von toggleGlobalLoader
         toggleGlobalLoader(true);
 
         fetch('php/partner_score_analyse.php', {
@@ -293,10 +297,8 @@ document.addEventListener("DOMContentLoaded", function() {
         })
         .then(resp => resp.json())
         .then(data => {
-            // AP 24: Nutzung von toggleGlobalLoader
             toggleGlobalLoader(false);
             if (Array.isArray(data) && data.length > 0) {
-                // HIER GEÄNDERT: Konvertierung von snake_case zu camelCase (AP 16)
                 analysisData = data.map(row => ({
                     partnerId: row.partner_id,
                     partnerName: row.partner_name,
@@ -309,7 +311,6 @@ document.addEventListener("DOMContentLoaded", function() {
                     hasActionItem: row.has_action_item,
                     numAssessorsMgr: row.num_assessors_mgr,
                     numAssessorsTeam: row.num_assessors_team
-                    // matrix_details und general_comments sind hier nicht enthalten und werden on-demand geladen
                 }));
 
                 renderResultTable(analysisData);
@@ -340,22 +341,13 @@ document.addEventListener("DOMContentLoaded", function() {
         const scores = rows.map(r => r.score);
         const min = Math.min(...scores); const max = Math.max(...scores);
         
-        // HIER GEÄNDERT: Verwende camelCase
         const globalCount = rows.length > 0 && rows[0].globalParticipantCount ? rows[0].globalParticipantCount : 0;
 
-        let html = `
-        <div class="criteria-group-title">Ergebnis: Partner Score Ranking (Basierend auf ${globalCount} Teilnehmern)</div>
-        <div class="criteria-table">
-            <div class="criteria-row score-table-header">
-                <div class="criteria-content col-partner">Partner</div>
-                <div class="criteria-content col-score-graph">Score</div>
-                <div class="criteria-content col-count">Anzahl Beurteiler</div>
-                <div class="criteria-content col-insights text-center">Insights</div>
-            </div>`;
+        // AP 25: Template Usage
+        let html = Tpl.getScoreTableStartHTML(`Ergebnis: Partner Score Ranking (Basierend auf ${globalCount} Teilnehmern)`);
 
         rows.forEach((row, idx) => {
             const pct = (max === min) ? 1 : (row.score - min) / (max - min);
-            // AP 24: Nutzung von CONFIG.COLORS für Heatmap
             const color = pct < 0.5
                 ? interpolateColor(CONFIG.COLORS.HEATMAP_LOW, CONFIG.COLORS.HEATMAP_MID, pct * 2)
                 : interpolateColor(CONFIG.COLORS.HEATMAP_MID, CONFIG.COLORS.HEATMAP_HIGH, (pct - 0.5) * 2);
@@ -368,33 +360,31 @@ document.addEventListener("DOMContentLoaded", function() {
             let slot4 = ''; 
 
             // 1. NPS
-            // HIER GEÄNDERT: Verwende camelCase
             if (row.npsScore !== null && row.npsScore !== undefined) {
                 const nps = parseInt(row.npsScore);
-                // AP 24: Nutzung von CONFIG.COLORS für NPS
                 let npsColor = CONFIG.COLORS.NPS_DETRACTOR; 
                 if (nps >= 0 && nps <= 30) npsColor = CONFIG.COLORS.NPS_PASSIVE_LOW; 
                 else if (nps > 30 && nps <= 70) npsColor = CONFIG.COLORS.NPS_PASSIVE_HIGH; 
                 else if (nps > 70) npsColor = CONFIG.COLORS.NPS_PROMOTER; 
                 
-                slot1 = `<span class="nps-display" title="NPS Score: ${nps}">📣 <span class="nps-value" style="color:${npsColor};">${nps > 0 ? '+' : ''}${nps}</span></span>`;
+                // AP 25: Template
+                slot1 = Tpl.getInsightNpsHTML(nps, npsColor);
             }
 
             // 2. Kommentare (Flag/Count)
-            // HIER GEÄNDERT: Verwende camelCase
             const commentCount = parseInt(row.commentCount || 0);
             if (commentCount > 0) {
-                slot2 = `<span class="insight-icon action-icon" data-action="comments" data-id="${row.partnerId}" title="${commentCount} Kommentare - Klick für Details">💬 <span class="action-count">${commentCount}</span></span>`;
+                // AP 25: Template
+                slot2 = Tpl.getInsightIconHTML('comments', row.partnerId, `${commentCount} Kommentare - Klick für Details`, `💬 <span class="action-count">${commentCount}</span>`);
             }
 
-            // 3. Action List (Flag aus SQL)
-            // HIER GEÄNDERT: Verwende camelCase
+            // 3. Action List
             if (parseInt(row.hasActionItem) === 1) {
-                slot3 = `<span class="insight-icon action-icon" data-action="action" data-id="${row.partnerId}" title="Handlungsbedarf - Klick für Details">⚠️</span>`;
+                // AP 25: Template
+                slot3 = Tpl.getInsightIconHTML('action', row.partnerId, 'Handlungsbedarf - Klick für Details', '⚠️');
             }
 
-            // 4. Divergenz (Metrik aus SQL)
-            // HIER GEÄNDERT: Verwende camelCase
+            // 4. Divergenz
             const maxDiv = parseFloat(row.maxDivergence || 0);
             const cntMgr = parseInt(row.numAssessorsMgr || 0);
             const cntTeam = parseInt(row.numAssessorsTeam || 0);
@@ -403,40 +393,17 @@ document.addEventListener("DOMContentLoaded", function() {
             
             if (cntMgr >= 3 && cntTeam >= 3 && maxDiv > conflictThreshold) {
                 const title = `Maximale Divergenz: ${maxDiv.toFixed(1)} (Schwellenwert: ${conflictThreshold})`;
-                slot4 = `<span class="insight-icon action-icon" data-action="conflict" data-id="${row.partnerId}" title="${title}">⚡</span>`;
+                // AP 25: Template
+                slot4 = Tpl.getInsightIconHTML('conflict', row.partnerId, title, '⚡');
             }
 
-            html += `
-            <div class="criteria-row partner-row-clickable score-table-row" data-partner-id="${row.partnerId}">
-                <div class="criteria-content col-partner col-partner-link">${escapeHtml(row.partnerName)} ↗</div>
-                
-                <div class="criteria-content col-score-graph">
-                    <div class="score-bar-wrapper">
-                        <div class="score-bar-fill" style="width:${Math.round(pct*90)+10}%; background:${rgb};"></div>
-                    </div>
-                    <div class="score-bar-text">${row.score}</div>
-                </div>
-                
-                <div class="criteria-content col-count">${row.totalAnswers}</div>
-                
-                <div class="criteria-content col-insights">
-                    <div class="insight-slot-nps">${slot1}</div>
-                    <div class="insight-slot-icon">${slot2}</div>
-                    <div class="insight-slot-mini">${slot3}</div>
-                    <div class="insight-slot-mini">${slot4}</div>
-                </div>
-            </div>`;
+            // AP 25: Template Usage
+            html += Tpl.getScoreRowHTML(row, pct, rgb, { slot1, slot2, slot3, slot4 });
         });
         html += `</div>`;
 
-        html += `
-        <div class="icon-legend-box">
-            <strong class="legend-label">Legende:</strong>
-            <span class="legend-item">📣 NPS-Score</span>
-            <span class="legend-item">💬 Kommentare vorhanden</span>
-            <span class="legend-item">⚠️ Handlungsfelder (Vorschläge)</span>
-            <span>⚡ Bewertungsunterschiede Mgmt/Field</span>
-        </div>`;
+        // AP 25: Template Usage
+        html += Tpl.getLegendHTML();
 
         resultSection.innerHTML = html;
     }
@@ -447,8 +414,6 @@ document.addEventListener("DOMContentLoaded", function() {
             return partner; // Bereits geladen
         }
 
-        // Nachladen
-        // AP 24: Nutzung von toggleGlobalLoader
         toggleGlobalLoader(true);
         try {
             const response = await fetch('php/get_partner_details.php', {
@@ -456,7 +421,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     ...currentFilterState,
-                    partner_id: partner.partnerId // HIER GEÄNDERT: Verwende camelCase
+                    partner_id: partner.partnerId
                 })
             });
             
@@ -464,7 +429,6 @@ document.addEventListener("DOMContentLoaded", function() {
             
             if (details.error) throw new Error(details.error);
 
-            // Daten mergen (matrix_details und general_comments kommen snake_case vom Detail-API, werden gemergt)
             partner.matrixDetails = details.matrix_details;
             partner.generalComments = details.general_comments;
             
@@ -478,7 +442,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     async function handleInsightClickAsync(action, partnerId) {
-        let partner = analysisData.find(p => p.partnerId == partnerId); // HIER GEÄNDERT: Verwende camelCase
+        let partner = analysisData.find(p => p.partnerId == partnerId);
         if (!partner) return;
 
         partner = await ensurePartnerDetails(partner);
@@ -487,45 +451,33 @@ document.addEventListener("DOMContentLoaded", function() {
         let title = "";
         let content = "";
 
-        // HIER GEÄNDERT: Verwende partner.partnerName
         if (action === 'comments') {
             title = `Kommentare zu ${escapeHtml(partner.partnerName)}`;
             if (partner.generalComments && partner.generalComments.length > 0) {
-                content += `<h4>Allgemeines Feedback</h4><ul>`;
-                partner.generalComments.forEach(c => content += `<li>${escapeHtml(c)}</li>`);
-                content += `</ul>`;
+                // AP 25 Template
+                content += Tpl.getCommentsListHTML('Allgemeines Feedback', partner.generalComments);
             }
             if (partner.matrixDetails) {
                 const specific = partner.matrixDetails.filter(d => d.comments && d.comments.length > 0);
                 if (specific.length > 0) {
-                    content += `<h4>Spezifisches Feedback</h4>`;
-                    specific.forEach(d => {
-                        content += `<strong>${escapeHtml(d.name)}</strong> (I:${d.imp}/P:${d.perf})<ul>`;
-                        d.comments.forEach(c => content += `<li>${escapeHtml(c)}</li>`);
-                        content += `</ul>`;
-                    });
+                    // AP 25 Template
+                    content += Tpl.getSpecificCommentsHTML(specific);
                 }
             }
         } 
         else if (action === 'action') {
-            // HIER GEÄNDERT: Verwende partner.partnerName
             title = `Handlungsfelder für ${escapeHtml(partner.partnerName)}`;
             if (partner.matrixDetails) {
                 const items = partner.matrixDetails.filter(d => parseFloat(d.imp) >= 8.0 && parseFloat(d.perf) <= 5.0);
                 if (items.length > 0) {
-                    content += `<table class="modal-table"><tr><th>Kriterium</th><th>Wichtigkeit</th><th>Performance</th></tr>`;
-                    items.forEach(i => {
-                        content += `<tr><td>${escapeHtml(i.name)}</td><td>${i.imp}</td><td class="text-danger-bold">${i.perf}</td></tr>`;
-                    });
-                    content += `</table>`;
+                    // AP 25 Template
+                    content += Tpl.getActionTableHTML(items);
                 }
             }
         }
         else if (action === 'conflict') {
-            // HIER GEÄNDERT: Verwende partner.partnerName und maxDivergence (wird in analysisData gespeichert)
             title = `Signifikante Abweichungen: ${escapeHtml(partner.partnerName)}`;
             
-            // Die Divergenz muss für die Anzeige im Modal neu berechnet werden, da die Details nicht auf oberster Ebene sind
             const partnerListRow = analysisData.find(p => p.partnerId == partnerId); 
             const maxDiv = partnerListRow ? partnerListRow.maxDivergence : 0;
             
@@ -538,19 +490,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 });
                 
                 if (conflicts.length > 0) {
-                    content += `<table class="modal-table"><tr><th>Kriterium</th><th>Manager Ø</th><th>Team Ø</th><th>Delta</th></tr>`;
-                    conflicts.forEach(c => {
-                        const mgr = parseFloat(c.perf_mgr || 0);
-                        const team = parseFloat(c.perf_team || 0);
-                        const delta = Math.abs(mgr - team).toFixed(1);
-                        content += `<tr>
-                            <td>${escapeHtml(c.name)}</td>
-                            <td class="text-danger-bold">${mgr.toFixed(1)}</td>
-                            <td class="text-primary-bold">${team.toFixed(1)}</td>
-                            <td>${delta}</td>
-                        </tr>`;
-                    });
-                    content += `</table>`;
+                    // AP 25 Template
+                    content += Tpl.getConflictTableHTML(conflicts);
                 } else {
                     content += `<p>Keine Kriterien gefunden, die den Schwellenwert von ${conflictThreshold} überschreiten.</p>`;
                 }
@@ -558,7 +499,8 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         const modalBody = document.getElementById('info-modal-body');
-        modalBody.innerHTML = `<h2 class="modal-headline">${title}</h2>` + content;
+        // AP 25 Template
+        modalBody.innerHTML = Tpl.getModalContentHTML(title, content);
         document.getElementById('global-info-modal').style.display = 'flex';
     }
 
@@ -572,14 +514,14 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     async function openMatrixAsync(partnerId) {
-        let partner = analysisData.find(p => p.partnerId == partnerId); // HIER GEÄNDERT: Verwende camelCase
+        let partner = analysisData.find(p => p.partnerId == partnerId);
         if (!partner) return;
 
         partner = await ensurePartnerDetails(partner);
         if (!partner || !partner.matrixDetails) return;
 
         currentPartnerDetails = partner; 
-        matrixTitle.textContent = "IPA Matrix: " + partner.partnerName; // HIER GEÄNDERT: Verwende camelCase
+        matrixTitle.textContent = "IPA Matrix: " + partner.partnerName;
 
         const radios = document.querySelectorAll('input[name="matrix-center"]');
         radios.forEach(r => { if(r.value === 'standard') r.checked = true; });
@@ -588,7 +530,7 @@ document.addEventListener("DOMContentLoaded", function() {
         matrixModal.style.display = 'flex';
     }
 
-    function updateMatrixView(mode) { /* ... (bleibt gleich) ... */
+    function updateMatrixView(mode) {
         if (!currentPartnerDetails) return;
         const stats = calculateStats(currentPartnerDetails.matrixDetails);
         let centerX = 5.0;
@@ -612,37 +554,24 @@ document.addEventListener("DOMContentLoaded", function() {
         return Math.max(maxD * 1.1, 0.5); 
     }
 
-    function renderMatrixSVG(details, centerX, centerY, rangeRadius) { /* ... (bleibt gleich) ... */
+    function renderMatrixSVG(details, centerX, centerY, rangeRadius) {
         // AP 24: Matrix Size aus Config
         const size = CONFIG.UI.MATRIX_SIZE;
         const scale = (size / 2) / rangeRadius;
-        let svg = `<svg viewBox="0 0 ${size} ${size}" class="matrix-svg">`;
         const mid = size / 2;
 
-        svg += `
-            <line x1="0" y1="${mid}" x2="${size}" y2="${mid}" stroke="#bdc3c7" stroke-width="2" stroke-dasharray="5,5" />
-            <line x1="${mid}" y1="0" x2="${mid}" y2="${size}" stroke="#bdc3c7" stroke-width="2" stroke-dasharray="5,5" />
-            <text x="10" y="20" fill="#95a5a6" font-size="12">Konzentrieren!</text>
-            <text x="${size-10}" y="20" fill="#95a5a6" font-size="12" text-anchor="end">Weiter so</text>
-            <text x="10" y="${size-10}" fill="#95a5a6" font-size="12">Niedrige Prio</text>
-            <text x="${size-10}" y="${size-10}" fill="#95a5a6" font-size="12" text-anchor="end">Overkill?</text>
-            <text x="${size-10}" y="${mid-10}" fill="#bdc3c7" font-size="11" text-anchor="end">
-                Zentrum: ${centerX.toFixed(2)} / ${centerY.toFixed(2)}
-            </text>
-        `;
-
+        let dotsHTML = '';
         details.forEach(d => {
             const dx = d.perf - centerX;
             const dy = d.imp - centerY; 
             const px = mid + (dx * scale);
             const py = mid - (dy * scale); 
-            svg += `<circle cx="${px}" cy="${py}" r="6" fill="#3498db" stroke="#fff" stroke-width="1"
-                    class="matrix-dot" 
-                    data-name="${escapeHtml(d.name)}" data-imp="${d.imp}" data-perf="${d.perf}" />`;
+            // AP 25: Template Usage
+            dotsHTML += Tpl.getMatrixDotHTML(px, py, d.name, d.imp, d.perf);
         });
         
-        svg += `</svg>`;
-        matrixContainer.innerHTML = svg;
+        // AP 25: Template Usage
+        matrixContainer.innerHTML = Tpl.getMatrixSVG(size, centerX, centerY, dotsHTML);
     }
 
     function exportToCSV() {
@@ -650,9 +579,7 @@ document.addEventListener("DOMContentLoaded", function() {
         
         let csvContent = "Partner;Gesamt-Score;Anzahl Beurteiler;Kriterium (Matrix);Wichtigkeit (I);Performance (P)\n";
 
-        // ACHTUNG: Export muss jetzt über den camelCase Namen iterieren
         analysisData.forEach(partner => {
-            // HIER GEÄNDERT (AP 21): CamelCase
             if (partner.matrixDetails) {
                 partner.matrixDetails.forEach(detail => {
                     let row = [
