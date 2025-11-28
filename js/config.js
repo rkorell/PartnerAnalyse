@@ -1,8 +1,11 @@
 /*
   Datei: js/config.js
   Zweck: Zentrale Konfigurationsdatei für alle Magic Numbers und Schwellenwerte
+  (c) - Dr. Ralf Korell, 2025/26
+
   # Created: 27.11.2025, 14:30 - Centralized application constants (AP 6)
   # Modified: 27.11.2025, 14:50 - Changed to ES6 module export (AP 8)
+  # Modified: 28.11.2025, 15:30 - AP 24: Added COLORS and UI constants for modularization
 */
 
 export const CONFIG = {
@@ -37,5 +40,26 @@ export const CONFIG = {
         
         // Frequenz-Werte (für Validierung)
         FREQUENCY_MAX: 4,
+    },
+
+    // --- Farben (AP 24) ---
+    COLORS: {
+        // NPS Ampel
+        NPS_DETRACTOR: '#e74c3c', // Rot
+        NPS_PASSIVE_LOW: '#f39c12', // Orange
+        NPS_PASSIVE_HIGH: '#f1c40f', // Gelb
+        NPS_PROMOTER: '#2ecc71', // Grün
+
+        // Score Heatmap (RGB Arrays für Interpolation)
+        HEATMAP_LOW: [231, 76, 60],   // Rot
+        HEATMAP_MID: [243, 156, 18],  // Orange
+        HEATMAP_HIGH: [46, 204, 113], // Grün
+    },
+
+    // --- UI Konstanten (AP 24) ---
+    UI: {
+        MATRIX_SIZE: 400,
+        LOADER_DELAY_MS: 300,
+        RENDER_DELAY_MS: 10,
     }
 };

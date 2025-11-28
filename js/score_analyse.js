@@ -14,20 +14,11 @@
   # Modified: 28.11.2025, 12:45 - CSS Cleanup (AP 19): Replaced remaining inline styles with utility classes.
   # Modified: 28.11.2025, 12:46 - FIX (AP 20): Use visibility instead of display for Matrix tooltip to prevent layout jumping.
   # Modified: 28.11.2025, 13:00 - AP 21: CamelCase consolidation for matrixDetails and generalComments
+  # Modified: 28.11.2025, 15:45 - AP 24 FIX: Use central CONFIG/utils AND restored missing exportToCSV function
 */
 
 import { CONFIG } from './config.js';
-
-// NEU: Hilfsfunktion gegen XSS (Global oder im Scope)
-function escapeHtml(text) {
-    if (text === null || text === undefined) return '';
-    return String(text)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
+import { escapeHtml, toggleGlobalLoader, interpolateColor } from './utils.js';
 
 document.addEventListener("DOMContentLoaded", function() {
     // ... (Selektoren)
@@ -37,7 +28,6 @@ document.addEventListener("DOMContentLoaded", function() {
     const minAnswersValue = document.getElementById('min-answers-value');
     const filterForm = document.getElementById('analyse-filter-form');
     const resultSection = document.getElementById('result-section');
-    const loadingOverlay = document.getElementById('loading-overlay');
     const errorMessage = document.getElementById('error-message');
     const errorText = document.getElementById('error-text');
     const closeErrorBtn = document.getElementById('close-error');
@@ -258,8 +248,6 @@ document.addEventListener("DOMContentLoaded", function() {
             });
     }
 
-    function showLoader() { loadingOverlay._timeout = setTimeout(() => { loadingOverlay.style.display = 'flex'; }, 300); }
-    function hideLoader() { clearTimeout(loadingOverlay._timeout); loadingOverlay.style.display = 'none'; }
     function showError(msg) { errorText.textContent = msg; errorMessage.style.display = 'flex'; }
 
     function setExportButtonState(enabled) { 
@@ -292,7 +280,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
         resultSection.innerHTML = "";
         setExportButtonState(false);
-        showLoader();
+        // AP 24: Nutzung von toggleGlobalLoader
+        toggleGlobalLoader(true);
 
         fetch('php/partner_score_analyse.php', {
             method: 'POST',
@@ -304,7 +293,8 @@ document.addEventListener("DOMContentLoaded", function() {
         })
         .then(resp => resp.json())
         .then(data => {
-            hideLoader();
+            // AP 24: Nutzung von toggleGlobalLoader
+            toggleGlobalLoader(false);
             if (Array.isArray(data) && data.length > 0) {
                 // HIER GEÄNDERT: Konvertierung von snake_case zu camelCase (AP 16)
                 analysisData = data.map(row => ({
@@ -339,7 +329,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         })
         .catch(err => {
-            hideLoader();
+            toggleGlobalLoader(false);
             showError("Analyse konnte nicht durchgeführt werden.");
             analysisData = [];
             setExportButtonState(false);
@@ -365,9 +355,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
         rows.forEach((row, idx) => {
             const pct = (max === min) ? 1 : (row.score - min) / (max - min);
+            // AP 24: Nutzung von CONFIG.COLORS für Heatmap
             const color = pct < 0.5
-                ? interpolateColor([231, 76, 60], [243, 156, 18], pct * 2)
-                : interpolateColor([243, 156, 18], [46, 204, 113], (pct - 0.5) * 2);
+                ? interpolateColor(CONFIG.COLORS.HEATMAP_LOW, CONFIG.COLORS.HEATMAP_MID, pct * 2)
+                : interpolateColor(CONFIG.COLORS.HEATMAP_MID, CONFIG.COLORS.HEATMAP_HIGH, (pct - 0.5) * 2);
             const rgb = `rgb(${color.join(',')})`;
 
             // --- Insights Slots ---
@@ -380,12 +371,12 @@ document.addEventListener("DOMContentLoaded", function() {
             // HIER GEÄNDERT: Verwende camelCase
             if (row.npsScore !== null && row.npsScore !== undefined) {
                 const nps = parseInt(row.npsScore);
-                let npsColor = '#e74c3c'; 
-                if (nps >= 0 && nps <= 30) npsColor = '#f39c12'; 
-                else if (nps > 30 && nps <= 70) npsColor = '#f1c40f'; 
-                else if (nps > 70) npsColor = '#2ecc71'; 
+                // AP 24: Nutzung von CONFIG.COLORS für NPS
+                let npsColor = CONFIG.COLORS.NPS_DETRACTOR; 
+                if (nps >= 0 && nps <= 30) npsColor = CONFIG.COLORS.NPS_PASSIVE_LOW; 
+                else if (nps > 30 && nps <= 70) npsColor = CONFIG.COLORS.NPS_PASSIVE_HIGH; 
+                else if (nps > 70) npsColor = CONFIG.COLORS.NPS_PROMOTER; 
                 
-                // Hinweis: npsColor ist dynamisch, daher bleibt style-Attribut
                 slot1 = `<span class="nps-display" title="NPS Score: ${nps}">📣 <span class="nps-value" style="color:${npsColor};">${nps > 0 ? '+' : ''}${nps}</span></span>`;
             }
 
@@ -415,7 +406,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 slot4 = `<span class="insight-icon action-icon" data-action="conflict" data-id="${row.partnerId}" title="${title}">⚡</span>`;
             }
 
-            // Hinweis: Breite und Hintergrundfarbe sind dynamisch, daher bleiben style-Attribute hierfür. height und transition sind nun in der Klasse.
             html += `
             <div class="criteria-row partner-row-clickable score-table-row" data-partner-id="${row.partnerId}">
                 <div class="criteria-content col-partner col-partner-link">${escapeHtml(row.partnerName)} ↗</div>
@@ -453,13 +443,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // NEU: Lädt Details nach, falls noch nicht vorhanden
     async function ensurePartnerDetails(partner) {
-        // HIER GEÄNDERT (AP 21): CamelCase
         if (partner.matrixDetails && partner.generalComments) {
             return partner; // Bereits geladen
         }
 
         // Nachladen
-        showLoader();
+        // AP 24: Nutzung von toggleGlobalLoader
+        toggleGlobalLoader(true);
         try {
             const response = await fetch('php/get_partner_details.php', {
                 method: 'POST',
@@ -474,7 +464,7 @@ document.addEventListener("DOMContentLoaded", function() {
             
             if (details.error) throw new Error(details.error);
 
-            // Daten mergen (Mapping snake_case -> camelCase) (AP 21)
+            // Daten mergen (matrix_details und general_comments kommen snake_case vom Detail-API, werden gemergt)
             partner.matrixDetails = details.matrix_details;
             partner.generalComments = details.general_comments;
             
@@ -483,7 +473,7 @@ document.addEventListener("DOMContentLoaded", function() {
             alert("Fehler beim Laden der Details: " + e.message);
             return null;
         } finally {
-            hideLoader();
+            toggleGlobalLoader(false);
         }
     }
 
@@ -500,7 +490,6 @@ document.addEventListener("DOMContentLoaded", function() {
         // HIER GEÄNDERT: Verwende partner.partnerName
         if (action === 'comments') {
             title = `Kommentare zu ${escapeHtml(partner.partnerName)}`;
-            // HIER GEÄNDERT (AP 21): CamelCase
             if (partner.generalComments && partner.generalComments.length > 0) {
                 content += `<h4>Allgemeines Feedback</h4><ul>`;
                 partner.generalComments.forEach(c => content += `<li>${escapeHtml(c)}</li>`);
@@ -521,7 +510,6 @@ document.addEventListener("DOMContentLoaded", function() {
         else if (action === 'action') {
             // HIER GEÄNDERT: Verwende partner.partnerName
             title = `Handlungsfelder für ${escapeHtml(partner.partnerName)}`;
-            // HIER GEÄNDERT (AP 21): CamelCase
             if (partner.matrixDetails) {
                 const items = partner.matrixDetails.filter(d => parseFloat(d.imp) >= 8.0 && parseFloat(d.perf) <= 5.0);
                 if (items.length > 0) {
@@ -541,7 +529,6 @@ document.addEventListener("DOMContentLoaded", function() {
             const partnerListRow = analysisData.find(p => p.partnerId == partnerId); 
             const maxDiv = partnerListRow ? partnerListRow.maxDivergence : 0;
             
-            // HIER GEÄNDERT (AP 21): CamelCase
             if (partner.matrixDetails) {
                 const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
                 const conflicts = partner.matrixDetails.filter(d => {
@@ -575,7 +562,88 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById('global-info-modal').style.display = 'flex';
     }
 
-    function interpolateColor(c1, c2, t) { return [ Math.round(c1[0] + (c2[0]-c1[0])*t), Math.round(c1[1] + (c2[1]-c1[1])*t), Math.round(c1[2] + (c2[2]-c2[2])*t) ]; }
+    // --- IPA Matrix Logik ---
+    function calculateStats(details) { /* ... (bleibt gleich) ... */
+        const imps = details.map(d => parseFloat(d.imp));
+        const perfs = details.map(d => parseFloat(d.perf));
+        const sumImp = imps.reduce((a,b) => a+b, 0);
+        const sumPerf = perfs.reduce((a,b) => a+b, 0);
+        return { mean: { imp: sumImp / imps.length, perf: sumPerf / perfs.length } };
+    }
+
+    async function openMatrixAsync(partnerId) {
+        let partner = analysisData.find(p => p.partnerId == partnerId); // HIER GEÄNDERT: Verwende camelCase
+        if (!partner) return;
+
+        partner = await ensurePartnerDetails(partner);
+        if (!partner || !partner.matrixDetails) return;
+
+        currentPartnerDetails = partner; 
+        matrixTitle.textContent = "IPA Matrix: " + partner.partnerName; // HIER GEÄNDERT: Verwende camelCase
+
+        const radios = document.querySelectorAll('input[name="matrix-center"]');
+        radios.forEach(r => { if(r.value === 'standard') r.checked = true; });
+        
+        updateMatrixView('standard');
+        matrixModal.style.display = 'flex';
+    }
+
+    function updateMatrixView(mode) { /* ... (bleibt gleich) ... */
+        if (!currentPartnerDetails) return;
+        const stats = calculateStats(currentPartnerDetails.matrixDetails);
+        let centerX = 5.0;
+        let centerY = 5.0;
+        let maxDist = 5.0; 
+        if (mode === 'mean') {
+            centerX = stats.mean.perf;
+            centerY = stats.mean.imp;
+            maxDist = calculateMaxDeviation(currentPartnerDetails.matrixDetails, centerX, centerY);
+        }
+        renderMatrixSVG(currentPartnerDetails.matrixDetails, centerX, centerY, maxDist);
+    }
+
+    function calculateMaxDeviation(details, cx, cy) { /* ... (bleibt gleich) ... */
+        let maxD = 0;
+        details.forEach(d => {
+            const dx = d.perf - cx;
+            const dy = d.imp - cy;
+            maxD = Math.max(maxD, dx, dy);
+        });
+        return Math.max(maxD * 1.1, 0.5); 
+    }
+
+    function renderMatrixSVG(details, centerX, centerY, rangeRadius) { /* ... (bleibt gleich) ... */
+        // AP 24: Matrix Size aus Config
+        const size = CONFIG.UI.MATRIX_SIZE;
+        const scale = (size / 2) / rangeRadius;
+        let svg = `<svg viewBox="0 0 ${size} ${size}" class="matrix-svg">`;
+        const mid = size / 2;
+
+        svg += `
+            <line x1="0" y1="${mid}" x2="${size}" y2="${mid}" stroke="#bdc3c7" stroke-width="2" stroke-dasharray="5,5" />
+            <line x1="${mid}" y1="0" x2="${mid}" y2="${size}" stroke="#bdc3c7" stroke-width="2" stroke-dasharray="5,5" />
+            <text x="10" y="20" fill="#95a5a6" font-size="12">Konzentrieren!</text>
+            <text x="${size-10}" y="20" fill="#95a5a6" font-size="12" text-anchor="end">Weiter so</text>
+            <text x="10" y="${size-10}" fill="#95a5a6" font-size="12">Niedrige Prio</text>
+            <text x="${size-10}" y="${size-10}" fill="#95a5a6" font-size="12" text-anchor="end">Overkill?</text>
+            <text x="${size-10}" y="${mid-10}" fill="#bdc3c7" font-size="11" text-anchor="end">
+                Zentrum: ${centerX.toFixed(2)} / ${centerY.toFixed(2)}
+            </text>
+        `;
+
+        details.forEach(d => {
+            const dx = d.perf - centerX;
+            const dy = d.imp - centerY; 
+            const px = mid + (dx * scale);
+            const py = mid - (dy * scale); 
+            svg += `<circle cx="${px}" cy="${py}" r="6" fill="#3498db" stroke="#fff" stroke-width="1"
+                    class="matrix-dot" 
+                    data-name="${escapeHtml(d.name)}" data-imp="${d.imp}" data-perf="${d.perf}" />`;
+        });
+        
+        svg += `</svg>`;
+        matrixContainer.innerHTML = svg;
+    }
 
     function exportToCSV() {
         if (!analysisData || analysisData.length === 0) return;
@@ -617,89 +685,5 @@ document.addEventListener("DOMContentLoaded", function() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-    }
-
-    // --- IPA Matrix Logik ---
-    function calculateStats(details) { /* ... (bleibt gleich) ... */
-        const imps = details.map(d => parseFloat(d.imp));
-        const perfs = details.map(d => parseFloat(d.perf));
-        const sumImp = imps.reduce((a,b) => a+b, 0);
-        const sumPerf = perfs.reduce((a,b) => a+b, 0);
-        return { mean: { imp: sumImp / imps.length, perf: sumPerf / perfs.length } };
-    }
-
-    async function openMatrixAsync(partnerId) {
-        let partner = analysisData.find(p => p.partnerId == partnerId); // HIER GEÄNDERT: Verwende camelCase
-        if (!partner) return;
-
-        partner = await ensurePartnerDetails(partner);
-        // HIER GEÄNDERT (AP 21): CamelCase
-        if (!partner || !partner.matrixDetails) return;
-
-        currentPartnerDetails = partner; 
-        matrixTitle.textContent = "IPA Matrix: " + partner.partnerName; // HIER GEÄNDERT: Verwende camelCase
-
-        const radios = document.querySelectorAll('input[name="matrix-center"]');
-        radios.forEach(r => { if(r.value === 'standard') r.checked = true; });
-        
-        updateMatrixView('standard');
-        matrixModal.style.display = 'flex';
-    }
-
-    function updateMatrixView(mode) { /* ... (bleibt gleich) ... */
-        if (!currentPartnerDetails) return;
-        // HIER GEÄNDERT (AP 21): CamelCase
-        const stats = calculateStats(currentPartnerDetails.matrixDetails);
-        let centerX = 5.0;
-        let centerY = 5.0;
-        let maxDist = 5.0; 
-        if (mode === 'mean') {
-            centerX = stats.mean.perf;
-            centerY = stats.mean.imp;
-            maxDist = calculateMaxDeviation(currentPartnerDetails.matrixDetails, centerX, centerY);
-        }
-        renderMatrixSVG(currentPartnerDetails.matrixDetails, centerX, centerY, maxDist);
-    }
-
-    function calculateMaxDeviation(details, cx, cy) { /* ... (bleibt gleich) ... */
-        let maxD = 0;
-        details.forEach(d => {
-            const dx = d.perf - cx;
-            const dy = d.imp - cy;
-            maxD = Math.max(maxD, dx, dy);
-        });
-        return Math.max(maxD * 1.1, 0.5); 
-    }
-
-    function renderMatrixSVG(details, centerX, centerY, rangeRadius) { /* ... (bleibt gleich) ... */
-        const size = 400;
-        const scale = (size / 2) / rangeRadius;
-        let svg = `<svg viewBox="0 0 ${size} ${size}" class="matrix-svg">`;
-        const mid = size / 2;
-
-        svg += `
-            <line x1="0" y1="${mid}" x2="${size}" y2="${mid}" stroke="#bdc3c7" stroke-width="2" stroke-dasharray="5,5" />
-            <line x1="${mid}" y1="0" x2="${mid}" y2="${size}" stroke="#bdc3c7" stroke-width="2" stroke-dasharray="5,5" />
-            <text x="10" y="20" fill="#95a5a6" font-size="12">Konzentrieren!</text>
-            <text x="${size-10}" y="20" fill="#95a5a6" font-size="12" text-anchor="end">Weiter so</text>
-            <text x="10" y="${size-10}" fill="#95a5a6" font-size="12">Niedrige Prio</text>
-            <text x="${size-10}" y="${size-10}" fill="#95a5a6" font-size="12" text-anchor="end">Overkill?</text>
-            <text x="${size-10}" y="${mid-10}" fill="#bdc3c7" font-size="11" text-anchor="end">
-                Zentrum: ${centerX.toFixed(2)} / ${centerY.toFixed(2)}
-            </text>
-        `;
-
-        details.forEach(d => {
-            const dx = d.perf - centerX;
-            const dy = d.imp - centerY; 
-            const px = mid + (dx * scale);
-            const py = mid - (dy * scale); 
-            svg += `<circle cx="${px}" cy="${py}" r="6" fill="#3498db" stroke="#fff" stroke-width="1"
-                    class="matrix-dot" 
-                    data-name="${escapeHtml(d.name)}" data-imp="${d.imp}" data-perf="${d.perf}" />`;
-        });
-        
-        svg += `</svg>`;
-        matrixContainer.innerHTML = svg;
     }
 });

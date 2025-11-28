@@ -9,10 +9,11 @@
   # Modified: 27.11.2025, 15:45 - FIX: Regression: Test-Mode no longer selects hierarchy/partners (AP 10 Regression Fix)
   # Modified: 27.11.2025, 15:50 - Deep Refactoring: Moved all Slider/Input Handler Logic from Controller to DataView (AP 10 Deep Refactoring)
   # Modified: 28.11.2025, 13:00 - AP 21: Mapping logic CamelCase <-> SnakeCase for Backend
+  # Modified: 28.11.2025, 15:30 - AP 24: Use central toggleGlobalLoader from utils
 */
 
 import { CONFIG } from './config.js';
-import { escapeHtml } from './utils.js';
+import { escapeHtml, toggleGlobalLoader } from './utils.js';
 import { DataView } from './wizard-data-view.js'; // NEU: Import DataView
 import { WizardFlow } from './wizard-flow.js';   // NEU: Import WizardFlow
 
@@ -409,7 +410,8 @@ export class WizardController {
             }
 
         } catch (error) {
-            throw new Error('Konfigurationsdateien konnten nicht geladen werden: ' + error.message);
+            console.error('Fehler beim Initialisieren:', error);
+            this.showError('Fehler beim Laden der Konfigurationsdaten: ' + error.message);
         }
     }
     
@@ -485,7 +487,8 @@ export class WizardController {
         // Auch beim Submit den aktuellen Partner validieren
         if (!this.flow.validatePartnerStep()) return;
 
-        this.showLoading(true);
+        // AP 24: toggleGlobalLoader
+        toggleGlobalLoader(true);
         
         try {
             // Strukturierung der Performance Daten für das Backend
@@ -544,17 +547,12 @@ export class WizardController {
             console.error('Fehler beim Speichern:', error);
             this.showError('Fehler beim Speichern der Daten: ' + error.message);
         } finally {
-            this.showLoading(false);
+            toggleGlobalLoader(false);
         }
     }
 
     restartSurvey() {
         location.reload();
-    }
-
-    showLoading(show) {
-        const overlay = document.getElementById('loading-overlay');
-        overlay.style.display = show ? 'flex' : 'none';
     }
 
     showError(message) {

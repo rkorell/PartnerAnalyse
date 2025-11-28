@@ -8,9 +8,9 @@
   # Modified: 27.11.2025, 17:45 - Refactoring: Deduplicated slider HTML generation and fixed tooltip toggle (AP 13)
   # Modified: 27.11.2025, 18:00 - CSS Cleanup (AP 14): Replaced inline styles with CSS classes.
   # Modified: 27.11.2025, 18:30 - FIX: Critical Regression (AP 15). Data Setters were inside 'else' block, preventing '0' (N/A) from being saved.
-  # Modified: 28.11.2025, 12:30 - FIX: Slider layout & value update logic (AP 18 Revision)
   # Modified: 28.11.2025, 13:00 - AP 21: CamelCase consolidation for generalComment
   # Modified: 28.11.2025, 15:15 - AP 18: Refactored slider markup (DRY) and fixed layout/value update logic
+  # Modified: 28.11.2025, 15:30 - AP 24: Use central CONFIG for render delays
 */
 
 import { CONFIG } from './config.js';
@@ -72,6 +72,7 @@ export class DataView {
     setupImportanceCriteria() {
         const { criteriaData, isTestMode } = this.state;
 
+        // AP 24: Nutzung von CONFIG.UI.RENDER_DELAY_MS
         setTimeout(() => {
             const container = document.getElementById('importance-criteria-container');
             const groupedCriteria = this.groupCriteria(criteriaData);
@@ -133,7 +134,7 @@ export class DataView {
             });
 
             this.bindSliderEvents('importance');
-        }, 10);
+        }, CONFIG.UI.RENDER_DELAY_MS);
     }
     
     createHeaderSliderHTML(domId, type, initialValue, min, max, labels) {
