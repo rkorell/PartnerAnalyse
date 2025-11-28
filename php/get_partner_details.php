@@ -6,6 +6,7 @@
 
   # Created: 27.11.2025, 17:00 - Part of AP 12 Performance Optimization
   # Modified: 28.11.2025, 09:00 - Centralized DB config path & added error logging (AP 17)
+  # Modified: 28.11.2025, 14:40 - AP 23.2: Refactored to use SQL function get_department_subtree() instead of inline CTE
 */
 
 header('Content-Type: application/json');
@@ -34,7 +35,10 @@ if ($partner_id <= 0 || empty($survey_ids) || empty($department_ids)) {
     exit;
 }
 
-$dept_placeholders = implode(',', array_fill(0, count($department_ids), '?'));
+// HIER GEÄNDERT: Array-String für PostgreSQL Funktion vorbereiten
+$dept_array_string = '{' . implode(',', array_map('intval', $department_ids)) . '}';
+
+// Survey Placeholders
 $survey_placeholders = implode(',', array_fill(0, count($survey_ids), '?'));
 
 $manager_where = "";
@@ -46,10 +50,8 @@ try {
 
     // 1. Matrix Details & Specific Comments holen
     $sqlDetails = "
-    WITH RECURSIVE subdeps AS (
-        SELECT id FROM departments WHERE id IN ($dept_placeholders)
-        UNION ALL
-        SELECT d.id FROM departments d JOIN subdeps s ON d.parent_id = s.id
+    WITH subdeps AS (
+        SELECT id FROM get_department_subtree(?::int[])
     ),
     participants_filtered AS (
         SELECT p.id, p.is_manager
@@ -75,9 +77,9 @@ try {
     ";
 
     $params = [];
-    foreach ($department_ids as $id) $params[] = intval($id);
-    foreach ($survey_ids as $id) $params[] = intval($id);
-    $params[] = $partner_id; // Partner ID am Ende
+    $params[] = $dept_array_string; // 1. Dept Array
+    foreach ($survey_ids as $id) $params[] = intval($id); // 2..N Survey IDs
+    $params[] = $partner_id; // Letzter Parameter: Partner ID
 
     $stmt = $pdo->prepare($sqlDetails);
     $stmt->execute($params);
@@ -93,10 +95,8 @@ try {
 
     // 2. General Comments holen
     $sqlGeneral = "
-    WITH RECURSIVE subdeps AS (
-        SELECT id FROM departments WHERE id IN ($dept_placeholders)
-        UNION ALL
-        SELECT d.id FROM departments d JOIN subdeps s ON d.parent_id = s.id
+    WITH subdeps AS (
+        SELECT id FROM get_department_subtree(?::int[])
     )
     SELECT 
         JSON_AGG(f.general_comment) FILTER (WHERE f.general_comment IS NOT NULL AND trim(f.general_comment) <> '') as general_comments
@@ -108,7 +108,7 @@ try {
     $manager_where
     ";
 
-    // Params neu aufbauen (gleiche Reihenfolge, aber PartnerID am Ende für Feedback Query)
+    // Params neu aufbauen (gleiche Logik wie oben)
     $stmtGen = $pdo->prepare($sqlGeneral);
     $stmtGen->execute($params);
     $resGen = $stmtGen->fetch(PDO::FETCH_ASSOC);

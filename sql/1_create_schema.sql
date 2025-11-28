@@ -5,6 +5,8 @@
   # Modified: 26.11.2025, 20:40 - Added partner_feedback table and comment column to ratings
   # Modified: 27.11.2025, 13:50 - Added critical indices for analysis query performance (AP 5)
   # Modified: 28.11.2025, 14:00 - AP 22: Synchronized schema with production DB (added app_texts, session_token, missing indices)
+  # Modified: 28.11.2025, 14:20 - AP 23.1: Added stored function get_department_subtree for recursive hierarchy lookup
+  # Modified: 28.11.2025, 14:30 - AP 23.2: Added view_ratings_extended to simplify PHP joins
 */
 
 DROP TABLE IF EXISTS app_texts CASCADE;
@@ -15,6 +17,8 @@ DROP TABLE IF EXISTS criteria CASCADE;
 DROP TABLE IF EXISTS partners CASCADE;
 DROP TABLE IF EXISTS departments CASCADE;
 DROP TABLE IF EXISTS surveys CASCADE;
+DROP FUNCTION IF EXISTS get_department_subtree CASCADE;
+DROP VIEW IF EXISTS view_ratings_extended CASCADE;
 
 -- 1. App Texte (Tooltips & Statische Texte)
 CREATE TABLE app_texts (
@@ -121,3 +125,46 @@ CREATE INDEX idx_ratings_type ON ratings(rating_type);
 
 -- Feedback
 CREATE INDEX idx_feedback_partner ON partner_feedback(partner_id);
+
+-- --- 9. FUNCTIONS & VIEWS (AP 23 Architecture Refactoring) ---
+
+/*
+  Funktion: get_department_subtree
+  Zweck: Liefert rekursiv alle Abteilungs-IDs unterhalb der gegebenen Root-IDs.
+  Parameter: root_ids INT[] (Array von Abteilungs-IDs)
+  Rückgabe: Tabelle mit einer Spalte (id)
+*/
+CREATE OR REPLACE FUNCTION get_department_subtree(root_ids INT[])
+RETURNS TABLE(id INT) AS $$
+BEGIN
+    RETURN QUERY
+    WITH RECURSIVE subdeps AS (
+        SELECT d.id FROM departments d WHERE d.id = ANY(root_ids)
+        UNION ALL
+        SELECT d.id FROM departments d JOIN subdeps s ON d.parent_id = s.id
+    )
+    SELECT s.id FROM subdeps s;
+END;
+$$ LANGUAGE plpgsql;
+
+/*
+  View: view_ratings_extended
+  Zweck: Flache Sicht auf Bewertungen inkl. Kontext (Abteilung, Manager, Kategorie)
+  Ersetzt komplexe Joins im PHP-Code.
+*/
+CREATE OR REPLACE VIEW view_ratings_extended AS
+SELECT 
+    r.id AS rating_id,
+    r.partner_id,
+    r.score,
+    r.comment,
+    r.rating_type,
+    p.survey_id,
+    p.department_id,
+    p.is_manager,
+    c.id AS criterion_id,
+    c.category,
+    c.name AS criterion_name
+FROM ratings r
+JOIN participants p ON r.participant_id = p.id
+JOIN criteria c ON r.criterion_id = c.id;

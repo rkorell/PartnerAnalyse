@@ -17,6 +17,7 @@
   # Modified: 27.11.2025, 16:30 - Final FIX: require_once moved into try-block for stable error handling (AP 11 Final Fix)
   # Modified: 27.11.2025, 17:00 - Performance Optimization (AP 12): "Smart Aggregation". Removed expensive JSON_AGG. Now returns only scores, counts and flags.
   # Modified: 28.11.2025, 09:00 - Centralized DB config path & added error logging (AP 17)
+  # Modified: 28.11.2025, 14:40 - AP 23.2: Refactored to use SQL function get_department_subtree() instead of inline CTE
 */
 
 header('Content-Type: application/json');
@@ -50,7 +51,10 @@ if (empty($survey_ids) || empty($department_ids)) {
     exit;
 }
 
-$dept_placeholders = implode(',', array_fill(0, count($department_ids), '?'));
+// HIER GEÄNDERT: Array-String für PostgreSQL Funktion vorbereiten "{1,2,3}"
+$dept_array_string = '{' . implode(',', array_map('intval', $department_ids)) . '}';
+
+// Survey Placeholders bleiben klassisch (IN (?,?))
 $survey_placeholders = implode(',', array_fill(0, count($survey_ids), '?'));
 
 $manager_where = "";
@@ -60,13 +64,10 @@ else if ($manager_filter === "nur_nicht_manager") $manager_where = "AND p.is_man
 try {
     require_once DB_CONFIG_PATH;
 
-    // OPTIMIERTE QUERY: Keine JSON-Aggregation mehr!
-    // Berechnet Flags (has_action_item) und Metriken (max_divergence) direkt.
+    // OPTIMIERTE QUERY: Nutzt jetzt get_department_subtree
     $sql = "
-WITH RECURSIVE subdeps AS (
-  SELECT id FROM departments WHERE id IN ($dept_placeholders)
-  UNION ALL
-  SELECT d.id FROM departments d JOIN subdeps s ON d.parent_id = s.id
+WITH subdeps AS (
+  SELECT id FROM get_department_subtree(?::int[])
 ),
 participants_filtered AS (
   SELECT p.id, p.is_manager
@@ -94,7 +95,6 @@ assessor_counts AS (
 feedback_stats AS (
   SELECT f.partner_id,
          COUNT(f.general_comment) as cnt_gen_comments,
-         -- HIER ENTFERNT: JSON_AGG für General Comments (Performance)
          ROUND(100.0 * (COUNT(*) FILTER (WHERE f.nps_score >= 9) - COUNT(*) FILTER (WHERE f.nps_score <= 6)) / NULLIF(COUNT(f.nps_score), 0), 0) as nps_score
     FROM partner_feedback f
    WHERE f.participant_id IN (SELECT id FROM participants_filtered)
@@ -113,7 +113,6 @@ performance_avg AS (
          AVG(r.score) FILTER (WHERE p.is_manager) as perf_mgr,
          AVG(r.score) FILTER (WHERE NOT p.is_manager) as perf_team,
          COUNT(r.comment) as cnt_spec_comments
-         -- HIER ENTFERNT: JSON_AGG für Specific Comments (Performance)
     FROM ratings r
     JOIN participants_filtered p ON r.participant_id = p.id
    WHERE r.rating_type = 'performance'
@@ -129,8 +128,7 @@ SELECT
   -- Indikator ⚡: Maximale Divergenz
   MAX(ABS(COALESCE(pf.perf_mgr, 0) - COALESCE(pf.perf_team, 0))) AS max_divergence,
   
-  -- Indikator ⚠️: Action Item Flag (Direkte SQL Berechnung statt JSON-Parsing im Frontend)
-  -- Prüft: Gibt es EIN Kriterium mit Wichtigkeit >= 8.0 UND Performance <= 5.0?
+  -- Indikator ⚠️: Action Item Flag
   MAX(CASE WHEN ia.importance >= 8.0 AND pf.performance <= 5.0 THEN 1 ELSE 0 END) as has_action_item,
 
   -- Beurteiler-Zahlen
@@ -138,7 +136,7 @@ SELECT
   MAX(ac.num_assessors_mgr) AS num_assessors_mgr,
   MAX(ac.num_assessors_team) AS num_assessors_team,
   
-  -- Insights Daten (Nur Zahlen/Flags)
+  -- Insights Daten
   MAX(fs.nps_score) as nps_score,
   (COALESCE(SUM(pf.cnt_spec_comments), 0) + COALESCE(MAX(fs.cnt_gen_comments), 0)) as comment_count,
   
@@ -157,9 +155,9 @@ ORDER BY score DESC
     ";
 
     $params = [];
-    foreach ($department_ids as $id) $params[] = intval($id);
-    foreach ($survey_ids as $id) $params[] = intval($id);
-    $params[] = $min_answers;
+    $params[] = $dept_array_string; // Parameter 1: Department IDs als PG Array String
+    foreach ($survey_ids as $id) $params[] = intval($id); // Parameter 2..N: Survey IDs
+    $params[] = $min_answers; // Parameter N+1: Min Answers
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
