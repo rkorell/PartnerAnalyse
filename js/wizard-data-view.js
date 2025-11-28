@@ -1,11 +1,14 @@
 /*
   Datei: js/wizard-data-view.js
   Zweck: View-Logik und HTML-Generierung für Wichtigkeit & Performance-Slider
+  (c) - Dr. Ralf Korell, 2025/26
+  
   # Created: 27.11.2025, 15:40 - Extracted Rendering Logic from wizard-controller.js (AP 10)
   # Modified: 27.11.2025, 15:50 - Moved all Slider/Input Handler Logic from controller (AP 10 Deep Refactoring)
   # Modified: 27.11.2025, 17:45 - Refactoring: Deduplicated slider HTML generation and fixed tooltip toggle (AP 13)
   # Modified: 27.11.2025, 18:00 - CSS Cleanup (AP 14): Replaced inline styles with CSS classes.
   # Modified: 27.11.2025, 18:30 - FIX: Critical Regression (AP 15). Data Setters were inside 'else' block, preventing '0' (N/A) from being saved.
+  # Modified: 28.11.2025, 12:30 - FIX: Slider layout & value update logic (AP 18 Revision)
 */
 
 import { CONFIG } from './config.js';
@@ -37,23 +40,30 @@ export class DataView {
         }
     }
 
-    _generateSliderMarkup(domId, type, min, max, value, extraClass, displayValue, rawId = null) {
+    /**
+     * Zentralisierte Methode zur Generierung des gesamten Slider-Markups.
+     * Ersetzt die redundante HTML-Erzeugung in createHeaderSliderHTML und createSliderHTML.
+     * WICHTIG: Keine Zeilenumbrüche/Whitespace im Return-String, da Flexbox-Gap diese als Elemente interpretiert!
+     */
+    _generateSliderMarkup(domId, type, min, max, value, options = {}) {
+        const {
+            rawId = null,
+            extraInputClass = '',
+            displayValue = '',
+            showMinMaxLabels = false,
+            valueLabelClass = 'slider-value',
+            iconHTML = ''
+        } = options;
+
         const critAttr = rawId ? `data-crit-id="${rawId}"` : '';
-        return `
-            <div class="slider-wrapper">
-                <input type="range" 
-                       id="${domId}" 
-                       ${critAttr}
-                       class="fancy-slider ${extraClass}" 
-                       min="${min}" 
-                       max="${max}" 
-                       value="${value}" 
-                       data-type="${type}">
-                <div class="slider-tooltip" id="tooltip_${domId}">
-                    ${displayValue}
-                </div>
-            </div>
-        `;
+        
+        // Kompakter HTML String ohne Whitespace zwischen Tags
+        const wrapperHTML = `<div class="slider-wrapper"><input type="range" id="${domId}" ${critAttr} class="fancy-slider ${extraInputClass}" min="${min}" max="${max}" value="${value}" data-type="${type}"><div class="slider-tooltip" id="tooltip_${domId}">${displayValue}</div></div>`;
+
+        const leftLabel = showMinMaxLabels ? `<span class="slider-label">${min}</span>` : '';
+        const rightLabel = showMinMaxLabels ? `<span class="slider-label">${max}</span>` : '';
+
+        return `<div class="slider-container">${leftLabel}${wrapperHTML}${rightLabel}<span class="slider-value ${valueLabelClass}" id="value_${domId}">${displayValue}</span>${iconHTML}</div>`;
     }
     
     // --- HAUPT VIEW METHODEN ---
@@ -126,14 +136,14 @@ export class DataView {
     }
     
     createHeaderSliderHTML(domId, type, initialValue, min, max, labels) {
-        let extraClass = 'slider-neutral';
+        let extraInputClass = 'slider-neutral';
         let displayValue = 'Bitte wählen...';
 
         if (type === 'frequency' && initialValue > 0) {
-            extraClass = '';
+            extraInputClass = '';
             displayValue = labels[initialValue] || initialValue;
         } else if (type === 'nps' && initialValue > CONFIG.WIZARD.NPS_RANGES.NA_VALUE) {
-            extraClass = '';
+            extraInputClass = '';
             if (labels[initialValue]) {
                 displayValue = labels[initialValue].replace('{Val}', initialValue);
             } else {
@@ -145,18 +155,16 @@ export class DataView {
             }
         }
 
-        const sliderHTML = this._generateSliderMarkup(domId, type, min, max, initialValue, extraClass, displayValue);
-
-        return `
-            <div class="slider-container">
-                ${sliderHTML}
-                <span class="slider-value slider-value-label" id="value_${domId}">${displayValue}</span>
-            </div>
-        `;
+        return this._generateSliderMarkup(domId, type, min, max, initialValue, {
+            extraInputClass: extraInputClass,
+            displayValue: displayValue,
+            showMinMaxLabels: false,
+            valueLabelClass: 'slider-value slider-value-label'
+        });
     }
 
     createSliderHTML(domId, rawId, type, initialValue = 0) {
-        const extraClass = initialValue === 0 ? 'slider-neutral' : '';
+        const extraInputClass = initialValue === 0 ? 'slider-neutral' : '';
         const displayValue = initialValue === 0 ? 'N/A' : initialValue;
         
         let iconHTML = '';
@@ -166,18 +174,20 @@ export class DataView {
             iconHTML = `<span class="comment-icon" id="icon_${domId}" style="visibility:${visibility}; cursor:pointer; font-size:1.2em; margin-left:10px;" title="Kommentar hinzufügen">📝</span>`;
         }
 
-        const sliderHTML = this._generateSliderMarkup(domId, type, 0, 10, initialValue, extraClass, displayValue, rawId);
+        const sliderContainer = this._generateSliderMarkup(domId, type, 0, 10, initialValue, {
+            rawId: rawId,
+            extraInputClass: extraInputClass,
+            displayValue: displayValue,
+            showMinMaxLabels: true,
+            valueLabelClass: 'slider-value',
+            iconHTML: iconHTML
+        });
 
-        return `
-            <div class="slider-container">
-                <span class="slider-label">1</span>
-                ${sliderHTML}
-                <span class="slider-label">10</span>
-                <span class="slider-value" id="value_${domId}">${displayValue}</span>
-                ${iconHTML}
-            </div>
-            ${type === 'performance' ? `<div id="comment_container_${domId}" class="comment-container"><textarea id="comment_${domId}" class="comment-textarea" placeholder="[FREIWILLIG: Warum diese Bewertung?]"></textarea></div>` : ''}
-        `;
+        const commentHTML = type === 'performance' 
+            ? `<div id="comment_container_${domId}" class="comment-container"><textarea id="comment_${domId}" class="comment-textarea" placeholder="[FREIWILLIG: Warum diese Bewertung?]"></textarea></div>` 
+            : '';
+
+        return sliderContainer + commentHTML;
     }
     
     renderPartnerView(partner) {
@@ -257,9 +267,7 @@ export class DataView {
                     <div class="criteria-content">
                         ${this.createSliderHTML(domId, rawId, 'performance', currentVal)}
                         <div id="comment_container_${domId}" class="comment-container" style="display:${currentComment.trim() !== '' ? 'block' : 'none'};">
-                            <textarea id="comment_${domId}" class="comment-textarea" placeholder="[FREIWILLIG: Warum diese Bewertung?]">${escapedComment}</textarea>
-                        </div>
-                    </div>`;
+                            <textarea id="comment_${domId}" class="comment-textarea" placeholder="[FREIWILLIG: Warum diese Bewertung?]"></textarea></div></div>`; 
 
                 criteriaHTML += `
                 <div class="criteria-row">
@@ -339,70 +347,71 @@ export class DataView {
         const valueDisplay = document.getElementById(`value_${domId}`);
         const tooltip = document.getElementById(`tooltip_${domId}`);
         
+        let displayValue = value; // Default: Zeige Zahl
         let tooltipText = `${value} - Neutral`;
-        
-        // 1. Visuelle Logik (Grau/Bunt)
-        if (value === 0) {
-            slider.classList.add('slider-neutral');
-            if (valueDisplay) valueDisplay.textContent = 'N/A';
-            if (tooltip) tooltip.textContent = 'Keine Angabe';
-        } else {
-            slider.classList.remove('slider-neutral');
-            if (valueDisplay) valueDisplay.textContent = value;
-        }
+        let isNeutral = false;
 
-        // HIER GEÄNDERT: Speicherlogik (Callbacks) aus dem if/else Block geholt.
-        // Die Daten müssen IMMER gespeichert werden, auch wenn value == 0 ist!
+        // SPEZIAL-LOGIK FÜR HEADER SLIDER (Frequenz & NPS)
+        // Hier muss der Text ermittelt werden, nicht die Zahl!
         
-        if (type === 'importance') {
-            if (value > 0) { // Tooltip Text nur wenn > 0 sinnvoll
+        if (type === 'frequency') {
+            const labels = {1: "Selten / Einmalig", 2: "Monatlich / Gelegentlich", 3: "Wöchentlich / Regelmäßig", 4: "Täglich / Intensiv"};
+            if (value === 0) {
+                isNeutral = true;
+                displayValue = "Bitte wählen...";
+                tooltipText = displayValue;
+            } else {
+                displayValue = labels[value] || value; // Text statt Zahl!
+                tooltipText = displayValue;
+            }
+            this.callbacks.setFeedback(this.callbacks.getCurrentPartnerId(), 'frequency', value);
+
+        } else if (type === 'nps') {
+            if (value === CONFIG.WIZARD.NPS_RANGES.NA_VALUE || value === -2) {
+                isNeutral = true;
+                displayValue = "Bitte wählen...";
+                tooltipText = displayValue;
+            } else {
+                // NPS Text Logik (Replikation aus createHeaderSliderHTML)
+                if (value === -1) displayValue = "Möchte ich nicht bewerten";
+                else if (value === 0) displayValue = "0 - Auf keinen Fall";
+                else if (value >= 1 && value <= 3) displayValue = value + " - Eher nicht";
+                else if (value >= 4 && value <= 6) displayValue = value + " - Eher schon";
+                else if (value >= 7 && value <= 10) displayValue = value + " - Auf jeden Fall";
+                else displayValue = value; // Fallback
+                
+                tooltipText = displayValue;
+            }
+            this.callbacks.setFeedback(this.callbacks.getCurrentPartnerId(), 'nps', value);
+
+        } else if (type === 'importance') {
+            if (value === 0) {
+                isNeutral = true;
+                displayValue = 'N/A';
+                tooltipText = 'Keine Angabe';
+            } else {
                 if (value <= CONFIG.WIZARD.IMPORTANCE_TOOLTIP_THRESHOLD.MIN) tooltipText = `${value} - ist mir eher unwichtig`;
                 else if (value >= CONFIG.WIZARD.IMPORTANCE_TOOLTIP_THRESHOLD.MAX) tooltipText = `${value} - ist mir extrem wichtig`;
                 else tooltipText = `${value} - wichtig`;
             }
-            // CRITICAL FIX: Speichern muss immer passieren
             this.callbacks.setImportance(rawId, value);
 
         } else if (type === 'performance') {
-            if (value > 0) {
+            if (value === 0) {
+                isNeutral = true;
+                displayValue = 'N/A';
+                tooltipText = 'Keine Angabe';
+            } else {
                 if (value <= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MIN) tooltipText = `${value} - erfüllt der Partner sehr schlecht`;
                 else if (value >= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MAX) tooltipText = `${value} - erfüllt der Partner sehr gut`;
                 else tooltipText = `${value} - neutral`;
             }
             
-            // CRITICAL FIX: Speichern muss immer passieren
             const partnerId = this.callbacks.getCurrentPartnerId(); 
             if (partnerId) {
                 this.callbacks.setPerformance(partnerId, rawId, value, undefined);
-            }
-
-        } else if (type === 'frequency') {
-            const labels = {1: "Selten / Einmalig", 2: "Monatlich / Gelegentlich", 3: "Wöchentlich / Regelmäßig", 4: "Täglich / Intensiv"};
-            tooltipText = labels[value] || "Bitte wählen...";
-            this.callbacks.setFeedback(this.callbacks.getCurrentPartnerId(), 'frequency', value);
-
-        } else if (type === 'nps') {
-            if (value === CONFIG.WIZARD.NPS_RANGES.NA_VALUE) {
-                tooltipText = "Bitte wählen...";
-                // Auch hier: Visuelle Klasse muss ggf. gesetzt werden, wenn es die spezielle N/A Value ist
-                slider.classList.add('slider-neutral');
-                if (valueDisplay) valueDisplay.textContent = tooltipText;
-            } else {
-                slider.classList.remove('slider-neutral'); // Sicherstellen, dass es nicht grau ist
-                if (value === -1) tooltipText = "Möchte ich nicht bewerten";
-                else if (value === 0) tooltipText = "0 - Auf keinen Fall";
-                else if (value >= 1 && value <= 3) tooltipText = value + " - Eher nicht";
-                else if (value >= 4 && value <= 6) tooltipText = value + " - Eher schon";
-                else if (value >= 7 && value <= 10) tooltipText = value + " - Auf jeden Fall";
-            }
-            this.callbacks.setFeedback(this.callbacks.getCurrentPartnerId(), 'nps', value);
-        }
-        
-        if (tooltip && value !== 0) tooltip.textContent = tooltipText;
-
-        if (type === 'performance') {
-            const partnerId = this.callbacks.getCurrentPartnerId(); 
-            if (partnerId) {
+                
+                // Icon Logik
                 const icon = document.getElementById(`icon_${domId}`);
                 const container = document.getElementById(`comment_container_${domId}`);
                 const textarea = document.getElementById(`comment_${domId}`);
@@ -421,5 +430,15 @@ export class DataView {
                 }
             }
         }
+        
+        // UI Updates
+        if (isNeutral) {
+            slider.classList.add('slider-neutral');
+        } else {
+            slider.classList.remove('slider-neutral');
+        }
+
+        if (valueDisplay) valueDisplay.textContent = displayValue; // Jetzt korrekt mit Text für Freq/NPS
+        if (tooltip && !isNeutral) tooltip.textContent = tooltipText;
     }
 }
