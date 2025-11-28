@@ -7,6 +7,7 @@
   # Created: 27.11.2025, 17:00 - Part of AP 12 Performance Optimization
   # Modified: 28.11.2025, 09:00 - Centralized DB config path & added error logging (AP 17)
   # Modified: 28.11.2025, 14:40 - AP 23.2: Refactored to use SQL function get_department_subtree() instead of inline CTE
+  # Modified: 28.11.2025, 14:50 - AP 23.4: Refactored to use view_ratings_extended for simplified queries
 */
 
 header('Content-Type: application/json');
@@ -35,51 +36,56 @@ if ($partner_id <= 0 || empty($survey_ids) || empty($department_ids)) {
     exit;
 }
 
-// HIER GEÄNDERT: Array-String für PostgreSQL Funktion vorbereiten
+// Array-String für PostgreSQL Funktion
 $dept_array_string = '{' . implode(',', array_map('intval', $department_ids)) . '}';
 
 // Survey Placeholders
 $survey_placeholders = implode(',', array_fill(0, count($survey_ids), '?'));
 
-$manager_where = "";
-if ($manager_filter === "nur_manager") $manager_where = "AND p.is_manager = TRUE";
-else if ($manager_filter === "nur_nicht_manager") $manager_where = "AND p.is_manager = FALSE";
+// Manager Filter für View (Spalte 'is_manager')
+$manager_sql = "";
+if ($manager_filter === "nur_manager") $manager_sql = "AND v_perf.is_manager = TRUE";
+else if ($manager_filter === "nur_nicht_manager") $manager_sql = "AND v_perf.is_manager = FALSE";
+
+// Manager Filter für Participants Tabelle (Spalte 'p.is_manager')
+$manager_sql_p = "";
+if ($manager_filter === "nur_manager") $manager_sql_p = "AND p.is_manager = TRUE";
+else if ($manager_filter === "nur_nicht_manager") $manager_sql_p = "AND p.is_manager = FALSE";
 
 try {
     require_once DB_CONFIG_PATH;
 
-    // 1. Matrix Details & Specific Comments holen
+    // 1. Matrix Details & Specific Comments holen (via VIEW)
+    // Wir joinen den View mit sich selbst: Performance-Einträge mit passenden Importance-Einträgen desselben Teilnehmers.
     $sqlDetails = "
     WITH subdeps AS (
         SELECT id FROM get_department_subtree(?::int[])
-    ),
-    participants_filtered AS (
-        SELECT p.id, p.is_manager
-        FROM participants p
-        WHERE p.survey_id IN ($survey_placeholders)
-        $manager_where
-        AND p.department_id IN (SELECT id FROM subdeps)
     )
     SELECT 
-        c.name,
-        ROUND(AVG(r_imp.score)::numeric, 1) as imp,
-        ROUND(AVG(r_perf.score)::numeric, 1) as perf,
-        ROUND(AVG(r_perf.score) FILTER (WHERE p.is_manager)::numeric, 1) as perf_mgr,
-        ROUND(AVG(r_perf.score) FILTER (WHERE NOT p.is_manager)::numeric, 1) as perf_team,
-        JSON_AGG(r_perf.comment) FILTER (WHERE r_perf.comment IS NOT NULL AND trim(r_perf.comment) <> '') as comments
-    FROM criteria c
-    JOIN ratings r_imp ON r_imp.criterion_id = c.id AND r_imp.rating_type = 'importance'
-    JOIN ratings r_perf ON r_perf.criterion_id = c.id AND r_perf.rating_type = 'performance'
-    JOIN participants_filtered p ON r_imp.participant_id = p.id AND r_perf.participant_id = p.id
-    WHERE r_perf.partner_id = ?
-    GROUP BY c.id, c.name
-    ORDER BY c.name
+        v_perf.criterion_name as name,
+        ROUND(AVG(v_imp.score)::numeric, 1) as imp,
+        ROUND(AVG(v_perf.score)::numeric, 1) as perf,
+        ROUND(AVG(v_perf.score) FILTER (WHERE v_perf.is_manager)::numeric, 1) as perf_mgr,
+        ROUND(AVG(v_perf.score) FILTER (WHERE NOT v_perf.is_manager)::numeric, 1) as perf_team,
+        JSON_AGG(v_perf.comment) FILTER (WHERE v_perf.comment IS NOT NULL AND trim(v_perf.comment) <> '') as comments
+    FROM view_ratings_extended v_perf
+    JOIN view_ratings_extended v_imp 
+      ON v_perf.participant_id = v_imp.participant_id 
+     AND v_perf.criterion_id = v_imp.criterion_id
+    WHERE v_perf.partner_id = ?
+      AND v_perf.rating_type = 'performance'
+      AND v_imp.rating_type = 'importance'
+      AND v_perf.survey_id IN ($survey_placeholders)
+      AND v_perf.department_id IN (SELECT id FROM subdeps)
+      $manager_sql
+    GROUP BY v_perf.criterion_id, v_perf.criterion_name
+    ORDER BY v_perf.criterion_name
     ";
 
     $params = [];
     $params[] = $dept_array_string; // 1. Dept Array
-    foreach ($survey_ids as $id) $params[] = intval($id); // 2..N Survey IDs
-    $params[] = $partner_id; // Letzter Parameter: Partner ID
+    $params[] = $partner_id; // 2. Partner ID
+    foreach ($survey_ids as $id) $params[] = intval($id); // 3..N Survey IDs
 
     $stmt = $pdo->prepare($sqlDetails);
     $stmt->execute($params);
@@ -93,7 +99,8 @@ try {
     }
     unset($row);
 
-    // 2. General Comments holen
+    // 2. General Comments holen (via Tabelle partner_feedback + participants)
+    // Hier nutzen wir NICHT den View, da dieser auf ratings basiert.
     $sqlGeneral = "
     WITH subdeps AS (
         SELECT id FROM get_department_subtree(?::int[])
@@ -105,12 +112,17 @@ try {
     WHERE f.partner_id = ?
     AND p.survey_id IN ($survey_placeholders)
     AND p.department_id IN (SELECT id FROM subdeps)
-    $manager_where
+    $manager_sql_p
     ";
 
-    // Params neu aufbauen (gleiche Logik wie oben)
+    // Params neu aufbauen für 2. Query
+    $paramsGen = [];
+    $paramsGen[] = $dept_array_string;
+    $paramsGen[] = $partner_id;
+    foreach ($survey_ids as $id) $paramsGen[] = intval($id);
+
     $stmtGen = $pdo->prepare($sqlGeneral);
-    $stmtGen->execute($params);
+    $stmtGen->execute($paramsGen);
     $resGen = $stmtGen->fetch(PDO::FETCH_ASSOC);
     
     $general_comments = [];

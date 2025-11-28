@@ -18,6 +18,7 @@
   # Modified: 27.11.2025, 17:00 - Performance Optimization (AP 12): "Smart Aggregation". Removed expensive JSON_AGG. Now returns only scores, counts and flags.
   # Modified: 28.11.2025, 09:00 - Centralized DB config path & added error logging (AP 17)
   # Modified: 28.11.2025, 14:40 - AP 23.2: Refactored to use SQL function get_department_subtree() instead of inline CTE
+  # Modified: 28.11.2025, 14:50 - AP 23.4: Refactored to use view_ratings_extended for simplified queries
 */
 
 header('Content-Type: application/json');
@@ -51,72 +52,83 @@ if (empty($survey_ids) || empty($department_ids)) {
     exit;
 }
 
-// HIER GEÄNDERT: Array-String für PostgreSQL Funktion vorbereiten "{1,2,3}"
+// Array-String für PostgreSQL Funktion vorbereiten "{1,2,3}"
 $dept_array_string = '{' . implode(',', array_map('intval', $department_ids)) . '}';
 
-// Survey Placeholders bleiben klassisch (IN (?,?))
+// Survey Placeholders
 $survey_placeholders = implode(',', array_fill(0, count($survey_ids), '?'));
 
-$manager_where = "";
-if ($manager_filter === "nur_manager") $manager_where = "AND p.is_manager = TRUE";
-else if ($manager_filter === "nur_nicht_manager") $manager_where = "AND p.is_manager = FALSE";
+// Filter-Logik für WHERE-Klauseln (jetzt direkt auf Spalten des Views/Tabelle)
+$manager_sql = "";
+if ($manager_filter === "nur_manager") $manager_sql = "AND is_manager = TRUE";
+else if ($manager_filter === "nur_nicht_manager") $manager_sql = "AND is_manager = FALSE";
+
+// Manager-Filter für Tabellen mit Alias 'p' (participants)
+$manager_sql_p = "";
+if ($manager_filter === "nur_manager") $manager_sql_p = "AND p.is_manager = TRUE";
+else if ($manager_filter === "nur_nicht_manager") $manager_sql_p = "AND p.is_manager = FALSE";
 
 try {
     require_once DB_CONFIG_PATH;
 
-    // OPTIMIERTE QUERY: Nutzt jetzt get_department_subtree
+    // QUERY REFACTORING (AP 23.4): Nutzung von view_ratings_extended
     $sql = "
 WITH subdeps AS (
   SELECT id FROM get_department_subtree(?::int[])
 ),
-participants_filtered AS (
-  SELECT p.id, p.is_manager
-    FROM participants p
-   WHERE p.survey_id IN ($survey_placeholders)
-     $manager_where
-     AND p.department_id IN (SELECT id FROM subdeps)
-),
 global_stats AS (
-  SELECT COUNT(DISTINCT r.participant_id) as unique_assessors_total
-    FROM ratings r
-   WHERE r.rating_type = 'performance'
-     AND r.participant_id IN (SELECT id FROM participants_filtered)
+  SELECT COUNT(DISTINCT participant_id) as unique_assessors_total
+    FROM view_ratings_extended
+   WHERE rating_type = 'performance'
+     AND survey_id IN ($survey_placeholders)
+     AND department_id IN (SELECT id FROM subdeps)
+     $manager_sql
 ),
 assessor_counts AS (
-  SELECT r.partner_id, 
-         COUNT(DISTINCT r.participant_id) as num_assessors,
-         COUNT(DISTINCT r.participant_id) FILTER (WHERE p.is_manager) as num_assessors_mgr,
-         COUNT(DISTINCT r.participant_id) FILTER (WHERE NOT p.is_manager) as num_assessors_team
-    FROM ratings r
-    JOIN participants_filtered p ON r.participant_id = p.id
-   WHERE r.rating_type = 'performance'
-   GROUP BY r.partner_id
+  SELECT partner_id, 
+         COUNT(DISTINCT participant_id) as num_assessors,
+         COUNT(DISTINCT participant_id) FILTER (WHERE is_manager) as num_assessors_mgr,
+         COUNT(DISTINCT participant_id) FILTER (WHERE NOT is_manager) as num_assessors_team
+    FROM view_ratings_extended
+   WHERE rating_type = 'performance'
+     AND survey_id IN ($survey_placeholders)
+     AND department_id IN (SELECT id FROM subdeps)
+     $manager_sql
+   GROUP BY partner_id
 ),
 feedback_stats AS (
+  -- Hier müssen wir partner_feedback mit participants joinen, da nicht im View
   SELECT f.partner_id,
          COUNT(f.general_comment) as cnt_gen_comments,
          ROUND(100.0 * (COUNT(*) FILTER (WHERE f.nps_score >= 9) - COUNT(*) FILTER (WHERE f.nps_score <= 6)) / NULLIF(COUNT(f.nps_score), 0), 0) as nps_score
     FROM partner_feedback f
-   WHERE f.participant_id IN (SELECT id FROM participants_filtered)
+    JOIN participants p ON f.participant_id = p.id
+   WHERE p.survey_id IN ($survey_placeholders)
+     AND p.department_id IN (SELECT id FROM subdeps)
+     $manager_sql_p
    GROUP BY f.partner_id
 ),
 importance_avg AS (
-  SELECT r.criterion_id, AVG(r.score) AS importance
-    FROM ratings r
-   WHERE r.rating_type = 'importance'
-     AND r.participant_id IN (SELECT id FROM participants_filtered)
-   GROUP BY r.criterion_id
+  SELECT criterion_id, AVG(score) AS importance
+    FROM view_ratings_extended
+   WHERE rating_type = 'importance'
+     AND survey_id IN ($survey_placeholders)
+     AND department_id IN (SELECT id FROM subdeps)
+     $manager_sql
+   GROUP BY criterion_id
 ),
 performance_avg AS (
-  SELECT r.partner_id, r.criterion_id, 
-         AVG(r.score) AS performance,
-         AVG(r.score) FILTER (WHERE p.is_manager) as perf_mgr,
-         AVG(r.score) FILTER (WHERE NOT p.is_manager) as perf_team,
-         COUNT(r.comment) as cnt_spec_comments
-    FROM ratings r
-    JOIN participants_filtered p ON r.participant_id = p.id
-   WHERE r.rating_type = 'performance'
-   GROUP BY r.partner_id, r.criterion_id
+  SELECT partner_id, criterion_id, 
+         AVG(score) AS performance,
+         AVG(score) FILTER (WHERE is_manager) as perf_mgr,
+         AVG(score) FILTER (WHERE NOT is_manager) as perf_team,
+         COUNT(comment) as cnt_spec_comments
+    FROM view_ratings_extended
+   WHERE rating_type = 'performance'
+     AND survey_id IN ($survey_placeholders)
+     AND department_id IN (SELECT id FROM subdeps)
+     $manager_sql
+   GROUP BY partner_id, criterion_id
 )
 SELECT
   pa.id         AS partner_id,
@@ -155,9 +167,14 @@ ORDER BY score DESC
     ";
 
     $params = [];
-    $params[] = $dept_array_string; // Parameter 1: Department IDs als PG Array String
-    foreach ($survey_ids as $id) $params[] = intval($id); // Parameter 2..N: Survey IDs
-    $params[] = $min_answers; // Parameter N+1: Min Answers
+    $params[] = $dept_array_string; // Parameter 1: Department IDs
+    // Survey IDs werden mehrfach benötigt (für jede CTE)
+    // Reihenfolge im SQL: global_stats, assessor_counts, feedback_stats, importance_avg, performance_avg
+    // Das sind 5 Blöcke, die jeweils $survey_ids benötigen.
+    for($i=0; $i<5; $i++) {
+        foreach ($survey_ids as $id) $params[] = intval($id);
+    }
+    $params[] = $min_answers; // Letzter Parameter
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
