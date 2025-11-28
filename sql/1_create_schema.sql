@@ -7,8 +7,11 @@
   # Modified: 28.11.2025, 14:00 - AP 22: Synchronized schema with production DB (added app_texts, session_token, missing indices)
   # Modified: 28.11.2025, 14:20 - AP 23.1: Added stored function get_department_subtree for recursive hierarchy lookup
   # Modified: 28.11.2025, 14:30 - AP 23.2: Added view_ratings_extended to simplify PHP joins
+  # Modified: 28.11.2025, 15:00 - FIX AP 23.2: Added missing participant_id to view_ratings_extended
+  # Modified: 28.11.2025, 18:00 - AP 29.1: Added admin_users table for authentication
 */
 
+DROP TABLE IF EXISTS admin_users CASCADE;
 DROP TABLE IF EXISTS app_texts CASCADE;
 DROP TABLE IF EXISTS partner_feedback CASCADE;
 DROP TABLE IF EXISTS ratings CASCADE;
@@ -100,6 +103,13 @@ CREATE TABLE partner_feedback (
     CONSTRAINT unique_feedback UNIQUE (participant_id, partner_id)
 );
 
+-- 9. Authentifizierung (AP 29.1)
+CREATE TABLE admin_users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL
+);
+
 -- --- INDIZES (Synchronisiert mit DB Stand AP 22) ---
 
 -- Departments
@@ -126,7 +136,7 @@ CREATE INDEX idx_ratings_type ON ratings(rating_type);
 -- Feedback
 CREATE INDEX idx_feedback_partner ON partner_feedback(partner_id);
 
--- --- 9. FUNCTIONS & VIEWS (AP 23 Architecture Refactoring) ---
+-- --- 10. FUNCTIONS & VIEWS (AP 23 Architecture Refactoring) ---
 
 /*
   Funktion: get_department_subtree
@@ -156,6 +166,7 @@ CREATE OR REPLACE VIEW view_ratings_extended AS
 SELECT 
     r.id AS rating_id,
     r.partner_id,
+    r.participant_id, 
     r.score,
     r.comment,
     r.rating_type,

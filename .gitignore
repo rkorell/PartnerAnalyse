@@ -36,6 +36,8 @@ MANIFEST
 php/db_connect.php
 php/MagicMirrorModuleStats.php
 
+# AP 29.1a: Local Admin Helper
+change_pw.sh
 
 # Installer logs
 pip-log.txt
