@@ -1,11 +1,14 @@
 /*
   Datei: js/wizard-controller.js
   Zweck: Kernlogik der Quality Index Datenerfassung (ehemals QualityIndexWizard in app.js)
+  (c) - Dr. Ralf Korell, 2025/26
+
   # Created: 27.11.2025, 14:50 - Extracted core logic from app.js (AP 8)
   # Modified: 27.11.2025, 15:30 - Removed unused 'restorePartnerValues' method (Dead Code Cleanup - AP 9)
   # Modified: 27.11.2025, 15:40 - Refactored into DataView and WizardFlow modules (AP 10)
   # Modified: 27.11.2025, 15:45 - FIX: Regression: Test-Mode no longer selects hierarchy/partners (AP 10 Regression Fix)
   # Modified: 27.11.2025, 15:50 - Deep Refactoring: Moved all Slider/Input Handler Logic from Controller to DataView (AP 10 Deep Refactoring)
+  # Modified: 28.11.2025, 13:00 - AP 21: Mapping logic CamelCase <-> SnakeCase for Backend
 */
 
 import { CONFIG } from './config.js';
@@ -320,7 +323,8 @@ export class WizardController {
             
             // Listener für General Comment
             document.getElementById(`gen_comment_${partner.id}`).addEventListener('input', (e) => {
-                this.partnerFeedback[partner.id].general_comment = e.target.value;
+                // HIER GEÄNDERT (AP 21): CamelCase
+                this.partnerFeedback[partner.id].generalComment = e.target.value;
             });
         });
         
@@ -494,16 +498,27 @@ export class WizardController {
                 }
             }
 
+            // HIER GEÄNDERT (AP 21): Mapping von CamelCase zurück zu SnakeCase für Backend
+            const partnerFeedbackMapped = {};
+            for (const pId in this.partnerFeedback) {
+                const fb = this.partnerFeedback[pId];
+                partnerFeedbackMapped[pId] = {
+                    frequency: fb.frequency,
+                    nps: fb.nps,
+                    general_comment: fb.generalComment // Mapping
+                };
+            }
+
             const surveyData = {
                 survey_id: this.surveyId,
-                department_id: this.personalData.final_dept_id, 
+                department_id: this.personalData.finalDeptId, // Mapping
                 name: this.personalData.name,
                 email: this.personalData.email,
-                is_manager: this.personalData.is_manager,
+                is_manager: this.personalData.isManager, // Mapping
                 
                 importance: this.importanceData,
                 performance: performanceData,
-                partner_feedback: this.partnerFeedback,
+                partner_feedback: partnerFeedbackMapped, // Mapped object
                 
                 timestamp: new Date().toISOString()
             };

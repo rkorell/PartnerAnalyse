@@ -1,8 +1,11 @@
 /*
   Datei: js/wizard-flow.js
   Zweck: Logik für Navigation, Validierung und Step-Flow
+  (c) - Dr. Ralf Korell, 2025/26
+  
   # Created: 27.11.2025, 15:40 - Extracted Flow and Validation Logic from wizard-controller.js (AP 10)
   # Modified: 27.11.2025, 15:50 - Minor update to use explicit callbacks (AP 10 Deep Refactoring)
+  # Modified: 28.11.2025, 13:00 - AP 21: CamelCase consolidation for personal data keys
 */
 
 import { CONFIG } from './config.js';
@@ -95,13 +98,14 @@ export class WizardFlow {
                     return false;
                 }
                 
+                // HIER GEÄNDERT (AP 21): CamelCase Keys
                 this.callbacks.setPersonalData({
                     name: document.getElementById('name').value,
                     email: document.getElementById('email').value,
-                    is_manager: document.getElementById('is_manager').checked,
-                    department_id: departmentId,
-                    department_name: departmentName,
-                    final_dept_id: document.getElementById('team').value || document.getElementById('area').value || departmentId
+                    isManager: document.getElementById('is_manager').checked,
+                    departmentId: departmentId,
+                    departmentName: departmentName,
+                    finalDeptId: document.getElementById('team').value || document.getElementById('area').value || departmentId
                 });
                 return true;
                 

@@ -9,6 +9,7 @@
   # Modified: 27.11.2025, 18:00 - CSS Cleanup (AP 14): Replaced inline styles with CSS classes.
   # Modified: 27.11.2025, 18:30 - FIX: Critical Regression (AP 15). Data Setters were inside 'else' block, preventing '0' (N/A) from being saved.
   # Modified: 28.11.2025, 12:30 - FIX: Slider layout & value update logic (AP 18 Revision)
+  # Modified: 28.11.2025, 13:00 - AP 21: CamelCase consolidation for generalComment
 */
 
 import { CONFIG } from './config.js';
@@ -198,11 +199,13 @@ export class DataView {
             partnerFeedback[partnerId] = {
                 frequency: isTestMode ? (Math.floor(Math.random() * 4) + 1) : 0,
                 nps: isTestMode ? (Math.floor(Math.random() * 11)) : CONFIG.WIZARD.NPS_RANGES.NA_VALUE, 
-                general_comment: ""
+                // HIER GEÄNDERT (AP 21): CamelCase
+                generalComment: ""
             };
         }
         const pf = partnerFeedback[partnerId];
-        const initialComment = this.callbacks.escapeHtml(pf.general_comment || '');
+        // HIER GEÄNDERT (AP 21): CamelCase Zugriff
+        const initialComment = this.callbacks.escapeHtml(pf.generalComment || '');
 
         const headerHTML = `
             <h3>Bewertung: ${this.callbacks.escapeHtml(partner.name)}</h3>

@@ -13,6 +13,7 @@
   # Modified: 27.11.2025, 18:35 - Code Quality: Converted snake_case DB fields to camelCase in frontend logic (AP 16).
   # Modified: 28.11.2025, 12:45 - CSS Cleanup (AP 19): Replaced remaining inline styles with utility classes.
   # Modified: 28.11.2025, 12:46 - FIX (AP 20): Use visibility instead of display for Matrix tooltip to prevent layout jumping.
+  # Modified: 28.11.2025, 13:00 - AP 21: CamelCase consolidation for matrixDetails and generalComments
 */
 
 import { CONFIG } from './config.js';
@@ -110,8 +111,6 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     // --- FIX AP 20: Event Handler für Tooltip ---
-    // Wir nutzen 'visibility' statt 'display', damit der Platz (40px) reserviert bleibt
-    // und das Modal nicht in der Höhe springt (verhindert Flackern/Stroboskop-Effekt).
     matrixContainer.addEventListener('mouseenter', function(e) {
         const dot = e.target.closest('.matrix-dot');
         if (dot) {
@@ -119,13 +118,13 @@ document.addEventListener("DOMContentLoaded", function() {
             const i = dot.getAttribute('data-imp');
             const p = dot.getAttribute('data-perf');
             matrixTooltip.textContent = `${name} (I: ${i} / P: ${p})`;
-            matrixTooltip.style.visibility = 'visible'; // HIER GEÄNDERT
+            matrixTooltip.style.visibility = 'visible'; 
         }
     }, true);
 
     matrixContainer.addEventListener('mouseleave', function(e) {
         if (!e.relatedTarget || !e.relatedTarget.closest('.matrix-dot')) {
-             matrixTooltip.style.visibility = 'hidden'; // HIER GEÄNDERT
+             matrixTooltip.style.visibility = 'hidden'; 
         }
     }, true);
 
@@ -454,7 +453,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // NEU: Lädt Details nach, falls noch nicht vorhanden
     async function ensurePartnerDetails(partner) {
-        if (partner.matrix_details && partner.general_comments) {
+        // HIER GEÄNDERT (AP 21): CamelCase
+        if (partner.matrixDetails && partner.generalComments) {
             return partner; // Bereits geladen
         }
 
@@ -474,9 +474,9 @@ document.addEventListener("DOMContentLoaded", function() {
             
             if (details.error) throw new Error(details.error);
 
-            // Daten mergen (matrix_details und general_comments kommen snake_case vom Detail-API, werden gemergt)
-            partner.matrix_details = details.matrix_details;
-            partner.general_comments = details.general_comments;
+            // Daten mergen (Mapping snake_case -> camelCase) (AP 21)
+            partner.matrixDetails = details.matrix_details;
+            partner.generalComments = details.general_comments;
             
             return partner;
         } catch (e) {
@@ -500,13 +500,14 @@ document.addEventListener("DOMContentLoaded", function() {
         // HIER GEÄNDERT: Verwende partner.partnerName
         if (action === 'comments') {
             title = `Kommentare zu ${escapeHtml(partner.partnerName)}`;
-            if (partner.general_comments && partner.general_comments.length > 0) {
+            // HIER GEÄNDERT (AP 21): CamelCase
+            if (partner.generalComments && partner.generalComments.length > 0) {
                 content += `<h4>Allgemeines Feedback</h4><ul>`;
-                partner.general_comments.forEach(c => content += `<li>${escapeHtml(c)}</li>`);
+                partner.generalComments.forEach(c => content += `<li>${escapeHtml(c)}</li>`);
                 content += `</ul>`;
             }
-            if (partner.matrix_details) {
-                const specific = partner.matrix_details.filter(d => d.comments && d.comments.length > 0);
+            if (partner.matrixDetails) {
+                const specific = partner.matrixDetails.filter(d => d.comments && d.comments.length > 0);
                 if (specific.length > 0) {
                     content += `<h4>Spezifisches Feedback</h4>`;
                     specific.forEach(d => {
@@ -520,8 +521,9 @@ document.addEventListener("DOMContentLoaded", function() {
         else if (action === 'action') {
             // HIER GEÄNDERT: Verwende partner.partnerName
             title = `Handlungsfelder für ${escapeHtml(partner.partnerName)}`;
-            if (partner.matrix_details) {
-                const items = partner.matrix_details.filter(d => parseFloat(d.imp) >= 8.0 && parseFloat(d.perf) <= 5.0);
+            // HIER GEÄNDERT (AP 21): CamelCase
+            if (partner.matrixDetails) {
+                const items = partner.matrixDetails.filter(d => parseFloat(d.imp) >= 8.0 && parseFloat(d.perf) <= 5.0);
                 if (items.length > 0) {
                     content += `<table class="modal-table"><tr><th>Kriterium</th><th>Wichtigkeit</th><th>Performance</th></tr>`;
                     items.forEach(i => {
@@ -539,9 +541,10 @@ document.addEventListener("DOMContentLoaded", function() {
             const partnerListRow = analysisData.find(p => p.partnerId == partnerId); 
             const maxDiv = partnerListRow ? partnerListRow.maxDivergence : 0;
             
-            if (partner.matrix_details) {
+            // HIER GEÄNDERT (AP 21): CamelCase
+            if (partner.matrixDetails) {
                 const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
-                const conflicts = partner.matrix_details.filter(d => {
+                const conflicts = partner.matrixDetails.filter(d => {
                     const mgr = parseFloat(d.perf_mgr || 0);
                     const team = parseFloat(d.perf_team || 0);
                     return Math.abs(mgr - team) > conflictThreshold;
@@ -581,8 +584,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
         // ACHTUNG: Export muss jetzt über den camelCase Namen iterieren
         analysisData.forEach(partner => {
-            if (partner.matrix_details) {
-                partner.matrix_details.forEach(detail => {
+            // HIER GEÄNDERT (AP 21): CamelCase
+            if (partner.matrixDetails) {
+                partner.matrixDetails.forEach(detail => {
                     let row = [
                         partner.partnerName,
                         partner.score,
@@ -629,7 +633,8 @@ document.addEventListener("DOMContentLoaded", function() {
         if (!partner) return;
 
         partner = await ensurePartnerDetails(partner);
-        if (!partner || !partner.matrix_details) return;
+        // HIER GEÄNDERT (AP 21): CamelCase
+        if (!partner || !partner.matrixDetails) return;
 
         currentPartnerDetails = partner; 
         matrixTitle.textContent = "IPA Matrix: " + partner.partnerName; // HIER GEÄNDERT: Verwende camelCase
@@ -643,16 +648,17 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function updateMatrixView(mode) { /* ... (bleibt gleich) ... */
         if (!currentPartnerDetails) return;
-        const stats = calculateStats(currentPartnerDetails.matrix_details);
+        // HIER GEÄNDERT (AP 21): CamelCase
+        const stats = calculateStats(currentPartnerDetails.matrixDetails);
         let centerX = 5.0;
         let centerY = 5.0;
         let maxDist = 5.0; 
         if (mode === 'mean') {
             centerX = stats.mean.perf;
             centerY = stats.mean.imp;
-            maxDist = calculateMaxDeviation(currentPartnerDetails.matrix_details, centerX, centerY);
+            maxDist = calculateMaxDeviation(currentPartnerDetails.matrixDetails, centerX, centerY);
         }
-        renderMatrixSVG(currentPartnerDetails.matrix_details, centerX, centerY, maxDist);
+        renderMatrixSVG(currentPartnerDetails.matrixDetails, centerX, centerY, maxDist);
     }
 
     function calculateMaxDeviation(details, cx, cy) { /* ... (bleibt gleich) ... */
