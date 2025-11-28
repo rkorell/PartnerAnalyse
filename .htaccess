@@ -1,0 +1,35 @@
+# Datei: .htaccess
+# Zweck: Server-Härtung und Sicherheitskonfiguration (Apache)
+# (c) - Dr. Ralf Korell, 2025/26
+#
+# # Created: 28.11.2025, 17:45 - AP 28: Initial security configuration
+
+# 1. Directory Browsing deaktivieren
+# Verhindert, dass Besucher eine Dateiliste sehen, wenn sie z.B. /img/ oder /js/ aufrufen.
+Options -Indexes
+
+# 2. Zugriff auf sensible Dateien blockieren
+# Verhindert den Download von Quellcode-Verwaltung, Doku, SQL-Dumps und Config-Templates.
+<FilesMatch "^(\.git|\.vscode|README\.md|.*\.sql|.*\.example|composer\.json|package\.json)$">
+    Require all denied
+</FilesMatch>
+
+# Alternativer Schutz für Verzeichnisse (falls FilesMatch nicht greift)
+RewriteEngine On
+RewriteRule ^(\.git|\.vscode) - [F,L]
+
+# 3. Security Headers setzen
+# Benötigt mod_headers. Wenn das Modul fehlt, wird der Block ignoriert (kein Absturz).
+<IfModule mod_headers.c>
+    # Verhindert, dass der Browser Dateien als etwas anderes interpretiert als der Server sagt (MIME-Sniffing)
+    Header set X-Content-Type-Options "nosniff"
+
+    # Verhindert, dass deine Seite in iFrames auf fremden Seiten eingebunden wird (Clickjacking)
+    Header set X-Frame-Options "SAMEORIGIN"
+
+    # Aktiviert den XSS-Filter in älteren Browsern
+    Header set X-XSS-Protection "1; mode=block"
+
+    # Datenschutz: Referrer nur bei gleicher Herkunft oder sicherem Ziel senden
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

@@ -20,7 +20,7 @@ export const CONFIG = {
     // --- Konfiguration für den Eingabe-Wizard (app.js) ---
     WIZARD: {
         // Feature Flag für State-Persistenz (AP 27)
-        USE_LOCAL_STORAGE: true, 
+        USE_LOCAL_STORAGE: false, 
 
         // Schwellenwerte für die Anzeige des Kommentar-Icons (Performance)
         // Hartcodiert in app.js: <= 3 ODER >= 8
