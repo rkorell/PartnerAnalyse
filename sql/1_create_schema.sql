@@ -1,7 +1,13 @@
-/* 1_create_schema.sql - Struktur ohne Daten */
-/* # Modified: 26.11.2025, 20:40 - Added partner_feedback table and comment column to ratings */
-/* # Modified: 27.11.2025, 13:50 - Added critical indices for analysis query performance (AP 5) */
+/* Datei: sql/1_create_schema.sql
+  Zweck: Definition des Datenbankschemas (Tabellen, Indizes, Constraints)
+  (c) - Dr. Ralf Korell, 2025/26
 
+  # Modified: 26.11.2025, 20:40 - Added partner_feedback table and comment column to ratings
+  # Modified: 27.11.2025, 13:50 - Added critical indices for analysis query performance (AP 5)
+  # Modified: 28.11.2025, 14:00 - AP 22: Synchronized schema with production DB (added app_texts, session_token, missing indices)
+*/
+
+DROP TABLE IF EXISTS app_texts CASCADE;
 DROP TABLE IF EXISTS partner_feedback CASCADE;
 DROP TABLE IF EXISTS ratings CASCADE;
 DROP TABLE IF EXISTS participants CASCADE;
@@ -10,7 +16,14 @@ DROP TABLE IF EXISTS partners CASCADE;
 DROP TABLE IF EXISTS departments CASCADE;
 DROP TABLE IF EXISTS surveys CASCADE;
 
--- 1. Kampagnen
+-- 1. App Texte (Tooltips & Statische Texte)
+CREATE TABLE app_texts (
+    id SERIAL PRIMARY KEY,
+    category VARCHAR(50),
+    content TEXT
+);
+
+-- 2. Kampagnen
 CREATE TABLE surveys (
     id SERIAL PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
@@ -21,7 +34,7 @@ CREATE TABLE surveys (
     test_mode BOOLEAN DEFAULT FALSE
 );
 
--- 2. Abteilungen (Hierarchie)
+-- 3. Abteilungen (Hierarchie)
 CREATE TABLE departments (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -30,47 +43,49 @@ CREATE TABLE departments (
     description TEXT
 );
 
--- 3. Partner
+-- 4. Partner
 CREATE TABLE partners (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     active BOOLEAN DEFAULT TRUE
 );
 
--- 4. Kriterien
+-- 5. Kriterien
 CREATE TABLE criteria (
     id SERIAL PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
-    description TEXT,
-    category VARCHAR(100),
-    sort_order INTEGER
+    category VARCHAR(50),
+    sort_order INTEGER,
+    description TEXT
 );
 
--- 5. Teilnehmer
+-- 6. Teilnehmer
 CREATE TABLE participants (
     id SERIAL PRIMARY KEY,
     survey_id INTEGER REFERENCES surveys(id),
     department_id INTEGER REFERENCES departments(id),
+    session_token VARCHAR(100),
     is_manager BOOLEAN DEFAULT FALSE,
     name VARCHAR(100),
     email VARCHAR(200),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 6. Bewertungen
+-- 7. Bewertungen
 CREATE TABLE ratings (
     id BIGSERIAL PRIMARY KEY,
     participant_id INTEGER REFERENCES participants(id),
     criterion_id INTEGER REFERENCES criteria(id),
     partner_id INTEGER REFERENCES partners(id),
-    rating_type VARCHAR(20) CHECK (rating_type IN ('importance', 'performance')),
+    rating_type VARCHAR(20),
     score INTEGER,
     comment TEXT,
-    CONSTRAINT unique_vote UNIQUE (participant_id, criterion_id, partner_id, rating_type),
-    CONSTRAINT ratings_score_check CHECK ((score BETWEEN 1 AND 10) OR score IS NULL)
+    CONSTRAINT ratings_rating_type_check CHECK (rating_type IN ('importance', 'performance')),
+    CONSTRAINT ratings_score_check CHECK ((score BETWEEN 1 AND 10) OR score IS NULL),
+    CONSTRAINT unique_vote_per_survey UNIQUE (participant_id, criterion_id, partner_id, rating_type)
 );
 
--- 7. Partner Feedback (Kopfdaten: Frequenz, NPS, Globaler Kommentar)
+-- 8. Partner Feedback (Kopfdaten: Frequenz, NPS, Globaler Kommentar)
 CREATE TABLE partner_feedback (
     id BIGSERIAL PRIMARY KEY,
     participant_id INTEGER REFERENCES participants(id),
@@ -81,11 +96,28 @@ CREATE TABLE partner_feedback (
     CONSTRAINT unique_feedback UNIQUE (participant_id, partner_id)
 );
 
--- Indizes
+-- --- INDIZES (Synchronisiert mit DB Stand AP 22) ---
+
+-- Departments
+CREATE INDEX idx_departments_parent ON departments(parent_id);
+
+-- Partners
 CREATE INDEX idx_partner_active ON partners(active);
+
+-- Surveys
 CREATE INDEX idx_survey_active ON surveys(is_active);
 
--- NEUE INDIZES FÜR ANALYSE-QUERIES (AP 5)
+-- Participants
+CREATE INDEX idx_participants_department ON participants(department_id);
+CREATE INDEX idx_participants_manager ON participants(is_manager);
+CREATE INDEX idx_participants_survey ON participants(survey_id);
+
+-- Ratings
+CREATE INDEX idx_ratings_criterion ON ratings(criterion_id);
 CREATE INDEX idx_ratings_participant ON ratings(participant_id);
+CREATE INDEX idx_ratings_partner ON ratings(partner_id);
 CREATE INDEX idx_ratings_partner_type ON ratings(partner_id, rating_type);
+CREATE INDEX idx_ratings_type ON ratings(rating_type);
+
+-- Feedback
 CREATE INDEX idx_feedback_partner ON partner_feedback(partner_id);
