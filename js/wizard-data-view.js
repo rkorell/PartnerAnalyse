@@ -12,6 +12,7 @@
   # Modified: 28.11.2025, 15:15 - AP 18: Refactored slider markup (DRY) and fixed layout/value update logic
   # Modified: 28.11.2025, 15:30 - AP 24: Use central CONFIG for render delays
   # Modified: 28.11.2025, 16:00 - AP 25: Extracted HTML generation to templates.js
+  # Modified: 28.11.2025, 17:00 - AP 27: Prefer loaded state over default/random values in initialization
 */
 
 import { CONFIG } from './config.js';
@@ -47,7 +48,7 @@ export class DataView {
     // --- HAUPT VIEW METHODEN ---
 
     setupImportanceCriteria() {
-        const { criteriaData, isTestMode } = this.state;
+        const { criteriaData, isTestMode, importanceData } = this.state;
 
         // AP 24: Nutzung von CONFIG.UI.RENDER_DELAY_MS
         setTimeout(() => {
@@ -63,12 +64,19 @@ export class DataView {
                     const rawId = criterion.id;
                     const domId = 'imp_' + rawId;
                     
+                    // AP 27: Daten aus State bevorzugen
                     let initialValue = 0;
-                    if (isTestMode) {
-                        initialValue = Math.floor(Math.random() * 10) + 1;
-                        this.callbacks.setImportance(rawId, initialValue);
+                    if (importanceData && importanceData[rawId] !== undefined) {
+                        initialValue = importanceData[rawId];
                     } else {
-                        this.callbacks.setImportance(rawId, 0); 
+                        // Fallback auf Test/Default
+                        if (isTestMode) {
+                            initialValue = Math.floor(Math.random() * 10) + 1;
+                        } else {
+                            initialValue = 0;
+                        }
+                        // Wert im State setzen, damit es konsistent ist
+                        this.callbacks.setImportance(rawId, initialValue);
                     }
 
                     // AP 25: Template Usage
@@ -145,6 +153,8 @@ export class DataView {
         const { isTestMode, criteriaData, partnerFeedback, performanceData } = this.state;
         const partnerId = partner.id;
 
+        // AP 27: Hier prüfen wir auch den State, bevor wir initialisieren
+        // Da partnerFeedback direkt aus this.state kommt, ist es bereits geladen (durch _loadState im Controller)
         if (!partnerFeedback[partnerId]) {
             partnerFeedback[partnerId] = {
                 frequency: isTestMode ? (Math.floor(Math.random() * 4) + 1) : 0,
@@ -175,6 +185,7 @@ export class DataView {
                     performanceData[partnerId] = {};
                 }
                 
+                // AP 27: Daten aus State verwenden
                 let storedData = performanceData[partnerId][rawId];
                 let currentVal = 0;
                 let currentComment = '';
@@ -193,22 +204,6 @@ export class DataView {
                     performanceData[partnerId][rawId] = { score: 0, comment: '' };
                 }
 
-                // AP 25: Einzelne Slider erzeugen (der Slider baut sein eigenes HTML via createSliderHTML)
-                // Die Kommentarbox ist nun Teil von createSliderHTML (in Tpl.getSliderHTML + getCommentBoxHTML), 
-                // ABER die Initialisierung des Kommentars müssen wir beachten.
-                
-                // Korrektur: createSliderHTML nutzt getCommentBoxHTML, aber ohne Value-Parameter.
-                // Wir müssen das etwas anpassen, oder createSliderHTML muss den Comment durchreichen.
-                // DA ich createSliderHTML oben refactored habe, aber den Comment-Value vergessen habe:
-                // Ich passe createSliderHTML (lokal) noch kurz an, dass er getCommentBoxHTML mit Value aufruft.
-                
-                // Da wir das Template nutzen, rufe ich es hier direkt auf, um den Content für die Row zu bauen.
-                // Eigentlich ruft createSliderHTML das Template auf.
-                
-                // Umbau: Ich übergebe currentComment an createSliderHTML? 
-                // Nein, createSliderHTML ist für Importance und Perf. Importance hat keinen Comment.
-                
-                // Hier in der Schleife bauen wir das HTML zusammen.
                 const sliderContainer = this.createSliderHTMLWithComment(domId, rawId, 'performance', currentVal, currentComment);
                 rowsHTML += Tpl.getCriteriaRowHTML(criterion.name, criterion.description, sliderContainer);
             });
@@ -237,10 +232,6 @@ export class DataView {
             iconHTML: iconHTML
         });
 
-        // Prüfen, ob Kommentarbox sichtbar sein soll (Text vorhanden oder Extremwert?)
-        // Logik war: display:block wenn text !=''. Extremwert steuert nur Icon visibility.
-        // Aber User klickt Icon -> Box geht auf.
-        // Also initial: Hat Text? -> Visible. Sonst Hidden.
         const isHidden = !initialComment || initialComment.trim() === '';
         const commentHTML = Tpl.getCommentBoxHTML(domId, '[FREIWILLIG: Warum diese Bewertung?]', initialComment, isHidden);
 

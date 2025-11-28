@@ -11,12 +11,15 @@
   # Modified: 28.11.2025, 13:00 - AP 21: Mapping logic CamelCase <-> SnakeCase for Backend
   # Modified: 28.11.2025, 15:30 - AP 24: Use central toggleGlobalLoader from utils
   # Modified: 28.11.2025, 16:30 - AP 26: Implemented dynamic button coloring (Blue=Active, Grey=Inactive)
+  # Modified: 28.11.2025, 17:00 - AP 27: Added LocalStorage persistence (Light version)
 */
 
 import { CONFIG } from './config.js';
 import { escapeHtml, toggleGlobalLoader } from './utils.js';
 import { DataView } from './wizard-data-view.js'; // NEU: Import DataView
 import { WizardFlow } from './wizard-flow.js';   // NEU: Import WizardFlow
+
+const STORAGE_KEY = 'cpqi_wizard_state';
 
 export class WizardController {
     constructor() {
@@ -45,6 +48,59 @@ export class WizardController {
         this.init();
     }
 
+    // --- AP 27: PERSISTENCE METHODS ---
+    _saveState() {
+        if (!CONFIG.WIZARD.USE_LOCAL_STORAGE) return;
+        
+        const stateToSave = {
+            personalData: this.personalData,
+            selectedPartners: this.selectedPartners,
+            importanceData: this.importanceData,
+            performanceData: this.performanceData,
+            partnerFeedback: this.partnerFeedback
+        };
+        
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+        } catch (e) {
+            console.warn('LocalStorage save failed:', e);
+        }
+    }
+
+    _loadState() {
+        if (!CONFIG.WIZARD.USE_LOCAL_STORAGE) {
+            // Wenn Feature aus, sicherstellen, dass keine alten Daten stören
+            this._clearState();
+            return;
+        }
+
+        try {
+            const json = localStorage.getItem(STORAGE_KEY);
+            if (!json) return;
+
+            const saved = JSON.parse(json);
+            
+            // Einfache Wiederherstellung der Datenobjekte
+            if (saved.personalData) this.personalData = saved.personalData;
+            if (saved.selectedPartners) this.selectedPartners = saved.selectedPartners;
+            if (saved.importanceData) this.importanceData = saved.importanceData;
+            if (saved.performanceData) this.performanceData = saved.performanceData;
+            if (saved.partnerFeedback) this.partnerFeedback = saved.partnerFeedback;
+            
+            // UI-Update für Step 3 wird in setupPartnerSelection gehandhabt
+            
+        } catch (e) {
+            console.warn('LocalStorage load failed, resetting:', e);
+            this._clearState();
+        }
+    }
+
+    _clearState() {
+        try {
+            localStorage.removeItem(STORAGE_KEY);
+        } catch (e) {}
+    }
+
     // --- CALLBACKS ZUR STEUERUNG DER MODULE ---
     _createCallbacks() {
         return {
@@ -59,11 +115,27 @@ export class WizardController {
             escapeHtml: escapeHtml, // Aus utils.js
 
             // Data Setter (Vom View aufgerufen, um den State zu aktualisieren)
-            setCurrentStep: (step) => this.currentStep = step,
-            setPersonalData: (data) => this.personalData = data,
-            setImportance: (critId, value) => this.importanceData[critId] = value,
-            setFeedback: (pId, type, value) => this._setPartnerFeedback(pId, type, value),
-            setPerformance: (pId, critId, score, comment) => this._setPerformance(pId, critId, score, comment),
+            // AP 27: Alle Setter triggern _saveState()
+            setCurrentStep: (step) => { 
+                this.currentStep = step; 
+                // Step speichern wir in "Light" nicht, aber ggf. Daten
+            },
+            setPersonalData: (data) => { 
+                this.personalData = data; 
+                this._saveState(); 
+            },
+            setImportance: (critId, value) => { 
+                this.importanceData[critId] = value; 
+                this._saveState(); 
+            },
+            setFeedback: (pId, type, value) => { 
+                this._setPartnerFeedback(pId, type, value); 
+                this._saveState(); 
+            },
+            setPerformance: (pId, critId, score, comment) => { 
+                this._setPerformance(pId, critId, score, comment); 
+                this._saveState(); 
+            },
             
             // Event Binding wird direkt vom View ausgeführt
             bindSliderEvents: (type) => this.view.bindSliderEvents(type),
@@ -95,6 +167,10 @@ export class WizardController {
         try {
             this.insertLogo();
             await this.loadConfigData();
+            
+            // AP 27: Daten laden BEVOR die UI aufgebaut wird
+            this._loadState();
+
             this.setupUI();
             
             if (this.isTestMode) {
@@ -251,7 +327,9 @@ export class WizardController {
         container.innerHTML = ''; 
         
         this.partnerData.forEach((partner, index) => {
-            const isSelected = this.isTestMode && Math.random() < 0.3; 
+            // AP 27: Check if partner is already selected (from loaded state)
+            const isLoaded = this.selectedPartners.some(p => p.id == partner.id);
+            const isSelected = isLoaded || (this.isTestMode && Math.random() < 0.3); 
 
             const checkboxDiv = document.createElement('div');
             checkboxDiv.className = 'partner-checkbox' + (isSelected ? ' selected' : '');
@@ -264,6 +342,11 @@ export class WizardController {
             const checkbox = checkboxDiv.querySelector('input');
             checkbox.addEventListener('change', () => {
                 this.updatePartnerSelection(); 
+                // AP 27: Save on change (via updatePartnerSelection logic triggering setter?)
+                // Actually updatePartnerSelection modifies this.selectedPartners directly.
+                // We should manually trigger save here.
+                this._saveState();
+
                 if (checkbox.checked) {
                     checkboxDiv.classList.add('selected');
                 } else {
@@ -273,6 +356,9 @@ export class WizardController {
             
             container.appendChild(checkboxDiv);
         });
+
+        // AP 27: Sync initial state if loaded
+        this.updatePartnerSelection();
 
         if (this.isTestMode) {
              this.updatePartnerSelection(); 
@@ -302,6 +388,7 @@ export class WizardController {
         if (this.currentStep === 3) {
             nextBtn.disabled = this.selectedPartners.length === 0;
         }
+        this._updateButtonState(nextBtn, !nextBtn.disabled); // AP 26 fix update
     }
     
     // --- EVALUATION & PARTNER FLOW ---
@@ -327,6 +414,7 @@ export class WizardController {
             document.getElementById(`gen_comment_${partner.id}`).addEventListener('input', (e) => {
                 // HIER GEÄNDERT (AP 21): CamelCase
                 this.partnerFeedback[partner.id].generalComment = e.target.value;
+                this._saveState(); // AP 27 Save
             });
         });
         
@@ -555,6 +643,9 @@ export class WizardController {
             const result = await response.json();
             
             if (response.ok && (result.status === 'success' || result.id)) {
+                // AP 27: Clear State on success
+                this._clearState();
+                
                 this.currentStep = 5;
                 this.showStep(this.currentStep);
                 this.updateProgress();
@@ -572,6 +663,8 @@ export class WizardController {
     }
 
     restartSurvey() {
+        // AP 27: Sicherstellen, dass Speicher leer ist bei Neustart
+        this._clearState();
         location.reload();
     }
 

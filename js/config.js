@@ -6,6 +6,7 @@
   # Created: 27.11.2025, 14:30 - Centralized application constants (AP 6)
   # Modified: 27.11.2025, 14:50 - Changed to ES6 module export (AP 8)
   # Modified: 28.11.2025, 15:30 - AP 24: Added COLORS and UI constants for modularization
+  # Modified: 28.11.2025, 17:00 - AP 27: Added USE_LOCAL_STORAGE switch
 */
 
 export const CONFIG = {
@@ -18,6 +19,9 @@ export const CONFIG = {
     
     // --- Konfiguration für den Eingabe-Wizard (app.js) ---
     WIZARD: {
+        // Feature Flag für State-Persistenz (AP 27)
+        USE_LOCAL_STORAGE: true, 
+
         // Schwellenwerte für die Anzeige des Kommentar-Icons (Performance)
         // Hartcodiert in app.js: <= 3 ODER >= 8
         PERFORMANCE_COMMENT_THRESHOLD: {
