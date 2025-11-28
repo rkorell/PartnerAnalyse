@@ -2,6 +2,8 @@
 /*
   Datei: /var/www/html/php/get_data.php
   Zweck: Liefert Survey-/Partner-/Kriterien-/Abteilungsdaten für das Frontend als JSON (Analyse & Erhebung)
+  (c) - Dr. Ralf Korell, 2025/26
+
   # Modified: 22.11.2025, 23:00 - surveys jetzt immer als Array (id, name), CI/CD für Analyse-Frontend
   # Modified: 23.11.2025, 11:35 - Aliase entfernt (Fix: Keine Umlaute/Germanismen in JSON-Keys)
   # Modified: 23.11.2025, 21:15 - App-Texte (Tooltips) aus DB laden (app_texts)
@@ -9,12 +11,12 @@
   # Modified: 27.11.2025, 13:45 - Suppress detailed DB error message for security
   # Modified: 27.11.2025, 16:00 - Security Fix: Required db_connect.php via absolute, private path (AP 11)
   # Modified: 27.11.2025, 16:30 - Final FIX: require_once moved into try-block for stable error handling (AP 11 Final Fix)
+  # Modified: 28.11.2025, 09:00 - Centralized DB config path & added error logging (AP 17)
 */
 
 header('Content-Type: application/json');
 
-// HIER GEÄNDERT: Definieren des absoluten Pfades außerhalb des Webroot
-define('DB_CONFIG_PATH', '/etc/partneranalyse/db_connect.php');
+require_once __DIR__ . '/common.php';
 
 // WICHTIG: require_once ist jetzt im try-Block, um PHP-Fatal-Errors abzufangen
 try {
@@ -80,7 +82,7 @@ try {
         'app_texts'   => $app_texts
     ]);
 } catch (Exception $e) {
-    // log $e->getMessage()
+    error_log("Fehler in get_data.php: " . $e->getMessage());
     http_response_code(500);
     echo json_encode(['error' => 'Fehler beim Laden der Konfigurationsdaten.']);
     exit;

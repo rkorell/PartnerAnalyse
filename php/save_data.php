@@ -1,5 +1,8 @@
 <?php
 /* DATEI: php/save_data.php
+   FUNKTION: Validiert eingehende Survey-Daten und speichert sie transaktionssicher in der Datenbank.
+   (c) - Dr. Ralf Korell, 2025/26
+
    # Modified: 22.11.2025 - Speichert Name und Email
    # Modified: 24.11.2025, 23:45 - Handle 0 as NULL for performance ratings
    # Modified: 26.11.2025, 20:50 - Added support for comments and partner_feedback table (NPS/Frequency)
@@ -7,11 +10,11 @@
    # Modified: 27.11.2025, 13:50 - Safer transaction handling (check inTransaction before rollback) (AP 5)
    # Modified: 27.11.2025, 16:00 - Security Fix: Required db_connect.php via absolute, private path (AP 11)
    # Modified: 27.11.2025, 16:30 - Final FIX: require_once moved into try-block for stable error handling (AP 11 Final Fix)
+   # Modified: 28.11.2025, 09:00 - Centralized DB config path & added error logging (AP 17)
 */
 header('Content-Type: application/json');
 
-// HIER GEÄNDERT: Definieren des absoluten Pfades außerhalb des Webroot
-define('DB_CONFIG_PATH', '/etc/partneranalyse/db_connect.php');
+require_once __DIR__ . '/common.php';
 
 $input = json_decode(file_get_contents('php://input'), true);
 
@@ -207,6 +210,7 @@ try {
     echo json_encode(['status' => 'success', 'id' => $participantId]);
 
 } catch (Exception $e) {
+    error_log("Fehler in save_data.php: " . $e->getMessage());
     // HIER GEÄNDERT: Rollback nur, wenn Transaktion noch aktiv ist
     if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();

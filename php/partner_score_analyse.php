@@ -2,6 +2,8 @@
 /*
   DATEI: php/partner_score_analyse.php
   Zweck: Analyse-API für Partner-Score-Berechnung mit Filter
+  (c) - Dr. Ralf Korell, 2025/26
+
   # Modified: 26.11.2025, 16:45 - Change logic to count distinct participants (Assessors) instead of total ratings
   # Modified: 26.11.2025, 17:00 - Added global_participant_count (Total Unique Assessors across all partners)
   # Modified: 26.11.2025, 21:30 - Extended SQL for Split-Scores (Mgr/Team), NPS and Comment Counts
@@ -14,11 +16,12 @@
   # Modified: 27.11.2025, 16:15 - FIX: Added file_exists check for robust require_once handling (AP 11 Fix)
   # Modified: 27.11.2025, 16:30 - Final FIX: require_once moved into try-block for stable error handling (AP 11 Final Fix)
   # Modified: 27.11.2025, 17:00 - Performance Optimization (AP 12): "Smart Aggregation". Removed expensive JSON_AGG. Now returns only scores, counts and flags.
+  # Modified: 28.11.2025, 09:00 - Centralized DB config path & added error logging (AP 17)
 */
 
 header('Content-Type: application/json');
 
-define('DB_CONFIG_PATH', '/etc/partneranalyse/db_connect.php');
+require_once __DIR__ . '/common.php';
 
 if (!file_exists(DB_CONFIG_PATH)) {
     http_response_code(500);
@@ -170,6 +173,7 @@ ORDER BY score DESC
     echo json_encode($result);
 
 } catch (Exception $e) {
+    error_log("Fehler in partner_score_analyse.php: " . $e->getMessage());
     if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();
     }

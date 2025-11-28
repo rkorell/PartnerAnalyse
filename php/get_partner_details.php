@@ -2,12 +2,15 @@
 /*
   DATEI: php/get_partner_details.php
   Zweck: Lädt Details (Matrix, Kommentare) für einen einzelnen Partner nach (Lazy Loading)
+  (c) - Dr. Ralf Korell, 2025/26
+
   # Created: 27.11.2025, 17:00 - Part of AP 12 Performance Optimization
+  # Modified: 28.11.2025, 09:00 - Centralized DB config path & added error logging (AP 17)
 */
 
 header('Content-Type: application/json');
 
-define('DB_CONFIG_PATH', '/etc/partneranalyse/db_connect.php');
+require_once __DIR__ . '/common.php';
 
 if (!file_exists(DB_CONFIG_PATH)) {
     http_response_code(500);
@@ -122,6 +125,7 @@ try {
     ]);
 
 } catch (Exception $e) {
+    error_log("Fehler in get_partner_details.php: " . $e->getMessage());
     http_response_code(500);
     echo json_encode(["error" => "Fehler beim Laden der Details."]);
 }
