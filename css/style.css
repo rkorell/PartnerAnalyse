@@ -1102,3 +1102,41 @@ input[type=range].slider-neutral {
 .legend-item {
     margin-right: 20px;
 }
+
+
+/* =========================================
+   NEU (AP 19): Utility Classes für JS-Generiertes HTML
+   Zweck: Ablösung verbliebener Inline-Styles in score_analyse.js
+   ========================================= */
+
+.text-center {
+    text-align: center;
+}
+
+/* Modal Tabellen & Texte */
+.modal-headline {
+    margin-top: 0;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+.modal-table {
+    width: 100%;
+    text-align: left;
+}
+
+.text-danger-bold {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+.text-primary-bold {
+    color: #3498db;
+    font-weight: bold;
+}
+
+/* Legende */
+.legend-label {
+    margin-right: 10px;
+}
+

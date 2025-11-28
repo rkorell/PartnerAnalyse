@@ -1,6 +1,8 @@
 /*
   Datei: /var/www/html/js/score_analyse.js
   Zweck: JS-Logik für Partner Score Analyse
+  (c) - Dr. Ralf Korell, 2025/26
+
   # Modified: 27.11.2025, 15:30 - Layout Clean-Up: Removed Rank Column, Aligned Score Bar & Value horizontally
   # Modified: 27.11.2025, 13:00 - Added XSS protection (escapeHtml) for user inputs
   # Modified: 27.11.2025, 14:30 - Centralized configuration via config.js (AP 6)
@@ -9,6 +11,8 @@
   # Modified: 27.11.2025, 17:00 - Performance Optimization (AP 12): Implemented Lazy Loading for details. 
   # Modified: 27.11.2025, 18:00 - CSS Cleanup (AP 14): Replaced inline styles with CSS classes.
   # Modified: 27.11.2025, 18:35 - Code Quality: Converted snake_case DB fields to camelCase in frontend logic (AP 16).
+  # Modified: 28.11.2025, 12:45 - CSS Cleanup (AP 19): Replaced remaining inline styles with utility classes.
+  # Modified: 28.11.2025, 12:46 - FIX (AP 20): Use visibility instead of display for Matrix tooltip to prevent layout jumping.
 */
 
 import { CONFIG } from './config.js';
@@ -105,7 +109,9 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // ... (Tooltip Events bleiben gleich) ...
+    // --- FIX AP 20: Event Handler für Tooltip ---
+    // Wir nutzen 'visibility' statt 'display', damit der Platz (40px) reserviert bleibt
+    // und das Modal nicht in der Höhe springt (verhindert Flackern/Stroboskop-Effekt).
     matrixContainer.addEventListener('mouseenter', function(e) {
         const dot = e.target.closest('.matrix-dot');
         if (dot) {
@@ -113,13 +119,13 @@ document.addEventListener("DOMContentLoaded", function() {
             const i = dot.getAttribute('data-imp');
             const p = dot.getAttribute('data-perf');
             matrixTooltip.textContent = `${name} (I: ${i} / P: ${p})`;
-            matrixTooltip.style.display = 'block';
+            matrixTooltip.style.visibility = 'visible'; // HIER GEÄNDERT
         }
     }, true);
 
     matrixContainer.addEventListener('mouseleave', function(e) {
         if (!e.relatedTarget || !e.relatedTarget.closest('.matrix-dot')) {
-             matrixTooltip.style.display = 'none';
+             matrixTooltip.style.visibility = 'hidden'; // HIER GEÄNDERT
         }
     }, true);
 
@@ -355,7 +361,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 <div class="criteria-content col-partner">Partner</div>
                 <div class="criteria-content col-score-graph">Score</div>
                 <div class="criteria-content col-count">Anzahl Beurteiler</div>
-                <div class="criteria-content col-insights" style="text-align:center;">Insights</div>
+                <div class="criteria-content col-insights text-center">Insights</div>
             </div>`;
 
         rows.forEach((row, idx) => {
@@ -380,6 +386,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 else if (nps > 30 && nps <= 70) npsColor = '#f1c40f'; 
                 else if (nps > 70) npsColor = '#2ecc71'; 
                 
+                // Hinweis: npsColor ist dynamisch, daher bleibt style-Attribut
                 slot1 = `<span class="nps-display" title="NPS Score: ${nps}">📣 <span class="nps-value" style="color:${npsColor};">${nps > 0 ? '+' : ''}${nps}</span></span>`;
             }
 
@@ -409,13 +416,14 @@ document.addEventListener("DOMContentLoaded", function() {
                 slot4 = `<span class="insight-icon action-icon" data-action="conflict" data-id="${row.partnerId}" title="${title}">⚡</span>`;
             }
 
+            // Hinweis: Breite und Hintergrundfarbe sind dynamisch, daher bleiben style-Attribute hierfür. height und transition sind nun in der Klasse.
             html += `
             <div class="criteria-row partner-row-clickable score-table-row" data-partner-id="${row.partnerId}">
                 <div class="criteria-content col-partner col-partner-link">${escapeHtml(row.partnerName)} ↗</div>
                 
                 <div class="criteria-content col-score-graph">
                     <div class="score-bar-wrapper">
-                        <div class="score-bar-fill" style="height:100%; width:${Math.round(pct*90)+10}%; background:${rgb}; transition:width 0.5s;"></div>
+                        <div class="score-bar-fill" style="width:${Math.round(pct*90)+10}%; background:${rgb};"></div>
                     </div>
                     <div class="score-bar-text">${row.score}</div>
                 </div>
@@ -434,7 +442,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         html += `
         <div class="icon-legend-box">
-            <strong style="margin-right:10px;">Legende:</strong>
+            <strong class="legend-label">Legende:</strong>
             <span class="legend-item">📣 NPS-Score</span>
             <span class="legend-item">💬 Kommentare vorhanden</span>
             <span class="legend-item">⚠️ Handlungsfelder (Vorschläge)</span>
@@ -515,9 +523,9 @@ document.addEventListener("DOMContentLoaded", function() {
             if (partner.matrix_details) {
                 const items = partner.matrix_details.filter(d => parseFloat(d.imp) >= 8.0 && parseFloat(d.perf) <= 5.0);
                 if (items.length > 0) {
-                    content += `<table style="width:100%; text-align:left;"><tr><th>Kriterium</th><th>Wichtigkeit</th><th>Performance</th></tr>`;
+                    content += `<table class="modal-table"><tr><th>Kriterium</th><th>Wichtigkeit</th><th>Performance</th></tr>`;
                     items.forEach(i => {
-                        content += `<tr><td>${escapeHtml(i.name)}</td><td>${i.imp}</td><td style="color:#e74c3c; font-weight:bold;">${i.perf}</td></tr>`;
+                        content += `<tr><td>${escapeHtml(i.name)}</td><td>${i.imp}</td><td class="text-danger-bold">${i.perf}</td></tr>`;
                     });
                     content += `</table>`;
                 }
@@ -540,15 +548,15 @@ document.addEventListener("DOMContentLoaded", function() {
                 });
                 
                 if (conflicts.length > 0) {
-                    content += `<table style="width:100%; text-align:left;"><tr><th>Kriterium</th><th>Manager Ø</th><th>Team Ø</th><th>Delta</th></tr>`;
+                    content += `<table class="modal-table"><tr><th>Kriterium</th><th>Manager Ø</th><th>Team Ø</th><th>Delta</th></tr>`;
                     conflicts.forEach(c => {
                         const mgr = parseFloat(c.perf_mgr || 0);
                         const team = parseFloat(c.perf_team || 0);
                         const delta = Math.abs(mgr - team).toFixed(1);
                         content += `<tr>
                             <td>${escapeHtml(c.name)}</td>
-                            <td style="color:#e74c3c; font-weight:bold;">${mgr.toFixed(1)}</td>
-                            <td style="color:#3498db; font-weight:bold;">${team.toFixed(1)}</td>
+                            <td class="text-danger-bold">${mgr.toFixed(1)}</td>
+                            <td class="text-primary-bold">${team.toFixed(1)}</td>
                             <td>${delta}</td>
                         </tr>`;
                     });
@@ -560,7 +568,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         const modalBody = document.getElementById('info-modal-body');
-        modalBody.innerHTML = `<h2 style="margin-top:0; border-bottom:2px solid #3498db; padding-bottom:10px;">${title}</h2>` + content;
+        modalBody.innerHTML = `<h2 class="modal-headline">${title}</h2>` + content;
         document.getElementById('global-info-modal').style.display = 'flex';
     }
 
