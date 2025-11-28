@@ -1140,3 +1140,8 @@ input[type=range].slider-neutral {
     margin-right: 10px;
 }
 
+/* Fix für Slider in Form-Groups (Header): Padding entfernen, damit die Linie bis zum Rand geht */
+.form-group input[type="range"] {
+    padding: 0;
+}
+

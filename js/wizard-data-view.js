@@ -10,6 +10,7 @@
   # Modified: 27.11.2025, 18:30 - FIX: Critical Regression (AP 15). Data Setters were inside 'else' block, preventing '0' (N/A) from being saved.
   # Modified: 28.11.2025, 12:30 - FIX: Slider layout & value update logic (AP 18 Revision)
   # Modified: 28.11.2025, 13:00 - AP 21: CamelCase consolidation for generalComment
+  # Modified: 28.11.2025, 15:15 - AP 18: Refactored slider markup (DRY) and fixed layout/value update logic
 */
 
 import { CONFIG } from './config.js';
@@ -44,7 +45,6 @@ export class DataView {
     /**
      * Zentralisierte Methode zur Generierung des gesamten Slider-Markups.
      * Ersetzt die redundante HTML-Erzeugung in createHeaderSliderHTML und createSliderHTML.
-     * WICHTIG: Keine Zeilenumbrüche/Whitespace im Return-String, da Flexbox-Gap diese als Elemente interpretiert!
      */
     _generateSliderMarkup(domId, type, min, max, value, options = {}) {
         const {
@@ -58,7 +58,7 @@ export class DataView {
 
         const critAttr = rawId ? `data-crit-id="${rawId}"` : '';
         
-        // Kompakter HTML String ohne Whitespace zwischen Tags
+        // Kompakter HTML String
         const wrapperHTML = `<div class="slider-wrapper"><input type="range" id="${domId}" ${critAttr} class="fancy-slider ${extraInputClass}" min="${min}" max="${max}" value="${value}" data-type="${type}"><div class="slider-tooltip" id="tooltip_${domId}">${displayValue}</div></div>`;
 
         const leftLabel = showMinMaxLabels ? `<span class="slider-label">${min}</span>` : '';
@@ -199,12 +199,10 @@ export class DataView {
             partnerFeedback[partnerId] = {
                 frequency: isTestMode ? (Math.floor(Math.random() * 4) + 1) : 0,
                 nps: isTestMode ? (Math.floor(Math.random() * 11)) : CONFIG.WIZARD.NPS_RANGES.NA_VALUE, 
-                // HIER GEÄNDERT (AP 21): CamelCase
                 generalComment: ""
             };
         }
         const pf = partnerFeedback[partnerId];
-        // HIER GEÄNDERT (AP 21): CamelCase Zugriff
         const initialComment = this.callbacks.escapeHtml(pf.generalComment || '');
 
         const headerHTML = `
@@ -375,13 +373,13 @@ export class DataView {
                 displayValue = "Bitte wählen...";
                 tooltipText = displayValue;
             } else {
-                // NPS Text Logik (Replikation aus createHeaderSliderHTML)
+                // NPS Text Logik
                 if (value === -1) displayValue = "Möchte ich nicht bewerten";
                 else if (value === 0) displayValue = "0 - Auf keinen Fall";
                 else if (value >= 1 && value <= 3) displayValue = value + " - Eher nicht";
                 else if (value >= 4 && value <= 6) displayValue = value + " - Eher schon";
                 else if (value >= 7 && value <= 10) displayValue = value + " - Auf jeden Fall";
-                else displayValue = value; // Fallback
+                else displayValue = value; 
                 
                 tooltipText = displayValue;
             }
@@ -441,7 +439,7 @@ export class DataView {
             slider.classList.remove('slider-neutral');
         }
 
-        if (valueDisplay) valueDisplay.textContent = displayValue; // Jetzt korrekt mit Text für Freq/NPS
+        if (valueDisplay) valueDisplay.textContent = displayValue; // Zeigt jetzt Text
         if (tooltip && !isNeutral) tooltip.textContent = tooltipText;
     }
 }
