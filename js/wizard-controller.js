@@ -10,6 +10,7 @@
   # Modified: 27.11.2025, 15:50 - Deep Refactoring: Moved all Slider/Input Handler Logic from Controller to DataView (AP 10 Deep Refactoring)
   # Modified: 28.11.2025, 13:00 - AP 21: Mapping logic CamelCase <-> SnakeCase for Backend
   # Modified: 28.11.2025, 15:30 - AP 24: Use central toggleGlobalLoader from utils
+  # Modified: 28.11.2025, 16:30 - AP 26: Implemented dynamic button coloring (Blue=Active, Grey=Inactive)
 */
 
 import { CONFIG } from './config.js';
@@ -415,14 +416,31 @@ export class WizardController {
         }
     }
     
+    // AP 26: Dynamische Button-Klasse basierend auf 'enabled'
+    _updateButtonState(button, isEnabled) {
+        if (!button) return;
+        button.disabled = !isEnabled;
+        if (isEnabled) {
+            button.classList.add('btn-primary');
+            button.classList.remove('btn-secondary');
+        } else {
+            button.classList.add('btn-secondary');
+            button.classList.remove('btn-primary');
+        }
+    }
+
     updatePartnerNavigation() {
         const totalPartners = this.selectedPartners.length;
         const currentNum = this.currentPartnerIndex + 1;
         
         document.getElementById('partner-progress').textContent = `Partner ${currentNum} von ${totalPartners}`;
         
-        document.getElementById('prev-partner').disabled = this.currentPartnerIndex === 0;
-        document.getElementById('next-partner').disabled = this.currentPartnerIndex === totalPartners - 1;
+        const prevBtn = document.getElementById('prev-partner');
+        const nextBtn = document.getElementById('next-partner');
+
+        // AP 26: Dynamische Einfärbung
+        this._updateButtonState(prevBtn, this.currentPartnerIndex > 0);
+        this._updateButtonState(nextBtn, this.currentPartnerIndex < totalPartners - 1);
     }
 
     showStep(stepNumber) {
@@ -454,7 +472,8 @@ export class WizardController {
         const nextBtn = document.getElementById('next-btn');
         const submitBtn = document.getElementById('submit-btn');
         
-        prevBtn.disabled = this.currentStep === 1;
+        // AP 26: Dynamische Einfärbung
+        this._updateButtonState(prevBtn, this.currentStep > 1);
         
         if (this.currentStep === 4) {
             const isLastPartner = this.currentPartnerIndex === this.selectedPartners.length - 1;
@@ -476,11 +495,12 @@ export class WizardController {
             prevBtn.style.display = 'inline-flex';
         }
         
+        // AP 26: Dynamische Einfärbung für Next Button (Step 3 Check)
+        let nextEnabled = true;
         if (this.currentStep === 3) {
-            nextBtn.disabled = this.selectedPartners.length === 0;
-        } else {
-            nextBtn.disabled = false;
+            nextEnabled = this.selectedPartners.length > 0;
         }
+        this._updateButtonState(nextBtn, nextEnabled);
     }
 
     async submitSurvey() {
