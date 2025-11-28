@@ -9,10 +9,7 @@
         .filter-row { display: flex; gap: 24px; margin-bottom: 18px; }
         .filter-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
         .collapsing-tree-container { display: block; margin: 0 auto 24px auto; width: 100%; max-width: 600px; }
-        
-        /* HIER GEÄNDERT: Flex-Alignment für zweizeiliges Label */
         .slider-row { width: 100%; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; }
-        
         .analyse-btn-row { width: 100%; text-align: center; margin: 24px 0 0 0; }
         .matrix-controls { display: flex; gap: 15px; margin-bottom: 15px; background: #f1f2f6; padding: 8px 15px; border-radius: 20px; font-size: 14px; }
         .matrix-controls label { cursor: pointer; display: flex; align-items: center; gap: 5px; user-select: none; }
@@ -93,6 +90,20 @@
         <div class="info-modal-content">
             <span class="info-modal-close" id="close-info-modal">&times;</span>
             <div id="info-modal-body"></div>
+        </div>
+    </div>
+
+    <div id="login-modal" class="modal-overlay" style="display: none; background: rgba(0,0,0,0.9); z-index: 5000;">
+        <div class="modal-content-large" style="max-width: 400px; text-align: center;">
+            <h2 class="modal-headline">Anmeldung erforderlich</h2>
+            <p style="margin-bottom: 20px;">Bitte geben Sie das Passwort ein, um auf die Analyse zuzugreifen.</p>
+            <form id="login-form" autocomplete="off">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <input type="password" id="login-password" name="password" placeholder="Passwort" style="text-align: center; font-size: 1.2em;" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Anmelden</button>
+                <p id="login-error" class="text-danger-bold" style="margin-top: 15px; display: none;"></p>
+            </form>
         </div>
     </div>
 

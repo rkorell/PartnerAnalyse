@@ -16,6 +16,7 @@
   # Modified: 28.11.2025, 13:00 - AP 21: CamelCase consolidation for matrixDetails and generalComments
   # Modified: 28.11.2025, 15:45 - AP 24 FIX: Use central CONFIG/utils AND restored missing exportToCSV function
   # Modified: 28.11.2025, 16:00 - AP 25: Extracted HTML generation to templates.js
+  # Modified: 28.11.2025, 20:15 - AP 29.3: Implement proactive login gatekeeper
 */
 
 import { CONFIG } from './config.js';
@@ -41,6 +42,12 @@ document.addEventListener("DOMContentLoaded", function() {
     const matrixTitle = document.getElementById('matrix-title');
     const matrixTooltip = document.getElementById('matrix-tooltip');
     
+    // AP 29.3: Login Modal
+    const loginModal = document.getElementById('login-modal');
+    const loginForm = document.getElementById('login-form');
+    const loginPasswordInput = document.getElementById('login-password');
+    const loginError = document.getElementById('login-error');
+    
     const matrixRadios = document.querySelectorAll('input[name="matrix-center"]');
 
     let appTexts = {};
@@ -51,9 +58,11 @@ document.addEventListener("DOMContentLoaded", function() {
     let currentPartnerDetails = null;
     let currentFilterState = null; 
 
+    // Initial Load
     fetchSurveys();
     fetchDepartments();
 
+    // Event Listeners
     minAnswersSlider.addEventListener('input', () => { minAnswersValue.textContent = minAnswersSlider.value; });
     closeErrorBtn.addEventListener('click', () => { errorMessage.style.display = 'none'; });
     
@@ -66,6 +75,14 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     if(exportBtn) exportBtn.addEventListener('click', exportToCSV);
+
+    // AP 29.3: Login Form Handler
+    if (loginForm) {
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleLogin(loginPasswordInput.value);
+        });
+    }
 
     window.openInfoModal = function(category) {
         const content = appTexts[category] || "<p>Information wird geladen oder ist nicht verfügbar.</p>";
@@ -102,6 +119,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
+    // --- FIX AP 20: Event Handler für Tooltip ---
     matrixContainer.addEventListener('mouseenter', function(e) {
         const dot = e.target.closest('.matrix-dot');
         if (dot) {
@@ -124,6 +142,12 @@ document.addEventListener("DOMContentLoaded", function() {
         fetch('php/get_data.php')
             .then(response => response.json())
             .then(data => {
+                // AP 29.3: Check Auth Status Proactively
+                if (data.auth_status && data.auth_status.enabled && !data.auth_status.logged_in) {
+                    showLoginModal();
+                    return;
+                }
+
                 if (data.app_texts) appTexts = data.app_texts;
                 if (data && data.surveys) {
                     surveySelect.innerHTML = '';
@@ -147,12 +171,9 @@ document.addEventListener("DOMContentLoaded", function() {
         fetch('php/get_data.php')
             .then(response => response.json())
             .then(data => {
+                // Auth check is implicitly handled by fetchSurveys as well, but safe to ignore here if blocked
                 if (data.app_texts) appTexts = data.app_texts;
                 if (data && data.departments && departmentTreeContainer) {
-                    // Tree Render Logic (bleibt hier, da sehr spezifisch mit Event-Listenern)
-                    // Könnte man auch refactorn, aber Template-Fokus lag auf den Strings.
-                    // Ich lasse den komplexen Tree-Code hier, da er DOM Elemente erzeugt und nicht HTML-Strings.
-                    // Das passt nicht ganz ins Template-String-Konzept von AP 25.
                     departmentTreeContainer.innerHTML = '';
                     const departments = data.departments.map(dep => ({
                         ...dep,
@@ -253,6 +274,43 @@ document.addEventListener("DOMContentLoaded", function() {
             });
     }
 
+    // AP 29.3: Login Functions
+    function showLoginModal() {
+        if (loginModal) {
+            loginModal.style.display = 'flex';
+            if(loginPasswordInput) loginPasswordInput.focus();
+        }
+    }
+
+    function handleLogin(password) {
+        toggleGlobalLoader(true);
+        loginError.style.display = 'none';
+
+        fetch('php/login.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: password })
+        })
+        .then(response => response.json())
+        .then(data => {
+            toggleGlobalLoader(false);
+            if (data.success) {
+                // Erfolg: Seite neu laden, um App sauber zu initialisieren
+                location.reload();
+            } else {
+                loginError.textContent = data.error || 'Login fehlgeschlagen';
+                loginError.style.display = 'block';
+            }
+        })
+        .catch(err => {
+            toggleGlobalLoader(false);
+            loginError.textContent = 'Verbindungsfehler';
+            loginError.style.display = 'block';
+        });
+    }
+
+    function showLoader() { loadingOverlay._timeout = setTimeout(() => { loadingOverlay.style.display = 'flex'; }, 300); }
+    function hideLoader() { clearTimeout(loadingOverlay._timeout); loadingOverlay.style.display = 'none'; }
     function showError(msg) { errorText.textContent = msg; errorMessage.style.display = 'flex'; }
 
     function setExportButtonState(enabled) { 
@@ -295,7 +353,14 @@ document.addEventListener("DOMContentLoaded", function() {
                 min_answers: minAnswers
             })
         })
-        .then(resp => resp.json())
+        .then(resp => {
+            // AP 29.3: Falls Session abgelaufen ist (401), Login zeigen
+            if (resp.status === 401) {
+                showLoginModal();
+                throw new Error("Login required");
+            }
+            return resp.json();
+        })
         .then(data => {
             toggleGlobalLoader(false);
             if (Array.isArray(data) && data.length > 0) {
@@ -331,7 +396,9 @@ document.addEventListener("DOMContentLoaded", function() {
         })
         .catch(err => {
             toggleGlobalLoader(false);
-            showError("Analyse konnte nicht durchgeführt werden.");
+            if (err.message !== "Login required") {
+                showError("Analyse konnte nicht durchgeführt werden.");
+            }
             analysisData = [];
             setExportButtonState(false);
         });
@@ -343,7 +410,6 @@ document.addEventListener("DOMContentLoaded", function() {
         
         const globalCount = rows.length > 0 && rows[0].globalParticipantCount ? rows[0].globalParticipantCount : 0;
 
-        // AP 25: Template Usage
         let html = Tpl.getScoreTableStartHTML(`Ergebnis: Partner Score Ranking (Basierend auf ${globalCount} Teilnehmern)`);
 
         rows.forEach((row, idx) => {
@@ -353,13 +419,11 @@ document.addEventListener("DOMContentLoaded", function() {
                 : interpolateColor(CONFIG.COLORS.HEATMAP_MID, CONFIG.COLORS.HEATMAP_HIGH, (pct - 0.5) * 2);
             const rgb = `rgb(${color.join(',')})`;
 
-            // --- Insights Slots ---
             let slot1 = ''; 
             let slot2 = ''; 
             let slot3 = ''; 
             let slot4 = ''; 
 
-            // 1. NPS
             if (row.npsScore !== null && row.npsScore !== undefined) {
                 const nps = parseInt(row.npsScore);
                 let npsColor = CONFIG.COLORS.NPS_DETRACTOR; 
@@ -367,24 +431,18 @@ document.addEventListener("DOMContentLoaded", function() {
                 else if (nps > 30 && nps <= 70) npsColor = CONFIG.COLORS.NPS_PASSIVE_HIGH; 
                 else if (nps > 70) npsColor = CONFIG.COLORS.NPS_PROMOTER; 
                 
-                // AP 25: Template
                 slot1 = Tpl.getInsightNpsHTML(nps, npsColor);
             }
 
-            // 2. Kommentare (Flag/Count)
             const commentCount = parseInt(row.commentCount || 0);
             if (commentCount > 0) {
-                // AP 25: Template
                 slot2 = Tpl.getInsightIconHTML('comments', row.partnerId, `${commentCount} Kommentare - Klick für Details`, `💬 <span class="action-count">${commentCount}</span>`);
             }
 
-            // 3. Action List
             if (parseInt(row.hasActionItem) === 1) {
-                // AP 25: Template
                 slot3 = Tpl.getInsightIconHTML('action', row.partnerId, 'Handlungsbedarf - Klick für Details', '⚠️');
             }
 
-            // 4. Divergenz
             const maxDiv = parseFloat(row.maxDivergence || 0);
             const cntMgr = parseInt(row.numAssessorsMgr || 0);
             const cntTeam = parseInt(row.numAssessorsTeam || 0);
@@ -393,25 +451,21 @@ document.addEventListener("DOMContentLoaded", function() {
             
             if (cntMgr >= 3 && cntTeam >= 3 && maxDiv > conflictThreshold) {
                 const title = `Maximale Divergenz: ${maxDiv.toFixed(1)} (Schwellenwert: ${conflictThreshold})`;
-                // AP 25: Template
                 slot4 = Tpl.getInsightIconHTML('conflict', row.partnerId, title, '⚡');
             }
 
-            // AP 25: Template Usage
             html += Tpl.getScoreRowHTML(row, pct, rgb, { slot1, slot2, slot3, slot4 });
         });
         html += `</div>`;
 
-        // AP 25: Template Usage
         html += Tpl.getLegendHTML();
 
         resultSection.innerHTML = html;
     }
 
-    // NEU: Lädt Details nach, falls noch nicht vorhanden
     async function ensurePartnerDetails(partner) {
         if (partner.matrixDetails && partner.generalComments) {
-            return partner; // Bereits geladen
+            return partner; 
         }
 
         toggleGlobalLoader(true);
@@ -425,6 +479,12 @@ document.addEventListener("DOMContentLoaded", function() {
                 })
             });
             
+            // AP 29.3: Auth Check
+            if (response.status === 401) {
+                showLoginModal();
+                throw new Error("Login required");
+            }
+
             const details = await response.json();
             
             if (details.error) throw new Error(details.error);
@@ -434,7 +494,9 @@ document.addEventListener("DOMContentLoaded", function() {
             
             return partner;
         } catch (e) {
-            alert("Fehler beim Laden der Details: " + e.message);
+            if (e.message !== "Login required") {
+                alert("Fehler beim Laden der Details: " + e.message);
+            }
             return null;
         } finally {
             toggleGlobalLoader(false);
@@ -454,13 +516,11 @@ document.addEventListener("DOMContentLoaded", function() {
         if (action === 'comments') {
             title = `Kommentare zu ${escapeHtml(partner.partnerName)}`;
             if (partner.generalComments && partner.generalComments.length > 0) {
-                // AP 25 Template
                 content += Tpl.getCommentsListHTML('Allgemeines Feedback', partner.generalComments);
             }
             if (partner.matrixDetails) {
                 const specific = partner.matrixDetails.filter(d => d.comments && d.comments.length > 0);
                 if (specific.length > 0) {
-                    // AP 25 Template
                     content += Tpl.getSpecificCommentsHTML(specific);
                 }
             }
@@ -470,7 +530,6 @@ document.addEventListener("DOMContentLoaded", function() {
             if (partner.matrixDetails) {
                 const items = partner.matrixDetails.filter(d => parseFloat(d.imp) >= 8.0 && parseFloat(d.perf) <= 5.0);
                 if (items.length > 0) {
-                    // AP 25 Template
                     content += Tpl.getActionTableHTML(items);
                 }
             }
@@ -479,7 +538,6 @@ document.addEventListener("DOMContentLoaded", function() {
             title = `Signifikante Abweichungen: ${escapeHtml(partner.partnerName)}`;
             
             const partnerListRow = analysisData.find(p => p.partnerId == partnerId); 
-            const maxDiv = partnerListRow ? partnerListRow.maxDivergence : 0;
             
             if (partner.matrixDetails) {
                 const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
@@ -490,7 +548,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 });
                 
                 if (conflicts.length > 0) {
-                    // AP 25 Template
                     content += Tpl.getConflictTableHTML(conflicts);
                 } else {
                     content += `<p>Keine Kriterien gefunden, die den Schwellenwert von ${conflictThreshold} überschreiten.</p>`;
@@ -499,13 +556,14 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         const modalBody = document.getElementById('info-modal-body');
-        // AP 25 Template
         modalBody.innerHTML = Tpl.getModalContentHTML(title, content);
         document.getElementById('global-info-modal').style.display = 'flex';
     }
 
-    // --- IPA Matrix Logik ---
-    function calculateStats(details) { /* ... (bleibt gleich) ... */
+    // ... (restliche Matrix-Logik bleibt gleich, da sie keine Fetch-Calls macht) ...
+    // Ich füge die restlichen Funktionen hier ein, um die Datei vollständig zu liefern.
+
+    function calculateStats(details) {
         const imps = details.map(d => parseFloat(d.imp));
         const perfs = details.map(d => parseFloat(d.perf));
         const sumImp = imps.reduce((a,b) => a+b, 0);
@@ -544,7 +602,7 @@ document.addEventListener("DOMContentLoaded", function() {
         renderMatrixSVG(currentPartnerDetails.matrixDetails, centerX, centerY, maxDist);
     }
 
-    function calculateMaxDeviation(details, cx, cy) { /* ... (bleibt gleich) ... */
+    function calculateMaxDeviation(details, cx, cy) {
         let maxD = 0;
         details.forEach(d => {
             const dx = d.perf - cx;
@@ -555,7 +613,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function renderMatrixSVG(details, centerX, centerY, rangeRadius) {
-        // AP 24: Matrix Size aus Config
         const size = CONFIG.UI.MATRIX_SIZE;
         const scale = (size / 2) / rangeRadius;
         const mid = size / 2;
@@ -566,11 +623,9 @@ document.addEventListener("DOMContentLoaded", function() {
             const dy = d.imp - centerY; 
             const px = mid + (dx * scale);
             const py = mid - (dy * scale); 
-            // AP 25: Template Usage
             dotsHTML += Tpl.getMatrixDotHTML(px, py, d.name, d.imp, d.perf);
         });
         
-        // AP 25: Template Usage
         matrixContainer.innerHTML = Tpl.getMatrixSVG(size, centerX, centerY, dotsHTML);
     }
 

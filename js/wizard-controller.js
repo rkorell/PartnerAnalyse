@@ -12,24 +12,26 @@
   # Modified: 28.11.2025, 15:30 - AP 24: Use central toggleGlobalLoader from utils
   # Modified: 28.11.2025, 16:30 - AP 26: Implemented dynamic button coloring (Blue=Active, Grey=Inactive)
   # Modified: 28.11.2025, 17:00 - AP 27: Added LocalStorage persistence (Light version)
+  # Modified: 28.11.2025, 20:00 - AP 29.3: Integrated CSRF token handling
 */
 
 import { CONFIG } from './config.js';
 import { escapeHtml, toggleGlobalLoader } from './utils.js';
-import { DataView } from './wizard-data-view.js'; // NEU: Import DataView
-import { WizardFlow } from './wizard-flow.js';   // NEU: Import WizardFlow
+import { DataView } from './wizard-data-view.js'; 
+import { WizardFlow } from './wizard-flow.js';   
 
 const STORAGE_KEY = 'cpqi_wizard_state';
 
 export class WizardController {
     constructor() {
-        // --- STATE (Der Controller hält nur noch die Daten) ---
+        // --- STATE ---
         this.currentStep = 1;
         this.totalSteps = 5;
         this.currentPartnerIndex = 0;
         this.selectedPartners = [];
         
         this.surveyId = null;
+        this.csrfToken = null; // AP 29.3: Token Speicher
         this.isTestMode = false;
         this.hierarchyData = [];
         this.criteriaData = [];
@@ -69,7 +71,6 @@ export class WizardController {
 
     _loadState() {
         if (!CONFIG.WIZARD.USE_LOCAL_STORAGE) {
-            // Wenn Feature aus, sicherstellen, dass keine alten Daten stören
             this._clearState();
             return;
         }
@@ -80,14 +81,11 @@ export class WizardController {
 
             const saved = JSON.parse(json);
             
-            // Einfache Wiederherstellung der Datenobjekte
             if (saved.personalData) this.personalData = saved.personalData;
             if (saved.selectedPartners) this.selectedPartners = saved.selectedPartners;
             if (saved.importanceData) this.importanceData = saved.importanceData;
             if (saved.performanceData) this.performanceData = saved.performanceData;
             if (saved.partnerFeedback) this.partnerFeedback = saved.partnerFeedback;
-            
-            // UI-Update für Step 3 wird in setupPartnerSelection gehandhabt
             
         } catch (e) {
             console.warn('LocalStorage load failed, resetting:', e);
@@ -101,7 +99,7 @@ export class WizardController {
         } catch (e) {}
     }
 
-    // --- CALLBACKS ZUR STEUERUNG DER MODULE ---
+    // --- CALLBACKS ---
     _createCallbacks() {
         return {
             // General
@@ -112,13 +110,11 @@ export class WizardController {
             setupPerformanceEvaluation: () => this.setupPerformanceEvaluation(),
             showPartnerEvaluationPage: (idx) => this.showPartnerEvaluationPage(idx),
             getCurrentPartnerId: () => this.getCurrentPartnerId(),
-            escapeHtml: escapeHtml, // Aus utils.js
+            escapeHtml: escapeHtml, 
 
-            // Data Setter (Vom View aufgerufen, um den State zu aktualisieren)
-            // AP 27: Alle Setter triggern _saveState()
+            // Data Setter
             setCurrentStep: (step) => { 
                 this.currentStep = step; 
-                // Step speichern wir in "Light" nicht, aber ggf. Daten
             },
             setPersonalData: (data) => { 
                 this.personalData = data; 
@@ -137,13 +133,13 @@ export class WizardController {
                 this._saveState(); 
             },
             
-            // Event Binding wird direkt vom View ausgeführt
+            // Event Binding
             bindSliderEvents: (type) => this.view.bindSliderEvents(type),
             bindCommentEvents: (pId) => this.view.bindCommentEvents(pId)
         };
     }
     
-    // --- PRIVATE DATA SETTER (STATE LOGIC) ---
+    // --- PRIVATE DATA SETTER ---
     _setPartnerFeedback(pId, type, value) {
         if(!this.partnerFeedback[pId]) this.partnerFeedback[pId] = {};
         this.partnerFeedback[pId][type] = value;
@@ -167,10 +163,7 @@ export class WizardController {
         try {
             this.insertLogo();
             await this.loadConfigData();
-            
-            // AP 27: Daten laden BEVOR die UI aufgebaut wird
             this._loadState();
-
             this.setupUI();
             
             if (this.isTestMode) {
@@ -188,12 +181,12 @@ export class WizardController {
     
     setupUI() {
         this.setupHierarchyDropdowns();
-        this.view.setupImportanceCriteria(); // DELEGIERT
+        this.view.setupImportanceCriteria(); 
         this.setupPartnerSelection();
         this.updateNavigationButtons();
     }
 
-    // --- NAVIGATION DELEGIERT AN FLOW MODULE ---
+    // --- NAVIGATION DELEGIERT ---
     previousStep() { return this.flow.previousStep(); }
     nextStep() { return this.flow.nextStep(); }
     previousPartner() { return this.flow.previousPartner(); }
@@ -204,7 +197,6 @@ export class WizardController {
 
     // --- EVENT BINDING & HANDLER ---
     bindEvents() {
-        // Logik bleibt hier, da sie an this.flow delegiert:
         document.getElementById('prev-btn').addEventListener('click', () => this.flow.previousStep());
         document.getElementById('next-btn').addEventListener('click', () => this.flow.nextStep());
         document.getElementById('submit-btn').addEventListener('click', () => this.submitSurvey());
@@ -226,7 +218,7 @@ export class WizardController {
         });
     }
     
-    // --- HIERARCHIE & PARTNER SELECTION (Bleibt hier wegen DOM/State-Nähe) ---
+    // --- HIERARCHIE & PARTNER SELECTION ---
     setupHierarchyDropdowns() {
         const departmentSelect = document.getElementById('department');
         const departments = this.hierarchyData.filter(d => d.parent_id === null);
@@ -290,12 +282,10 @@ export class WizardController {
     }
 
     prefillTestData() {
-        // Step 1: Personal Data
         document.getElementById('name').value = "Test User " + Math.floor(Math.random() * 1000);
         document.getElementById('email').value = "test@example.com";
         document.getElementById('is_manager').checked = Math.random() < 0.3; 
 
-        // Step 1: Hierarchy Selection
         const leafs = this.hierarchyData.filter(d => d.level_depth === 3);
         if (leafs.length > 0) {
             const randomLeaf = leafs[Math.floor(Math.random() * leafs.length)];
@@ -306,12 +296,12 @@ export class WizardController {
                     const deptSelect = document.getElementById('department');
                     deptSelect.value = level1.id;
                     
-                    this.updateAreas(); // Füllt Area-Dropdown
+                    this.updateAreas(); 
                     
                     const areaSelect = document.getElementById('area');
                     areaSelect.value = level2.id;
                     
-                    this.updateTeams(); // Füllt Team-Dropdown
+                    this.updateTeams(); 
                     
                     const teamSelect = document.getElementById('team');
                     teamSelect.value = randomLeaf.id;
@@ -327,7 +317,6 @@ export class WizardController {
         container.innerHTML = ''; 
         
         this.partnerData.forEach((partner, index) => {
-            // AP 27: Check if partner is already selected (from loaded state)
             const isLoaded = this.selectedPartners.some(p => p.id == partner.id);
             const isSelected = isLoaded || (this.isTestMode && Math.random() < 0.3); 
 
@@ -342,9 +331,6 @@ export class WizardController {
             const checkbox = checkboxDiv.querySelector('input');
             checkbox.addEventListener('change', () => {
                 this.updatePartnerSelection(); 
-                // AP 27: Save on change (via updatePartnerSelection logic triggering setter?)
-                // Actually updatePartnerSelection modifies this.selectedPartners directly.
-                // We should manually trigger save here.
                 this._saveState();
 
                 if (checkbox.checked) {
@@ -357,7 +343,6 @@ export class WizardController {
             container.appendChild(checkboxDiv);
         });
 
-        // AP 27: Sync initial state if loaded
         this.updatePartnerSelection();
 
         if (this.isTestMode) {
@@ -388,7 +373,7 @@ export class WizardController {
         if (this.currentStep === 3) {
             nextBtn.disabled = this.selectedPartners.length === 0;
         }
-        this._updateButtonState(nextBtn, !nextBtn.disabled); // AP 26 fix update
+        this._updateButtonState(nextBtn, !nextBtn.disabled); 
     }
     
     // --- EVALUATION & PARTNER FLOW ---
@@ -410,11 +395,9 @@ export class WizardController {
             this.view.bindSliderEvents('performance');
             this.view.bindCommentEvents(partner.id); 
             
-            // Listener für General Comment
             document.getElementById(`gen_comment_${partner.id}`).addEventListener('input', (e) => {
-                // HIER GEÄNDERT (AP 21): CamelCase
                 this.partnerFeedback[partner.id].generalComment = e.target.value;
-                this._saveState(); // AP 27 Save
+                this._saveState(); 
             });
         });
         
@@ -449,10 +432,6 @@ export class WizardController {
         return null;
     }
     
-    // ... (updatePartnerNavigation, updateProgress, updateNavigationButtons, submitSurvey, etc.)
-    
-    // Hier nur die verbleibenden Methoden, die in der alten Klasse waren:
-
     insertLogo() {
         const header = document.querySelector('.header h1');
         if(header && !document.getElementById('cisco-logo')) {
@@ -475,6 +454,11 @@ export class WizardController {
             const data = await response.json();
             
             if (data.error) throw new Error(data.error);
+
+            // AP 29.3: CSRF Token sichern
+            if (data.csrf_token) {
+                this.csrfToken = data.csrf_token;
+            }
 
             if (Array.isArray(data.surveys) && data.surveys.length > 0) {
                 this.surveyId = data.surveys[0].id;
@@ -504,7 +488,6 @@ export class WizardController {
         }
     }
     
-    // AP 26: Dynamische Button-Klasse basierend auf 'enabled'
     _updateButtonState(button, isEnabled) {
         if (!button) return;
         button.disabled = !isEnabled;
@@ -526,7 +509,6 @@ export class WizardController {
         const prevBtn = document.getElementById('prev-partner');
         const nextBtn = document.getElementById('next-partner');
 
-        // AP 26: Dynamische Einfärbung
         this._updateButtonState(prevBtn, this.currentPartnerIndex > 0);
         this._updateButtonState(nextBtn, this.currentPartnerIndex < totalPartners - 1);
     }
@@ -560,7 +542,6 @@ export class WizardController {
         const nextBtn = document.getElementById('next-btn');
         const submitBtn = document.getElementById('submit-btn');
         
-        // AP 26: Dynamische Einfärbung
         this._updateButtonState(prevBtn, this.currentStep > 1);
         
         if (this.currentStep === 4) {
@@ -583,7 +564,6 @@ export class WizardController {
             prevBtn.style.display = 'inline-flex';
         }
         
-        // AP 26: Dynamische Einfärbung für Next Button (Step 3 Check)
         let nextEnabled = true;
         if (this.currentStep === 3) {
             nextEnabled = this.selectedPartners.length > 0;
@@ -592,14 +572,11 @@ export class WizardController {
     }
 
     async submitSurvey() {
-        // Auch beim Submit den aktuellen Partner validieren
         if (!this.flow.validatePartnerStep()) return;
 
-        // AP 24: toggleGlobalLoader
         toggleGlobalLoader(true);
         
         try {
-            // Strukturierung der Performance Daten für das Backend
             const performanceData = {};
             for (const partnerId in this.performanceData) {
                 performanceData[partnerId] = {};
@@ -609,27 +586,29 @@ export class WizardController {
                 }
             }
 
-            // HIER GEÄNDERT (AP 21): Mapping von CamelCase zurück zu SnakeCase für Backend
             const partnerFeedbackMapped = {};
             for (const pId in this.partnerFeedback) {
                 const fb = this.partnerFeedback[pId];
                 partnerFeedbackMapped[pId] = {
                     frequency: fb.frequency,
                     nps: fb.nps,
-                    general_comment: fb.generalComment // Mapping
+                    general_comment: fb.generalComment 
                 };
             }
 
             const surveyData = {
                 survey_id: this.surveyId,
-                department_id: this.personalData.finalDeptId, // Mapping
+                department_id: this.personalData.finalDeptId, 
                 name: this.personalData.name,
                 email: this.personalData.email,
-                is_manager: this.personalData.isManager, // Mapping
+                is_manager: this.personalData.isManager, 
                 
                 importance: this.importanceData,
                 performance: performanceData,
-                partner_feedback: partnerFeedbackMapped, // Mapped object
+                partner_feedback: partnerFeedbackMapped, 
+                
+                // AP 29.3: CSRF Token mitsenden
+                csrf_token: this.csrfToken,
                 
                 timestamp: new Date().toISOString()
             };
@@ -643,7 +622,6 @@ export class WizardController {
             const result = await response.json();
             
             if (response.ok && (result.status === 'success' || result.id)) {
-                // AP 27: Clear State on success
                 this._clearState();
                 
                 this.currentStep = 5;
@@ -663,7 +641,6 @@ export class WizardController {
     }
 
     restartSurvey() {
-        // AP 27: Sicherstellen, dass Speicher leer ist bei Neustart
         this._clearState();
         location.reload();
     }

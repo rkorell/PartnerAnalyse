@@ -12,11 +12,25 @@
   # Modified: 27.11.2025, 16:00 - Security Fix: Required db_connect.php via absolute, private path (AP 11)
   # Modified: 27.11.2025, 16:30 - Final FIX: require_once moved into try-block for stable error handling (AP 11 Final Fix)
   # Modified: 28.11.2025, 09:00 - Centralized DB config path & added error logging (AP 17)
+  # Modified: 28.11.2025, 18:45 - AP 29.2: Enable access protection
+  # Modified: 28.11.2025, 19:30 - FIX AP 29.2: Removed protection (must be public for survey participants)
+  # Modified: 28.11.2025, 20:00 - AP 29.3: Added CSRF token generation
+  # Modified: 28.11.2025, 20:15 - AP 29.3: Added auth_status for proactive frontend login
 */
 
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/common.php';
+
+// AP 29.3: Session starten für CSRF-Token und Login-Status
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// AP 29.3: CSRF-Token generieren, falls nicht vorhanden
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 
 // WICHTIG: require_once ist jetzt im try-Block, um PHP-Fatal-Errors abzufangen
 try {
@@ -24,7 +38,6 @@ try {
     
     // Surveys als Array
     $surveys = [];
-    // HIER GEÄNDERT: test_mode hinzugefügt
     $stmt = $pdo->query("SELECT id, name, test_mode FROM surveys ORDER BY start_date DESC, id DESC");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $surveys[] = [
@@ -44,14 +57,14 @@ try {
         ];
     }
 
-    // Criteria (Original Spaltennamen)
+    // Criteria
     $criteria = [];
     $stmt = $pdo->query("SELECT id, category, name, description, sort_order FROM criteria ORDER BY sort_order ASC, id ASC");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $criteria[] = $row;
     }
 
-    // Departments (Adjacency List)
+    // Departments
     $departments = [];
     $stmt = $pdo->query("SELECT id, name, parent_id, level_depth FROM departments ORDER BY level_depth ASC, name ASC");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -79,7 +92,12 @@ try {
         'partners'    => $partners,
         'criteria'    => $criteria,
         'departments' => $departments,
-        'app_texts'   => $app_texts
+        'app_texts'   => $app_texts,
+        'csrf_token'  => $_SESSION['csrf_token'],
+        'auth_status' => [
+            'enabled' => defined('USE_LOGIN') && USE_LOGIN,
+            'logged_in' => isset($_SESSION['user_id'])
+        ]
     ]);
 } catch (Exception $e) {
     error_log("Fehler in get_data.php: " . $e->getMessage());

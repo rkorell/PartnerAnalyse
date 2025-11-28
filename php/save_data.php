@@ -11,16 +11,31 @@
    # Modified: 27.11.2025, 16:00 - Security Fix: Required db_connect.php via absolute, private path (AP 11)
    # Modified: 27.11.2025, 16:30 - Final FIX: require_once moved into try-block for stable error handling (AP 11 Final Fix)
    # Modified: 28.11.2025, 09:00 - Centralized DB config path & added error logging (AP 17)
+   # Modified: 28.11.2025, 18:45 - AP 29.2: Enable access protection
+   # Modified: 28.11.2025, 19:30 - FIX AP 29.2: Removed protection (must be public for survey participants)
+   # Modified: 28.11.2025, 20:00 - AP 29.3: Added CSRF token validation
 */
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/common.php';
+
+// AP 29.3: Session starten für CSRF-Check
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $input = json_decode(file_get_contents('php://input'), true);
 
 if (!$input) {
     http_response_code(400);
     echo json_encode(['error' => 'Keine Daten empfangen']);
+    exit;
+}
+
+// --- AP 29.3: CSRF VALIDATION ---
+if (!isset($input['csrf_token']) || $input['csrf_token'] !== $_SESSION['csrf_token']) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Sicherheitswarnung: Ungültiger Session-Token. Bitte laden Sie die Seite neu.']);
     exit;
 }
 

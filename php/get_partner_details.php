@@ -8,11 +8,13 @@
   # Modified: 28.11.2025, 09:00 - Centralized DB config path & added error logging (AP 17)
   # Modified: 28.11.2025, 14:40 - AP 23.2: Refactored to use SQL function get_department_subtree() instead of inline CTE
   # Modified: 28.11.2025, 14:50 - AP 23.4: Refactored to use view_ratings_extended for simplified queries
+  # Modified: 28.11.2025, 18:45 - AP 29.2: Enable access protection
 */
 
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/common.php';
+require_once __DIR__ . '/protect.php'; // AP 29.2: Schutz aktivieren
 
 if (!file_exists(DB_CONFIG_PATH)) {
     http_response_code(500);
