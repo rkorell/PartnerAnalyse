@@ -7,14 +7,22 @@
   # Modified: 27.11.2025, 14:50 - Changed to ES6 module export (AP 8)
   # Modified: 28.11.2025, 15:30 - AP 24: Added COLORS and UI constants for modularization
   # Modified: 28.11.2025, 17:00 - AP 27: Added USE_LOCAL_STORAGE switch
+  # Modified: 29.11.2025, 20:10 - AP 32: Added ANALYSIS thresholds (Min Answers, Conflict) for validation phase
 */
 
 export const CONFIG = {
     // --- Konfiguration für den Analyse-Dashboard (score_analyse.js) ---
     ANALYSIS: {
         // Schwellenwert für die maximale Divergenz (Konflikt) zwischen Manager und Team.
-        // Hartcodiert in score_analyse.js: 2.0
         CONFLICT_THRESHOLD: 2.0, 
+        
+        // Standard-Wert für den Slider "Mindestanzahl Antworten" beim Laden
+        // Für Validierung auf 1 gesetzt (damit "Der Sanierungsfall" sichtbar ist)
+        MIN_ANSWERS_DEFAULT: 1,
+
+        // Mindestanzahl von Bewertern (pro Gruppe: Mgr/Team), damit ein Konflikt angezeigt wird
+        // Für Validierung auf 1 gesetzt (damit "Der Konflikt" auch bei kleinen Datenmengen sichtbar ist)
+        CONFLICT_MIN_ASSESSORS: 1,
     },
     
     // --- Konfiguration für den Eingabe-Wizard (app.js) ---

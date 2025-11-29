@@ -9,6 +9,7 @@
   # Modified: 28.11.2025, 14:30 - AP 23.2: Added view_ratings_extended to simplify PHP joins
   # Modified: 28.11.2025, 15:00 - FIX AP 23.2: Added missing participant_id to view_ratings_extended
   # Modified: 28.11.2025, 18:00 - AP 29.1: Added admin_users table for authentication
+  # Modified: 29.11.2025, 20:10 - AP 33: Added main analysis function calculate_partner_bilanz
 */
 
 DROP TABLE IF EXISTS admin_users CASCADE;
@@ -21,6 +22,7 @@ DROP TABLE IF EXISTS partners CASCADE;
 DROP TABLE IF EXISTS departments CASCADE;
 DROP TABLE IF EXISTS surveys CASCADE;
 DROP FUNCTION IF EXISTS get_department_subtree CASCADE;
+DROP FUNCTION IF EXISTS calculate_partner_bilanz CASCADE;
 DROP VIEW IF EXISTS view_ratings_extended CASCADE;
 
 -- 1. App Texte (Tooltips & Statische Texte)
@@ -179,3 +181,168 @@ SELECT
 FROM ratings r
 JOIN participants p ON r.participant_id = p.id
 JOIN criteria c ON r.criterion_id = c.id;
+
+/*
+  Funktion: calculate_partner_bilanz (AP 33)
+  Zweck: Zentrale Berechnung des Partner-Scores nach Modell V2.2 (Strategische Bilanz)
+*/
+CREATE OR REPLACE FUNCTION calculate_partner_bilanz(
+    p_survey_ids INT[],
+    p_dept_ids INT[],
+    p_manager_filter TEXT, 
+    p_min_answers INT
+)
+RETURNS TABLE (
+    partner_id INT,
+    partner_name VARCHAR,
+    score NUMERIC,
+    score_positive NUMERIC,
+    score_negative NUMERIC,
+    count_positive INT,
+    count_negative INT,
+    awareness_pct INT,
+    max_divergence NUMERIC,
+    has_action_item INT,
+    total_answers INT,
+    num_assessors_mgr INT,
+    num_assessors_team INT,
+    nps_score INT,
+    comment_count INT,
+    global_participant_count INT
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH
+    -- 1. Relevante Teilnehmer filtern
+    relevant_participants AS (
+        SELECT p.id, p.is_manager 
+        FROM participants p
+        WHERE p.survey_id = ANY(p_survey_ids)
+          AND p.department_id IN (SELECT id FROM get_department_subtree(p_dept_ids))
+          AND (
+              p_manager_filter = 'alle'
+              OR (p_manager_filter = 'nur_manager' AND p.is_manager = TRUE)
+              OR (p_manager_filter = 'nur_nicht_manager' AND p.is_manager = FALSE)
+          )
+    ),
+
+    -- 2. Wichtigkeit pro Kriterium (Separat berechnet!)
+    avg_importance AS (
+        SELECT 
+            r.criterion_id,
+            AVG(r.score) as val
+        FROM ratings r
+        JOIN relevant_participants rp ON r.participant_id = rp.id
+        WHERE r.rating_type = 'importance'
+        GROUP BY r.criterion_id
+    ),
+
+    -- 3. Performance pro Partner & Kriterium
+    partner_performance AS (
+        SELECT 
+            r.partner_id,
+            r.criterion_id,
+            -- Gewichteter Durchschnitt: Sum(Score * Freq) / Sum(Freq)
+            (SUM(r.score * COALESCE(pf.interaction_frequency, 1))::numeric / 
+             NULLIF(SUM(COALESCE(pf.interaction_frequency, 1)), 0)) as val,
+            
+            -- Hilfswerte
+            AVG(CASE WHEN rp.is_manager THEN r.score END) as val_mgr,
+            AVG(CASE WHEN NOT rp.is_manager THEN r.score END) as val_team,
+            COUNT(CASE WHEN r.comment IS NOT NULL AND trim(r.comment) <> '' THEN 1 END) as comment_cnt
+
+        FROM ratings r
+        JOIN relevant_participants rp ON r.participant_id = rp.id
+        LEFT JOIN partner_feedback pf ON r.participant_id = pf.participant_id AND r.partner_id = pf.partner_id
+        WHERE r.rating_type = 'performance' 
+          AND r.score IS NOT NULL 
+        GROUP BY r.partner_id, r.criterion_id
+    ),
+    
+    -- 4. Zusammenführung & Faktoren (Join via Criterion ID)
+    impacts AS (
+        SELECT
+            pp.partner_id,
+            pp.criterion_id,
+            pp.comment_cnt,
+            pp.val_mgr,
+            pp.val_team,
+            
+            -- Wichtigkeit (Hebel): 0, 2, 4, 7, 12
+            CASE ROUND(COALESCE(ai.val, 0)) 
+                WHEN 5 THEN 12 WHEN 4 THEN 7 WHEN 3 THEN 4 WHEN 2 THEN 2 ELSE 0 
+            END as f_imp,
+            
+            -- Performance (Wert): -2, -1, 0, +1, +2
+            CASE ROUND(COALESCE(pp.val, 3))
+                WHEN 5 THEN 2 WHEN 4 THEN 1 WHEN 3 THEN 0 WHEN 2 THEN -1 WHEN 1 THEN -2 ELSE 0
+            END as f_perf
+            
+        FROM partner_performance pp
+        LEFT JOIN avg_importance ai ON pp.criterion_id = ai.criterion_id
+    ),
+
+    -- 5. Bilanzierung
+    partner_bilanz AS (
+        SELECT
+            i.partner_id,
+            SUM(CASE WHEN (i.f_imp * i.f_perf) > 0 THEN (i.f_imp * i.f_perf) ELSE 0 END) as score_pos,
+            SUM(CASE WHEN (i.f_imp * i.f_perf) < 0 THEN (i.f_imp * i.f_perf) ELSE 0 END) as score_neg,
+            COUNT(CASE WHEN (i.f_imp * i.f_perf) > 0 THEN 1 END) as count_pos,
+            COUNT(CASE WHEN (i.f_imp * i.f_perf) < 0 THEN 1 END) as count_neg,
+            MAX(ABS(COALESCE(i.val_mgr, 0) - COALESCE(i.val_team, 0))) as max_div,
+            MAX(CASE WHEN i.f_imp >= 7 AND i.f_perf <= -1 THEN 1 ELSE 0 END) as has_action,
+            SUM(i.comment_cnt) as total_spec_comments
+        FROM impacts i
+        GROUP BY i.partner_id
+    ),
+
+    -- 6. Metadaten
+    partner_meta AS (
+        SELECT
+            r.partner_id,
+            COUNT(DISTINCT r.participant_id) as num_assessors,
+            COUNT(DISTINCT r.participant_id) FILTER (WHERE rp.is_manager) as num_assessors_mgr,
+            COUNT(DISTINCT r.participant_id) FILTER (WHERE NOT rp.is_manager) as num_assessors_team,
+            ROUND(100.0 * (COUNT(DISTINCT CASE WHEN pf.nps_score >= 9 THEN pf.participant_id END) - 
+                           COUNT(DISTINCT CASE WHEN pf.nps_score <= 6 THEN pf.participant_id END)) / 
+                           NULLIF(COUNT(DISTINCT CASE WHEN pf.nps_score IS NOT NULL THEN pf.participant_id END), 0), 0) as nps,
+            COUNT(DISTINCT CASE WHEN pf.general_comment IS NOT NULL AND trim(pf.general_comment) <> '' THEN pf.participant_id END) as cnt_gen_comments,
+            ROUND(100.0 * COUNT(CASE WHEN r.rating_type='performance' AND r.score IS NOT NULL THEN 1 END) / 
+                          NULLIF(COUNT(DISTINCT r.participant_id) * 20, 0), 0) as awareness
+        FROM ratings r
+        JOIN relevant_participants rp ON r.participant_id = rp.id
+        LEFT JOIN partner_feedback pf ON r.participant_id = pf.participant_id AND r.partner_id = pf.partner_id
+        WHERE r.rating_type = 'performance'
+        GROUP BY r.partner_id
+    ),
+    
+    global_total AS (
+        SELECT COUNT(id) as cnt FROM relevant_participants
+    )
+
+    -- Final Select
+    SELECT
+        p.id,
+        p.name,
+        (COALESCE(pb.score_pos, 0) + COALESCE(pb.score_neg, 0))::numeric as score,
+        COALESCE(pb.score_pos, 0)::numeric,
+        COALESCE(pb.score_neg, 0)::numeric,
+        COALESCE(pb.count_pos, 0)::int,
+        COALESCE(pb.count_neg, 0)::int,
+        COALESCE(pm.awareness, 0)::int,
+        COALESCE(pb.max_div, 0)::numeric,
+        COALESCE(pb.has_action, 0)::int,
+        COALESCE(pm.num_assessors, 0)::int,
+        COALESCE(pm.num_assessors_mgr, 0)::int,
+        COALESCE(pm.num_assessors_team, 0)::int,
+        COALESCE(pm.nps, 0)::int,
+        (COALESCE(pb.total_spec_comments, 0) + COALESCE(pm.cnt_gen_comments, 0))::int,
+        (SELECT cnt FROM global_total)::int
+    FROM partners p
+    JOIN partner_meta pm ON p.id = pm.partner_id
+    LEFT JOIN partner_bilanz pb ON p.id = pb.partner_id
+    WHERE pm.num_assessors >= p_min_answers
+    ORDER BY (COALESCE(pb.score_pos, 0) + COALESCE(pb.score_neg, 0)) DESC;
+END;
+$$ LANGUAGE plpgsql;

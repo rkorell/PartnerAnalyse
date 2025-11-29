@@ -19,6 +19,7 @@
   # Modified: 28.11.2025, 20:15 - AP 29.3: Implement proactive login gatekeeper
   # Modified: 29.11.2025, 12:00 - AP 31: Map awarenessPct to frontend
   # Modified: 29.11.2025, 16:00 - CRITICAL FIX: Restored missing Tree-View logic & Implemented DBC Visuals (AP I.3)
+  # Modified: 29.11.2025, 20:10 - AP 32: Use CONFIG for Min Answers default and Conflict threshold
 */
 
 import { CONFIG } from './config.js';
@@ -60,6 +61,7 @@ document.addEventListener("DOMContentLoaded", function() {
     let currentFilterState = null; 
 
     // Initial Load
+    initializeFilters();
     fetchSurveys();
     fetchDepartments();
 
@@ -127,6 +129,14 @@ document.addEventListener("DOMContentLoaded", function() {
              matrixTooltip.style.visibility = 'hidden'; 
         }
     }, true);
+
+    // AP 32: Initialisierung der Filter aus Config
+    function initializeFilters() {
+        if (CONFIG.ANALYSIS.MIN_ANSWERS_DEFAULT) {
+            minAnswersSlider.value = CONFIG.ANALYSIS.MIN_ANSWERS_DEFAULT;
+            minAnswersValue.textContent = CONFIG.ANALYSIS.MIN_ANSWERS_DEFAULT;
+        }
+    }
 
     // Login Helper
     function showLoginModal() {
@@ -460,8 +470,10 @@ document.addEventListener("DOMContentLoaded", function() {
             const cntMgr = parseInt(row.numAssessorsMgr || 0);
             const cntTeam = parseInt(row.numAssessorsTeam || 0);
             const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
+            const conflictMinAssessors = CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS || 1; // Default 1 (aus AP 32)
             
-            if (cntMgr >= 3 && cntTeam >= 3 && maxDiv > conflictThreshold) {
+            // AP 32: Nutze Config-Wert für Konflikt-Erkennung
+            if (cntMgr >= conflictMinAssessors && cntTeam >= conflictMinAssessors && maxDiv > conflictThreshold) {
                 const title = `Maximale Divergenz: ${maxDiv.toFixed(1)} (Schwellenwert: ${conflictThreshold})`;
                 slot4 = Tpl.getInsightIconHTML('conflict', row.partnerId, title, '⚡');
             }
