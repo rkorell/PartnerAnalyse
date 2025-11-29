@@ -1,224 +1,185 @@
 <?php
-/* DATEI: php/save_data.php
-   FUNKTION: Validiert eingehende Survey-Daten und speichert sie transaktionssicher in der Datenbank.
-   (c) - Dr. Ralf Korell, 2025/26
+/*
+  DATEI: php/partner_score_analyse.php
+  Zweck: Analyse-API für Partner-Score-Berechnung mit Filter
+  (c) - Dr. Ralf Korell, 2025/26
 
-   # Modified: 22.11.2025 - Speichert Name und Email
-   # Modified: 24.11.2025, 23:45 - Handle 0 as NULL for performance ratings
-   # Modified: 26.11.2025, 20:50 - Added support for comments and partner_feedback table (NPS/Frequency)
-   # Modified: 27.11.2025, 13:30 - Strict Backend Input Validation (Range Check, Type Check, Fail-Fast)
-   # Modified: 27.11.2025, 13:50 - Safer transaction handling (check inTransaction before rollback) (AP 5)
-   # Modified: 27.11.2025, 16:00 - Security Fix: Required db_connect.php via absolute, private path (AP 11)
-   # Modified: 27.11.2025, 16:30 - Final FIX: require_once moved into try-block for stable error handling (AP 11 Final Fix)
-   # Modified: 28.11.2025, 09:00 - Centralized DB config path & added error logging (AP 17)
-   # Modified: 28.11.2025, 18:45 - AP 29.2: Enable access protection
+  # Modified: 28.11.2025, 14:50 - AP 23.4: Refactored to use view_ratings_extended for simplified queries
+  # Modified: 28.11.2025, 18:45 - AP 29.2: Enable access protection
+  # Modified: 29.11.2025, 10:45 - FIX: Restored correct content (was accidentally overwritten with save_data.php code)
 */
+
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/common.php';
-require_once __DIR__ . '/protect.php'; // AP 29.2: Schutz aktivieren
+require_once __DIR__ . '/protect.php'; // Analyse MUSS geschützt sein!
+
+if (!file_exists(DB_CONFIG_PATH)) {
+    http_response_code(500);
+    echo json_encode(["error" => "Interner Serverfehler (Konfiguration nicht gefunden)."]);
+    exit;
+}
+
+require_once DB_CONFIG_PATH;
 
 $input = json_decode(file_get_contents('php://input'), true);
 
-if (!$input) {
+if (!is_array($input)) {
     http_response_code(400);
-    echo json_encode(['error' => 'Keine Daten empfangen']);
+    echo json_encode(["error" => "Ungültiger Request."]);
     exit;
 }
 
-// --- VALIDATION HELPER ---
-// Prüft, ob ein Wert eine Ganzzahl im gegebenen Bereich ist.
-function validateIntRange($value, $min, $max) {
-    // NULL oder leerer String ist ungültig, da wir das im save-Teil explizit mappen
-    if ($value === null || $value === "") {
-        return false;
-    }
-    // Strikter Check, ob es sich um eine Zahl handelt (keine Strings wie "abc")
-    if (!is_numeric($value)) { 
-        return false;
-    }
-    $val = intval($value);
-    
-    // Strikter Check, ob z.B. "5.5" als 5 gespeichert würde (Sicherstellung, dass nur Integer ankommen)
-    if ((string)$val !== (string)$value && (string)($val . ".0") !== (string)$value) {
-        return false;
-    }
-    
-    return ($val >= $min && $val <= $max);
-}
+$survey_ids     = $input['survey_ids'] ?? [];
+$manager_filter = $input['manager_filter'] ?? "alle";
+$department_ids = $input['department_ids'] ?? [];
+$min_answers    = isset($input['min_answers']) ? intval($input['min_answers']) : 1;
 
-// --- CORE VALIDATION & DATA PREPARATION ---
-
-// 1. Participant/Survey Data (Muss positiv sein)
-$surveyId = $input['survey_id'] ?? null;
-$departmentId = $input['department_id'] ?? null;
-$name = trim($input['name'] ?? '');
-$email = trim($input['email'] ?? '');
-$isManager = isset($input['is_manager']) && $input['is_manager'] === true ? 'true' : 'false';
-
-if (!validateIntRange($surveyId, 1, PHP_INT_MAX) || !validateIntRange($departmentId, 1, PHP_INT_MAX)) {
+if (empty($survey_ids) || empty($department_ids)) {
     http_response_code(400);
-    echo json_encode(['error' => 'Ungültige Survey- oder Abteilungs-ID (muss positive Ganzzahl sein).']);
+    echo json_encode(["error" => "Filter unvollständig."]);
     exit;
 }
 
-// 2. Importance (Muss 1-10 sein, Pflichtfeld)
-if (empty($input['importance']) || !is_array($input['importance'])) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Wichtigkeitsbewertungen fehlen.']);
-    exit;
-}
-foreach ($input['importance'] as $critId => $score) {
-    // Wichtigkeit MUSS zwischen 1 und 10 liegen (kein 0/N/A)
-    if (!validateIntRange($score, 1, 10)) {
-        http_response_code(400);
-        echo json_encode(['error' => "Ungültiger Wert für Wichtigkeit Kriterium {$critId}. Erlaubt: 1-10."]);
-        exit;
-    }
-}
+// Array-String für PostgreSQL Funktion vorbereiten "{1,2,3}"
+$dept_array_string = '{' . implode(',', array_map('intval', $department_ids)) . '}';
 
-// 3. Performance (Muss 0-10 sein, 0 wird zu NULL gemappt)
-if (isset($input['performance']) && is_array($input['performance'])) {
-    foreach ($input['performance'] as $partnerId => $criteriaList) {
-        if (!is_array($criteriaList) || !validateIntRange($partnerId, 1, PHP_INT_MAX)) {
-            http_response_code(400);
-            echo json_encode(['error' => "Ungültiger Partner-ID oder Kriterienliste."]);
-            exit;
-        }
-        foreach ($criteriaList as $critId => $data) {
-            $val = 0;
-            if (is_array($data)) {
-                $val = $data['score'] ?? 0;
-            } else {
-                $val = $data; // Legacy number format
-            }
-            
-            // Performance Score muss 0-10 sein
-            if (!validateIntRange($val, 0, 10)) {
-                http_response_code(4_00);
-                echo json_encode(['error' => "Ungültiger Performance-Score für Partner {$partnerId} / Kriterium {$critId}. Erlaubt: 0-10."]);
-                exit;
-            }
-        }
-    }
-}
+// Survey Placeholders
+$survey_placeholders = implode(',', array_fill(0, count($survey_ids), '?'));
 
-// 4. Partner Feedback (Frequency, NPS)
-if (isset($input['partner_feedback']) && is_array($input['partner_feedback'])) {
-    foreach ($input['partner_feedback'] as $partnerId => $fb) {
-        
-        // Frequency check (0-4 validiert)
-        $freq = $fb['frequency'] ?? 0; // Frontend sendet 0 für "Bitte wählen..."
-        if (!validateIntRange($freq, 0, 4)) {
-            http_response_code(400);
-            echo json_encode(['error' => "Ungültige Frequenz für Partner {$partnerId}. Erlaubt: 0-4."]);
-            exit;
-        }
+// Filter-Logik für WHERE-Klauseln (jetzt direkt auf Spalten des Views/Tabelle)
+$manager_sql = "";
+if ($manager_filter === "nur_manager") $manager_sql = "AND is_manager = TRUE";
+else if ($manager_filter === "nur_nicht_manager") $manager_sql = "AND is_manager = FALSE";
 
-        // NPS check (-2 to 10 validiert)
-        $nps = $fb['nps'] ?? -2; // Frontend sendet -2 für "Bitte wählen..."
-        if (!validateIntRange($nps, -2, 10)) {
-            http_response_code(400);
-            echo json_encode(['error' => "Ungültiger NPS-Wert für Partner {$partnerId}. Erlaubt: -2 bis 10."]);
-            exit;
-        }
-    }
-}
+// Manager-Filter für Tabellen mit Alias 'p' (participants)
+$manager_sql_p = "";
+if ($manager_filter === "nur_manager") $manager_sql_p = "AND p.is_manager = TRUE";
+else if ($manager_filter === "nur_nicht_manager") $manager_sql_p = "AND p.is_manager = FALSE";
 
-// --- SPEICHERUNG (Start der Transaktion) ---
-
-// WICHTIG: require_once ist jetzt im try-Block, um PHP-Fatal-Errors abzufangen
 try {
     require_once DB_CONFIG_PATH;
 
-    $pdo->beginTransaction();
+    // QUERY REFACTORING (AP 23.4): Nutzung von view_ratings_extended
+    $sql = "
+WITH subdeps AS (
+  SELECT id FROM get_department_subtree(?::int[])
+),
+global_stats AS (
+  SELECT COUNT(DISTINCT participant_id) as unique_assessors_total
+    FROM view_ratings_extended
+   WHERE rating_type = 'performance'
+     AND survey_id IN ($survey_placeholders)
+     AND department_id IN (SELECT id FROM subdeps)
+     $manager_sql
+),
+assessor_counts AS (
+  SELECT partner_id, 
+         COUNT(DISTINCT participant_id) as num_assessors,
+         COUNT(DISTINCT participant_id) FILTER (WHERE is_manager) as num_assessors_mgr,
+         COUNT(DISTINCT participant_id) FILTER (WHERE NOT is_manager) as num_assessors_team
+    FROM view_ratings_extended
+   WHERE rating_type = 'performance'
+     AND survey_id IN ($survey_placeholders)
+     AND department_id IN (SELECT id FROM subdeps)
+     $manager_sql
+   GROUP BY partner_id
+),
+feedback_stats AS (
+  -- Hier müssen wir partner_feedback mit participants joinen, da nicht im View
+  SELECT f.partner_id,
+         COUNT(f.general_comment) as cnt_gen_comments,
+         ROUND(100.0 * (COUNT(*) FILTER (WHERE f.nps_score >= 9) - COUNT(*) FILTER (WHERE f.nps_score <= 6)) / NULLIF(COUNT(f.nps_score), 0), 0) as nps_score
+    FROM partner_feedback f
+    JOIN participants p ON f.participant_id = p.id
+   WHERE p.survey_id IN ($survey_placeholders)
+     AND p.department_id IN (SELECT id FROM subdeps)
+     $manager_sql_p
+   GROUP BY f.partner_id
+),
+importance_avg AS (
+  SELECT criterion_id, AVG(score) AS importance
+    FROM view_ratings_extended
+   WHERE rating_type = 'importance'
+     AND survey_id IN ($survey_placeholders)
+     AND department_id IN (SELECT id FROM subdeps)
+     $manager_sql
+   GROUP BY criterion_id
+),
+performance_avg AS (
+  SELECT partner_id, criterion_id, 
+         AVG(score) AS performance,
+         AVG(score) FILTER (WHERE is_manager) as perf_mgr,
+         AVG(score) FILTER (WHERE NOT is_manager) as perf_team,
+         COUNT(comment) as cnt_spec_comments
+    FROM view_ratings_extended
+   WHERE rating_type = 'performance'
+     AND survey_id IN ($survey_placeholders)
+     AND department_id IN (SELECT id FROM subdeps)
+     $manager_sql
+   GROUP BY partner_id, criterion_id
+)
+SELECT
+  pa.id         AS partner_id,
+  pa.name       AS partner_name,
+  
+  -- Gesamt Score
+  ROUND(SUM(pf.performance * ia.importance)::numeric, 2) AS score,
+  
+  -- Indikator ⚡: Maximale Divergenz
+  MAX(ABS(COALESCE(pf.perf_mgr, 0) - COALESCE(pf.perf_team, 0))) AS max_divergence,
+  
+  -- Indikator ⚠️: Action Item Flag
+  MAX(CASE WHEN ia.importance >= 8.0 AND pf.performance <= 5.0 THEN 1 ELSE 0 END) as has_action_item,
 
-    // 1. Teilnehmer anlegen (Verwendet trim-ed Name/Email und validierte IDs)
-    $stmt = $pdo->prepare("INSERT INTO participants (survey_id, department_id, is_manager, name, email) VALUES (?, ?, ?, ?, ?) RETURNING id");
-    
-    $stmt->execute([
-        $surveyId,
-        $departmentId, 
-        $isManager,
-        $name,
-        $email
-    ]);
-    
-    $participantId = $stmt->fetchColumn();
+  -- Beurteiler-Zahlen
+  MAX(ac.num_assessors) AS total_answers,
+  MAX(ac.num_assessors_mgr) AS num_assessors_mgr,
+  MAX(ac.num_assessors_team) AS num_assessors_team,
+  
+  -- Insights Daten
+  MAX(fs.nps_score) as nps_score,
+  (COALESCE(SUM(pf.cnt_spec_comments), 0) + COALESCE(MAX(fs.cnt_gen_comments), 0)) as comment_count,
+  
+  -- Globaler Zähler
+  (SELECT unique_assessors_total FROM global_stats) AS global_participant_count
 
-    // 2. Bewertungen speichern
-    $stmtRating = $pdo->prepare("INSERT INTO ratings (participant_id, criterion_id, partner_id, rating_type, score, comment) VALUES (?, ?, ?, ?, ?, ?)");
+FROM performance_avg pf
+JOIN importance_avg ia ON pf.criterion_id = ia.criterion_id
+JOIN partners pa ON pa.id = pf.partner_id
+JOIN assessor_counts ac ON ac.partner_id = pa.id 
+LEFT JOIN feedback_stats fs ON fs.partner_id = pa.id 
 
-    // A) Importance (Kriterien-Wichtigkeit)
-    if (isset($input['importance'])) {
-        foreach ($input['importance'] as $critId => $score) {
-            // Bereits validiert (1-10)
-            $val = intval($score);
-            $stmtRating->execute([$participantId, $critId, NULL, 'importance', $val, NULL]);
-        }
+GROUP BY pa.id, pa.name
+HAVING MAX(ac.num_assessors) >= ? 
+ORDER BY score DESC
+    ";
+
+    $params = [];
+    $params[] = $dept_array_string; // Parameter 1: Department IDs
+    // Survey IDs werden mehrfach benötigt (für jede CTE)
+    for($i=0; $i<5; $i++) {
+        foreach ($survey_ids as $id) $params[] = intval($id);
+    }
+    $params[] = $min_answers; // Letzter Parameter
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!$result) {
+        echo json_encode(["message" => "Keine Daten bei dieser Auswahl"]);
+        exit;
     }
 
-    // B) Performance (Partner-Bewertung)
-    if (isset($input['performance'])) {
-        foreach ($input['performance'] as $partnerId => $criteriaList) {
-            foreach ($criteriaList as $critId => $data) {
-                // Bereits validiert (0-10)
-                $val = 0;
-                $comment = NULL;
-
-                if (is_array($data)) {
-                    $val = isset($data['score']) ? intval($data['score']) : 0;
-                    if (isset($data['comment']) && trim($data['comment']) !== '') {
-                        $comment = trim($data['comment']); // Trimmen
-                    }
-                } else {
-                    $val = intval($data);
-                }
-
-                // 0 -> NULL Mapping für Score
-                $scoreParam = ($val === 0) ? NULL : $val;
-                
-                $stmtRating->execute([$participantId, $critId, $partnerId, 'performance', $scoreParam, $comment]);
-            }
-        }
-    }
-
-    // 3. Partner Feedback speichern (Kopfdaten: Frequenz, NPS, Globaler Text)
-    if (isset($input['partner_feedback'])) {
-        $stmtFeedback = $pdo->prepare("INSERT INTO partner_feedback (participant_id, partner_id, interaction_frequency, nps_score, general_comment) VALUES (?, ?, ?, ?, ?)");
-
-        foreach ($input['partner_feedback'] as $partnerId => $fb) {
-            
-            // Frequency (0-4 validiert)
-            $freq = isset($fb['frequency']) ? intval($fb['frequency']) : NULL;
-            if ($freq === 0) $freq = NULL; // 0 -> NULL Mapping
-
-            // NPS (-2 to 10 validiert)
-            $nps = isset($fb['nps']) ? intval($fb['nps']) : NULL;
-            // -2 ("Bitte wählen...") und -1 ("Möchte nicht bewerten") mappen auf NULL
-            if ($nps === -2 || $nps === -1) $nps = NULL; 
-
-            // General Comment
-            $genComment = NULL;
-            if (isset($fb['general_comment']) && trim($fb['general_comment']) !== '') {
-                $genComment = trim($fb['general_comment']); // Trimmen
-            }
-
-            $stmtFeedback->execute([$participantId, $partnerId, $freq, $nps, $genComment]);
-        }
-    }
-
-    $pdo->commit();
-    echo json_encode(['status' => 'success', 'id' => $participantId]);
+    echo json_encode($result);
 
 } catch (Exception $e) {
-    error_log("Fehler in save_data.php: " . $e->getMessage());
-    // HIER GEÄNDERT: Rollback nur, wenn Transaktion noch aktiv ist
+    error_log("Fehler in partner_score_analyse.php: " . $e->getMessage());
     if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
     http_response_code(500);
-    // Neutralere Fehlermeldung, um DB-Details nicht preiszugeben
-    echo json_encode(['error' => 'Speicherfehler auf dem Server. Bitte überprüfe die Eingaben oder versuche es später erneut.']);
+    echo json_encode(["error" => "Fehler bei der Analyse-Abfrage."]);
 }
 ?>

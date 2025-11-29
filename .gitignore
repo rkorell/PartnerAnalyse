@@ -35,7 +35,7 @@ MANIFEST
 # SECURITY! - database connection information
 php/db_connect.php
 php/MagicMirrorModuleStats.php
-
+index.sql
 # AP 29.1a: Local Admin Helper
 change_pw.sh
 
