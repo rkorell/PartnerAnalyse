@@ -9,7 +9,8 @@
   # Modified: 28.11.2025, 14:30 - AP 23.2: Added view_ratings_extended to simplify PHP joins
   # Modified: 28.11.2025, 15:00 - FIX AP 23.2: Added missing participant_id to view_ratings_extended
   # Modified: 28.11.2025, 18:00 - AP 29.1: Added admin_users table for authentication
-  # Modified: 29.11.2025, 20:10 - AP 33: Added main analysis function calculate_partner_bilanz
+  # Modified: 29.11.2025, 20:30 - AP 33: Added main analysis function calculate_partner_bilanz
+  # Modified: 29.11.2025, 22:45 - AP 34: Updated calculate_partner_bilanz to use V2.3 Linear Model (No Rounding)
 */
 
 DROP TABLE IF EXISTS admin_users CASCADE;
@@ -183,8 +184,9 @@ JOIN participants p ON r.participant_id = p.id
 JOIN criteria c ON r.criterion_id = c.id;
 
 /*
-  Funktion: calculate_partner_bilanz (AP 33)
-  Zweck: Zentrale Berechnung des Partner-Scores nach Modell V2.2 (Strategische Bilanz)
+  Funktion: calculate_partner_bilanz (AP 33 / AP 34 Update)
+  Zweck: Zentrale Berechnung des Partner-Scores nach Modell V2.3 (Lineares Modell / Continuous Net Value)
+  Änderung V2.3: Keine Rundung mehr bei Performance. Abweichung vom Mittelwert (3.0) wird berechnet.
 */
 CREATE OR REPLACE FUNCTION calculate_partner_bilanz(
     p_survey_ids INT[],
@@ -268,15 +270,15 @@ BEGIN
             pp.val_mgr,
             pp.val_team,
             
-            -- Wichtigkeit (Hebel): 0, 2, 4, 7, 12
+            -- Wichtigkeit (Hebel): Bleibt Stufenmodell (0, 2, 4, 7, 12)
             CASE ROUND(COALESCE(ai.val, 0)) 
                 WHEN 5 THEN 12 WHEN 4 THEN 7 WHEN 3 THEN 4 WHEN 2 THEN 2 ELSE 0 
             END as f_imp,
             
-            -- Performance (Wert): -2, -1, 0, +1, +2
-            CASE ROUND(COALESCE(pp.val, 3))
-                WHEN 5 THEN 2 WHEN 4 THEN 1 WHEN 3 THEN 0 WHEN 2 THEN -1 WHEN 1 THEN -2 ELSE 0
-            END as f_perf
+            -- Performance (Wert): LINEARES MODELL V2.3
+            -- Berechnung der Abweichung vom Neutralwert 3.0
+            -- Beispiel: Note 3.5 -> +0.5 | Note 2.33 -> -0.67
+            (COALESCE(pp.val, 3.0) - 3.0) as f_perf
             
         FROM partner_performance pp
         LEFT JOIN avg_importance ai ON pp.criterion_id = ai.criterion_id
@@ -291,7 +293,11 @@ BEGIN
             COUNT(CASE WHEN (i.f_imp * i.f_perf) > 0 THEN 1 END) as count_pos,
             COUNT(CASE WHEN (i.f_imp * i.f_perf) < 0 THEN 1 END) as count_neg,
             MAX(ABS(COALESCE(i.val_mgr, 0) - COALESCE(i.val_team, 0))) as max_div,
-            MAX(CASE WHEN i.f_imp >= 7 AND i.f_perf <= -1 THEN 1 ELSE 0 END) as has_action,
+            
+            -- Action Item Logik angepasst an lineares Modell:
+            -- f_perf <= -1.0 entspricht einer Note <= 2.0 (Echtes Defizit)
+            MAX(CASE WHEN i.f_imp >= 7 AND i.f_perf <= -1.0 THEN 1 ELSE 0 END) as has_action,
+            
             SUM(i.comment_cnt) as total_spec_comments
         FROM impacts i
         GROUP BY i.partner_id

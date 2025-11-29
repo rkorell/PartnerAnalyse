@@ -6,6 +6,7 @@
   # Created: 28.11.2025, 16:00 - AP 25: Extracted HTML templates from logic files
   # Modified: 29.11.2025, 12:00 - AP 31: Added Awareness display to score row
   # Modified: 29.11.2025, 14:30 - AP I.3: Added Diverging Bar Chart (DBC) and New Matrix Templates
+  # Modified: 29.11.2025, 23:15 - AP 35: Redesigned Matrix SVG (Solid Cross, No Origin Label, Larger End Labels)
 */
 
 import { escapeHtml } from './utils.js';
@@ -107,9 +108,6 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
     const awPct = row.awarenessPct || 0;
     const pieStyle = `background: conic-gradient(${awarenessColor} 0% ${awPct}%, #ecf0f1 ${awPct}% 100%);`;
 
-    // AP I.3: Text im/am Balken: "Wert (Anzahl)"
-    // Wir prüfen, ob der Balken breit genug für Text ist (z.B. > 10%)
-    // Wenn nicht, rendern wir den Text leer oder daneben (hier einfach abgeschnitten durch overflow:hidden im CSS)
     const txtPos = posWidth > 0 ? `${posScore} (${posCount})` : '';
     const txtNeg = negWidth > 0 ? `${negScore} (${negCount})` : '';
 
@@ -226,6 +224,7 @@ export function getMatrixSVG_Standard(dotsHTML) {
     const padding = 40; 
     const plotSize = size - padding;
     
+    // AP 35: Design-Korrekturen (Dezentes Kreuz, 5er-Labels größer, 1er-Label weg)
     return `<svg viewBox="0 0 ${size} ${size}" class="matrix-svg">
         <defs>
             <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
@@ -239,12 +238,12 @@ export function getMatrixSVG_Standard(dotsHTML) {
         <line x1="${padding}" y1="${plotSize}" x2="${size-10}" y2="${plotSize}" class="matrix-axis-line" />
         <text x="${padding + plotSize/2}" y="${size-5}" class="matrix-axis-label" text-anchor="middle">Leistung (1-5)</text>
 
-        <line x1="220" y1="${plotSize}" x2="220" y2="0" class="matrix-grid-line" stroke-dasharray="4" />
-        <line x1="${padding}" y1="180" x2="${size}" y2="180" class="matrix-grid-line" stroke-dasharray="4" />
+        <line x1="220" y1="${plotSize}" x2="220" y2="0" class="matrix-cross-line" />
+        <line x1="${padding}" y1="180" x2="${size}" y2="180" class="matrix-cross-line" />
         
-        <text x="${padding - 10}" y="${plotSize}" class="matrix-axis-label" style="font-size:10px;">1</text>
-        <text x="${padding - 10}" y="20" class="matrix-axis-label" style="font-size:10px;">5</text>
-        <text x="${size - 20}" y="${plotSize + 15}" class="matrix-axis-label" style="font-size:10px;">5</text>
+        <text x="${padding - 15}" y="20" class="matrix-axis-label-large">5</text>
+        
+        <text x="${size - 20}" y="${plotSize + 20}" class="matrix-axis-label-large">5</text>
 
         ${dotsHTML}
     </svg>`;

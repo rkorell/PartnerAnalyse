@@ -20,6 +20,7 @@
   # Modified: 29.11.2025, 12:00 - AP 31: Map awarenessPct to frontend
   # Modified: 29.11.2025, 16:00 - CRITICAL FIX: Restored missing Tree-View logic & Implemented DBC Visuals (AP I.3)
   # Modified: 29.11.2025, 20:30 - AP 32: Implemented soft filter initialization (set min only, keep html default value)
+  # Modified: 29.11.2025, 23:15 - AP 35: Added Jitter logic to Matrix generation to solve overplotting
 */
 
 import { CONFIG } from './config.js';
@@ -618,13 +619,21 @@ document.addEventListener("DOMContentLoaded", function() {
         const plotSize = size - padding; 
         const step = plotSize / 4; 
 
+        // AP 35: Jittering für Overplotting-Lösung (+/- 5px)
+        const jitterRange = 10; 
+        const jitter = () => (Math.random() - 0.5) * jitterRange;
+
         let dotsHTML = '';
         details.forEach(d => {
             const valImp = parseFloat(d.imp);
             const valPerf = parseFloat(d.perf);
 
-            const cx = padding + ((valPerf - 1) * step);
-            const cy = plotSize - ((valImp - 1) * step);
+            // Jitter auf Koordinaten addieren
+            let cx = padding + ((valPerf - 1) * step);
+            let cy = plotSize - ((valImp - 1) * step);
+            
+            cx += jitter();
+            cy += jitter();
 
             dotsHTML += Tpl.getMatrixDotHTML(cx, cy, d.name, valImp, valPerf);
         });

@@ -1259,3 +1259,46 @@ input[type=range].slider-neutral {
     stroke-width: 2;
     marker-end: url(#arrow); /* Pfeilspitze */
 }
+
+/* =========================================
+   AP 35: Matrix & Modal Optimierungen 
+   ========================================= */
+
+/* Modal breiter machen für mehr Platz (Matrix + Text) */
+.modal-content-large {
+    max-width: 800px; /* Verbreitert von 600px */
+}
+
+/* Matrix Tooltip fixieren gegen "Springen" */
+.matrix-tooltip {
+    min-height: 80px; /* Feste Mindesthöhe erzwingen */
+    display: flex;
+    align-items: center;     /* Vertikal zentrieren */
+    justify-content: center; /* Horizontal zentrieren */
+    width: 100%;             /* Volle Breite nutzen */
+}
+
+/* Matrix Punkte: Transparenz für Overplotting-Erkennung */
+.matrix-dot {
+    opacity: 0.6; /* Halbtransparent */
+}
+
+/* Beim Hovern voll deckend */
+.matrix-dot:hover {
+    opacity: 1.0;
+}
+
+/* Neues, dezentes Koordinatenkreuz (Durchgezogen) */
+.matrix-cross-line {
+    stroke: #bdc3c7; /* Dezentes Grau (Silver) */
+    stroke-width: 1.5px;
+    shape-rendering: geometricPrecision;
+}
+
+/* Größere Labels für die Endwerte (5) */
+.matrix-axis-label-large {
+    font-size: 14px;
+    font-weight: bold;
+    fill: #7f8c8d;
+}
+
