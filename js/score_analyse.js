@@ -19,7 +19,7 @@
   # Modified: 28.11.2025, 20:15 - AP 29.3: Implement proactive login gatekeeper
   # Modified: 29.11.2025, 12:00 - AP 31: Map awarenessPct to frontend
   # Modified: 29.11.2025, 16:00 - CRITICAL FIX: Restored missing Tree-View logic & Implemented DBC Visuals (AP I.3)
-  # Modified: 29.11.2025, 20:10 - AP 32: Use CONFIG for Min Answers default and Conflict threshold
+  # Modified: 29.11.2025, 20:30 - AP 32: Implemented soft filter initialization (set min only, keep html default value)
 */
 
 import { CONFIG } from './config.js';
@@ -130,11 +130,13 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }, true);
 
-    // AP 32: Initialisierung der Filter aus Config
+    // AP 32: Soft Initialization (Setze nur Grenzen, überschreibe nicht den HTML-Default-Value)
     function initializeFilters() {
-        if (CONFIG.ANALYSIS.MIN_ANSWERS_DEFAULT) {
-            minAnswersSlider.value = CONFIG.ANALYSIS.MIN_ANSWERS_DEFAULT;
-            minAnswersValue.textContent = CONFIG.ANALYSIS.MIN_ANSWERS_DEFAULT;
+        if (CONFIG.ANALYSIS.MIN_ANSWERS_LIMIT) {
+            minAnswersSlider.min = CONFIG.ANALYSIS.MIN_ANSWERS_LIMIT;
+            // Wir lassen den 'value' unangetastet, damit der HTML-Standard (5) greift.
+            // Aktualisieren aber den Text, damit er synchron zum Slider steht.
+            minAnswersValue.textContent = minAnswersSlider.value;
         }
     }
 
