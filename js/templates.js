@@ -7,6 +7,8 @@
   # Modified: 29.11.2025, 12:00 - AP 31: Added Awareness display to score row
   # Modified: 29.11.2025, 14:30 - AP I.3: Added Diverging Bar Chart (DBC) and New Matrix Templates
   # Modified: 29.11.2025, 23:15 - AP 35: Redesigned Matrix SVG (Solid Cross, No Origin Label, Larger End Labels)
+  # Modified: 29.11.2025, 23:45 - AP 36: Added getParticipantStructureHTML
+  # Modified: 30.11.2025, 00:15 - AP 37: Changed manager color in conflict table to primary blue (neutral)
 */
 
 import { escapeHtml } from './utils.js';
@@ -172,6 +174,41 @@ export function getInsightIconHTML(action, id, title, content) {
 
 // --- MODAL & MATRIX TEMPLATES ---
 
+// NEU AP 36: Struktur-Tabelle im Modal
+export function getParticipantStructureHTML(stats) {
+    if (!stats || stats.length === 0) return '';
+
+    let rows = '';
+    stats.forEach(s => {
+        // Hervorhebung für die Gesamt-Zeile
+        const style = s.role.includes('Gesamt') ? 'font-weight:bold; background:#f1f2f6;' : '';
+        rows += `<tr style="${style}">
+            <td>${escapeHtml(s.role)}</td>
+            <td style="text-align:center;">${s.headcount}</td>
+            <td style="text-align:center;">${s.avg_score}</td>
+            <td style="text-align:center;">${s.avg_freq}</td>
+        </tr>`;
+    });
+
+    return `
+    <div style="margin-bottom: 20px; border: 1px solid #eee; border-radius: 8px; overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+            <thead style="background: #3498db; color: white;">
+                <tr>
+                    <th style="padding: 8px; text-align: left;">Gruppe</th>
+                    <th style="padding: 8px; text-align: center;">Anzahl</th>
+                    <th style="padding: 8px; text-align: center;">Ø Note</th>
+                    <th style="padding: 8px; text-align: center;">Ø Frequenz (1-4)</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+        <div style="padding: 5px 10px; font-size: 0.8em; color: #7f8c8d; background: #f9f9f9;">
+            * Hinweis: 'Gesamt' ist gewichtet nach Frequenz. (Note 1-5 Skala).
+        </div>
+    </div>`;
+}
+
 export function getModalContentHTML(title, content) {
     return `<h2 class="modal-headline">${escapeHtml(title)}</h2>${content}`;
 }
@@ -210,7 +247,7 @@ export function getConflictTableHTML(conflicts) {
         const delta = Math.abs(mgr - team).toFixed(1);
         html += `<tr>
             <td>${escapeHtml(c.name)}</td>
-            <td class="text-danger-bold">${mgr.toFixed(1)}</td>
+            <td class="text-primary-bold">${mgr.toFixed(1)}</td>
             <td class="text-primary-bold">${team.toFixed(1)}</td>
             <td>${delta}</td>
         </tr>`;
@@ -219,12 +256,12 @@ export function getConflictTableHTML(conflicts) {
     return html;
 }
 
+// UPDATE AP 35/36: Design-Optimierung & Quadranten
 export function getMatrixSVG_Standard(dotsHTML) {
     const size = 400;
     const padding = 40; 
     const plotSize = size - padding;
     
-    // AP 35: Design-Korrekturen (Dezentes Kreuz, 5er-Labels größer, 1er-Label weg)
     return `<svg viewBox="0 0 ${size} ${size}" class="matrix-svg">
         <defs>
             <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
@@ -233,17 +270,21 @@ export function getMatrixSVG_Standard(dotsHTML) {
         </defs>
         
         <line x1="${padding}" y1="${plotSize}" x2="${padding}" y2="10" class="matrix-axis-line" />
-        <text x="10" y="${plotSize/2}" transform="rotate(-90 10,${plotSize/2})" class="matrix-axis-label" text-anchor="middle">Wichtigkeit (1-5)</text>
+        <text x="10" y="${plotSize/2}" transform="rotate(-90 10,${plotSize/2})" class="matrix-axis-label" text-anchor="middle">Wichtigkeit</text>
         
         <line x1="${padding}" y1="${plotSize}" x2="${size-10}" y2="${plotSize}" class="matrix-axis-line" />
-        <text x="${padding + plotSize/2}" y="${size-5}" class="matrix-axis-label" text-anchor="middle">Leistung (1-5)</text>
+        <text x="${padding + plotSize/2}" y="${size-5}" class="matrix-axis-label" text-anchor="middle">Leistung</text>
 
         <line x1="220" y1="${plotSize}" x2="220" y2="0" class="matrix-cross-line" />
         <line x1="${padding}" y1="180" x2="${size}" y2="180" class="matrix-cross-line" />
         
         <text x="${padding - 15}" y="20" class="matrix-axis-label-large">5</text>
-        
         <text x="${size - 20}" y="${plotSize + 20}" class="matrix-axis-label-large">5</text>
+
+        <text x="60" y="40" fill="#e74c3c" font-size="14" font-weight="bold">ACTION</text>
+        <text x="340" y="40" fill="#2ecc71" font-size="14" font-weight="bold" text-anchor="end">PROMOTE</text>
+        <text x="60" y="340" fill="#bdc3c7" font-size="14" font-weight="bold">MONITOR</text>
+        <text x="340" y="340" fill="#bdc3c7" font-size="14" font-weight="bold" text-anchor="end">MAINTAIN</text>
 
         ${dotsHTML}
     </svg>`;

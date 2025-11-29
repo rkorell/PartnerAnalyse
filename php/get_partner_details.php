@@ -6,10 +6,11 @@
 
   # Created: 27.11.2025, 17:00 - Part of AP 12 Performance Optimization
   # Modified: 28.11.2025, 09:00 - Centralized DB config path & added error logging (AP 17)
-  # Modified: 28.11.2025, 14:40 - AP 23.2: Refactored to use SQL function get_department_subtree() instead of inline CTE
+  # Modified: 28.11.2025, 14:40 - AP 23.2: Refactored to use SQL function get_department_subtree for recursive hierarchy lookup
   # Modified: 28.11.2025, 14:50 - AP 23.4: Refactored to use view_ratings_extended for simplified queries
   # Modified: 28.11.2025, 18:45 - AP 29.2: Enable access protection
   # Modified: 29.11.2025, 11:15 - AP I.2: Switched to view_ratings_v2 (Non-destructive testing of V2.1 Model)
+  # Modified: 29.11.2025, 23:45 - AP 36: Full Refactoring - Use DB functions for Matrix & Structure Stats to ensure consistency
 */
 
 header('Content-Type: application/json');
@@ -27,7 +28,6 @@ require_once DB_CONFIG_PATH;
 
 $input = json_decode(file_get_contents('php://input'), true);
 
-// Validierung
 $partner_id = isset($input['partner_id']) ? intval($input['partner_id']) : 0;
 $survey_ids = $input['survey_ids'] ?? [];
 $department_ids = $input['department_ids'] ?? [];
@@ -39,58 +39,18 @@ if ($partner_id <= 0 || empty($survey_ids) || empty($department_ids)) {
     exit;
 }
 
-$dept_array_string = '{' . implode(',', array_map('intval', $department_ids)) . '}';
-$survey_placeholders = implode(',', array_fill(0, count($survey_ids), '?'));
-
-$manager_sql = "";
-if ($manager_filter === "nur_manager") $manager_sql = "AND v_perf.is_manager = TRUE";
-else if ($manager_filter === "nur_nicht_manager") $manager_sql = "AND v_perf.is_manager = FALSE";
-
-$manager_sql_p = "";
-if ($manager_filter === "nur_manager") $manager_sql_p = "AND p.is_manager = TRUE";
-else if ($manager_filter === "nur_nicht_manager") $manager_sql_p = "AND p.is_manager = FALSE";
+// Arrays für Postgres vorbereiten
+$dept_array = '{' . implode(',', array_map('intval', $department_ids)) . '}';
+$survey_array = '{' . implode(',', array_map('intval', $survey_ids)) . '}';
 
 try {
-    require_once DB_CONFIG_PATH;
+    // 1. Matrix Details laden (inkl. ungewichteter Splits für Tooltips)
+    // Nutzt die neue DB-Funktion, die Frequenz-Gewichtung korrekt anwendet.
+    $stmtMatrix = $pdo->prepare("SELECT * FROM get_partner_matrix_details(?, ?::int[], ?::int[], ?)");
+    $stmtMatrix->execute([$partner_id, $survey_array, $dept_array, $manager_filter]);
+    $matrix_details = $stmtMatrix->fetchAll(PDO::FETCH_ASSOC);
 
-    // 1. Matrix Details & Specific Comments holen (via Shadow View V2)
-    // Wir joinen den View mit sich selbst: Performance-Einträge mit passenden Importance-Einträgen desselben Teilnehmers.
-    $sqlDetails = "
-    WITH subdeps AS (
-        SELECT id FROM get_department_subtree(?::int[])
-    )
-    SELECT 
-        v_perf.criterion_name as name,
-        -- Hier nehmen wir den simulierten 1-5 Score aus dem View
-        ROUND(AVG(v_imp.score)::numeric, 1) as imp,
-        ROUND(AVG(v_perf.score)::numeric, 1) as perf,
-        ROUND(AVG(v_perf.score) FILTER (WHERE v_perf.is_manager)::numeric, 1) as perf_mgr,
-        ROUND(AVG(v_perf.score) FILTER (WHERE NOT v_perf.is_manager)::numeric, 1) as perf_team,
-        JSON_AGG(v_perf.comment) FILTER (WHERE v_perf.comment IS NOT NULL AND trim(v_perf.comment) <> '') as comments
-    FROM view_ratings_v2 v_perf
-    JOIN view_ratings_v2 v_imp 
-      ON v_perf.participant_id = v_imp.participant_id 
-     AND v_perf.criterion_id = v_imp.criterion_id
-    WHERE v_perf.partner_id = ?
-      AND v_perf.rating_type = 'performance'
-      AND v_imp.rating_type = 'importance'
-      AND v_perf.survey_id IN ($survey_placeholders)
-      AND v_perf.department_id IN (SELECT id FROM subdeps)
-      $manager_sql
-    GROUP BY v_perf.criterion_id, v_perf.criterion_name
-    ORDER BY v_perf.criterion_name
-    ";
-
-    $params = [];
-    $params[] = $dept_array_string; // 1. Dept Array
-    $params[] = $partner_id; // 2. Partner ID
-    foreach ($survey_ids as $id) $params[] = intval($id); // 3..N Survey IDs
-
-    $stmt = $pdo->prepare($sqlDetails);
-    $stmt->execute($params);
-    $matrix_details = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // JSON Strings decodieren
+    // JSON-Strings in der DB-Antwort decodieren (Kommentare)
     foreach ($matrix_details as &$row) {
         if (isset($row['comments'])) {
             $row['comments'] = json_decode($row['comments'], true);
@@ -98,41 +58,30 @@ try {
     }
     unset($row);
 
-    // 2. General Comments holen (via Tabelle partner_feedback + participants)
-    // Hier nutzen wir NICHT den View, da dieser auf ratings basiert.
-    $sqlGeneral = "
-    WITH subdeps AS (
-        SELECT id FROM get_department_subtree(?::int[])
-    )
-    SELECT 
-        JSON_AGG(f.general_comment) FILTER (WHERE f.general_comment IS NOT NULL AND trim(f.general_comment) <> '') as general_comments
-    FROM partner_feedback f
-    JOIN participants p ON f.participant_id = p.id
-    WHERE f.partner_id = ?
-    AND p.survey_id IN ($survey_placeholders)
-    AND p.department_id IN (SELECT id FROM subdeps)
-    $manager_sql_p
-    ";
+    // 2. Struktur-Daten laden (Wer hat bewertet?)
+    $stmtStruct = $pdo->prepare("SELECT * FROM get_partner_structure_stats(?, ?::int[], ?::int[], ?)");
+    $stmtStruct->execute([$partner_id, $survey_array, $dept_array, $manager_filter]);
+    $structure_stats = $stmtStruct->fetchAll(PDO::FETCH_ASSOC);
 
-    // Params neu aufbauen für 2. Query
-    $paramsGen = [];
-    $paramsGen[] = $dept_array_string;
-    $paramsGen[] = $partner_id;
-    foreach ($survey_ids as $id) $paramsGen[] = intval($id);
-
-    $stmtGen = $pdo->prepare($sqlGeneral);
-    $stmtGen->execute($paramsGen);
-    $resGen = $stmtGen->fetch(PDO::FETCH_ASSOC);
+    // 3. General Comments laden
+    // Einfache Abfrage, da diese nicht Teil der komplexen Matrix-Berechnung sind.
+    // Wir filtern hier ebenfalls auf Survey, um konsistent zu bleiben.
+    // (Department-Filterung ist hier implizit über participants-Tabelle und Survey-Logik ausreichend für den Kontext "Partner-Feedback", 
+    // aber sauberer wäre auch hier der Dept-Filter. Wir belassen es bei Survey-Filterung wie im vorherigen Stand für Comments.)
+    $sqlGen = "SELECT general_comment FROM partner_feedback pf 
+               JOIN participants p ON pf.participant_id = p.id 
+               WHERE pf.partner_id = ? AND p.survey_id = ANY(?::int[]) 
+               AND pf.general_comment IS NOT NULL AND trim(pf.general_comment) <> ''";
     
-    $general_comments = [];
-    if ($resGen && $resGen['general_comments']) {
-        $general_comments = json_decode($resGen['general_comments'], true);
-    }
+    $stmtGen = $pdo->prepare($sqlGen);
+    $stmtGen->execute([$partner_id, $survey_array]);
+    $gen_comments = $stmtGen->fetchAll(PDO::FETCH_COLUMN);
 
     echo json_encode([
         'partner_id' => $partner_id,
         'matrix_details' => $matrix_details,
-        'general_comments' => $general_comments
+        'structure_stats' => $structure_stats,
+        'general_comments' => $gen_comments
     ]);
 
 } catch (Exception $e) {

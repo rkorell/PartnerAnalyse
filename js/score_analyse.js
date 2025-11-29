@@ -21,6 +21,7 @@
   # Modified: 29.11.2025, 16:00 - CRITICAL FIX: Restored missing Tree-View logic & Implemented DBC Visuals (AP I.3)
   # Modified: 29.11.2025, 20:30 - AP 32: Implemented soft filter initialization (set min only, keep html default value)
   # Modified: 29.11.2025, 23:15 - AP 35: Added Jitter logic to Matrix generation to solve overplotting
+  # Modified: 29.11.2025, 23:45 - AP 36: Integration of Structure Table and new DB-based data loading
 */
 
 import { CONFIG } from './config.js';
@@ -495,7 +496,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     async function ensurePartnerDetails(partner) {
-        if (partner.matrixDetails && partner.generalComments) {
+        // Prüfen, ob wir alles haben (inkl. Stats) - AP 36
+        if (partner.matrixDetails && partner.generalComments && partner.structureStats) {
             return partner; 
         }
 
@@ -521,6 +523,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
             partner.matrixDetails = details.matrix_details;
             partner.generalComments = details.general_comments;
+            partner.structureStats = details.structure_stats; // NEU AP 36
             
             return partner;
         } catch (e) {
@@ -533,6 +536,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
+    // UPDATE: handleInsightClickAsync zeigt jetzt Struktur-Tabelle an
     async function handleInsightClickAsync(action, partnerId) {
         let partner = analysisData.find(p => p.partnerId == partnerId);
         if (!partner) return;
@@ -542,6 +546,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let title = "";
         let content = "";
+        
+        // AP 36: Struktur-Tabelle immer anzeigen
+        content += Tpl.getParticipantStructureHTML(partner.structureStats);
+        content += "<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>";
 
         if (action === 'comments') {
             title = `Kommentare zu ${escapeHtml(partner.partnerName)}`;
@@ -558,9 +566,12 @@ document.addEventListener("DOMContentLoaded", function() {
         else if (action === 'action') {
             title = `Handlungsfelder für ${escapeHtml(partner.partnerName)}`;
             if (partner.matrixDetails) {
+                // Nutzung der DB-Werte (V2.3 Konsistenz)
                 const items = partner.matrixDetails.filter(d => parseFloat(d.imp) >= 4.0 && parseFloat(d.perf) <= 2.0);
                 if (items.length > 0) {
                     content += Tpl.getActionTableHTML(items);
+                } else {
+                    content += "<p>Keine spezifischen Handlungsfelder gefunden.</p>";
                 }
             }
         }
@@ -583,7 +594,7 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById('global-info-modal').style.display = 'flex';
     }
 
-    // --- IPA Matrix Logik V2.2 ---
+    // IPA Matrix Logic V2.2
     function calculateStats(details) {
         const imps = details.map(d => parseFloat(d.imp));
         const perfs = details.map(d => parseFloat(d.perf));

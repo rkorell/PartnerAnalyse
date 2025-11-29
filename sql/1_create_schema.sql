@@ -352,3 +352,145 @@ BEGIN
     ORDER BY (COALESCE(pb.score_pos, 0) + COALESCE(pb.score_neg, 0)) DESC;
 END;
 $$ LANGUAGE plpgsql;
+
+
+/* Funktion: get_partner_matrix_details (AP 36)
+  Zweck: Liefert die Punkte für die IPA-Matrix.
+  WICHTIG: Nutzt Frequenz-Gewichtung für Performance, damit Matrix und Score konsistent sind.
+  Skala: 1-5 (für die Grafik), nicht Netto-Wert.
+*/
+CREATE OR REPLACE FUNCTION get_partner_matrix_details(
+    p_partner_id INT,
+    p_survey_ids INT[],
+    p_dept_ids INT[],
+    p_manager_filter TEXT
+)
+RETURNS TABLE (
+    name VARCHAR,
+    imp NUMERIC,      -- Durchschnitt Wichtigkeit (Ungewichtet, da strategisch)
+    perf NUMERIC,     -- Durchschnitt Performance (GEWICHTET nach Frequenz!)
+    perf_mgr NUMERIC, -- Reiner Schnitt Manager (für Tooltip/Konflikt)
+    perf_team NUMERIC,-- Reiner Schnitt Team (für Tooltip/Konflikt)
+    comments JSON     -- Liste der Kommentare
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH relevant_participants AS (
+        SELECT p.id, p.is_manager 
+        FROM participants p
+        WHERE p.survey_id = ANY(p_survey_ids)
+          AND p.department_id IN (SELECT id FROM get_department_subtree(p_dept_ids))
+          AND (
+              p_manager_filter = 'alle'
+              OR (p_manager_filter = 'nur_manager' AND p.is_manager = TRUE)
+              OR (p_manager_filter = 'nur_nicht_manager' AND p.is_manager = FALSE)
+          )
+    ),
+    -- Performance: Gewichtung mit Frequenz!
+    perf_data AS (
+        SELECT 
+            r.criterion_id,
+            -- Formel: Sum(Score * Freq) / Sum(Freq)
+            (SUM(r.score * COALESCE(pf.interaction_frequency, 1))::numeric / 
+             NULLIF(SUM(COALESCE(pf.interaction_frequency, 1)), 0)) as val_weighted,
+            -- Splits (Ungewichtet für Vergleich)
+            AVG(CASE WHEN rp.is_manager THEN r.score END) as val_mgr,
+            AVG(CASE WHEN NOT rp.is_manager THEN r.score END) as val_team,
+            -- Kommentare
+            JSON_AGG(r.comment) FILTER (WHERE r.comment IS NOT NULL AND trim(r.comment) <> '') as comment_list
+        FROM ratings r
+        JOIN relevant_participants rp ON r.participant_id = rp.id
+        LEFT JOIN partner_feedback pf ON r.participant_id = pf.participant_id AND r.partner_id = pf.partner_id
+        WHERE r.partner_id = p_partner_id AND r.rating_type = 'performance'
+        GROUP BY r.criterion_id
+    ),
+    -- Importance: Einfacher Durchschnitt
+    imp_data AS (
+        SELECT 
+            r.criterion_id,
+            AVG(r.score) as val_imp
+        FROM ratings r
+        JOIN relevant_participants rp ON r.participant_id = rp.id
+        WHERE r.rating_type = 'importance'
+        GROUP BY r.criterion_id
+    )
+    SELECT
+        c.name,
+        ROUND(i.val_imp, 1) as imp,
+        ROUND(p.val_weighted, 1) as perf,
+        ROUND(p.val_mgr, 1) as perf_mgr,
+        ROUND(p.val_team, 1) as perf_team,
+        p.comment_list as comments
+    FROM perf_data p
+    JOIN imp_data i ON p.criterion_id = i.criterion_id
+    JOIN criteria c ON p.criterion_id = c.id
+    ORDER BY c.name;
+END;
+$$ LANGUAGE plpgsql;
+
+/* Funktion: get_partner_structure_stats (AP 36)
+  Zweck: Liefert die "Erklär-Tabelle" (Wer hat bewertet? Wie oft? Welche Note?)
+*/
+CREATE OR REPLACE FUNCTION get_partner_structure_stats(
+    p_partner_id INT,
+    p_survey_ids INT[],
+    p_dept_ids INT[],
+    p_manager_filter TEXT
+)
+RETURNS TABLE (
+    role TEXT,
+    headcount INT,
+    avg_score NUMERIC, -- Reine Note (ungewichtet)
+    avg_freq NUMERIC   -- Durchschnittliche Frequenz
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH base_data AS (
+        SELECT 
+            rp.is_manager,
+            r.score,
+            COALESCE(pf.interaction_frequency, 1) as freq,
+            rp.id as pid
+        FROM ratings r
+        JOIN participants rp ON r.participant_id = rp.id
+        LEFT JOIN partner_feedback pf ON r.participant_id = pf.participant_id AND r.partner_id = pf.partner_id
+        WHERE r.partner_id = p_partner_id
+          AND r.rating_type = 'performance'
+          AND rp.survey_id = ANY(p_survey_ids)
+          AND rp.department_id IN (SELECT id FROM get_department_subtree(p_dept_ids))
+          AND (
+              p_manager_filter = 'alle'
+              OR (p_manager_filter = 'nur_manager' AND rp.is_manager = TRUE)
+              OR (p_manager_filter = 'nur_nicht_manager' AND rp.is_manager = FALSE)
+          )
+    )
+    -- Zeile 1: Manager
+    SELECT 
+        'Manager'::text as role,
+        COUNT(DISTINCT pid)::int as headcount,
+        ROUND(AVG(score), 1) as avg_score,
+        ROUND(AVG(freq), 1) as avg_freq
+    FROM base_data WHERE is_manager = TRUE
+    
+    UNION ALL
+    
+    -- Zeile 2: Team
+    SELECT 
+        'Team'::text as role,
+        COUNT(DISTINCT pid)::int as headcount,
+        ROUND(AVG(score), 1) as avg_score,
+        ROUND(AVG(freq), 1) as avg_freq
+    FROM base_data WHERE is_manager = FALSE
+    
+    UNION ALL
+    
+    -- Zeile 3: Gesamt (Gewichtet!)
+    SELECT 
+        'Gesamt (Gewichtet)'::text as role,
+        COUNT(DISTINCT pid)::int as headcount,
+        -- Hier zeigen wir den gewichteten Score, der auch im Balken landet
+        ROUND(SUM(score * freq) / NULLIF(SUM(freq), 0), 1) as avg_score,
+        ROUND(AVG(freq), 1) as avg_freq
+    FROM base_data;
+END;
+$$ LANGUAGE plpgsql;
