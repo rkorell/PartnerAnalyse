@@ -9,12 +9,13 @@
   # Modified: 28.11.2025, 14:40 - AP 23.2: Refactored to use SQL function get_department_subtree() instead of inline CTE
   # Modified: 28.11.2025, 14:50 - AP 23.4: Refactored to use view_ratings_extended for simplified queries
   # Modified: 28.11.2025, 18:45 - AP 29.2: Enable access protection
+  # Modified: 29.11.2025, 11:15 - AP I.2: Switched to view_ratings_v2 (Non-destructive testing of V2.1 Model)
 */
 
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/common.php';
-require_once __DIR__ . '/protect.php'; // AP 29.2: Schutz aktivieren
+require_once __DIR__ . '/protect.php'; 
 
 if (!file_exists(DB_CONFIG_PATH)) {
     http_response_code(500);
@@ -38,18 +39,13 @@ if ($partner_id <= 0 || empty($survey_ids) || empty($department_ids)) {
     exit;
 }
 
-// Array-String für PostgreSQL Funktion
 $dept_array_string = '{' . implode(',', array_map('intval', $department_ids)) . '}';
-
-// Survey Placeholders
 $survey_placeholders = implode(',', array_fill(0, count($survey_ids), '?'));
 
-// Manager Filter für View (Spalte 'is_manager')
 $manager_sql = "";
 if ($manager_filter === "nur_manager") $manager_sql = "AND v_perf.is_manager = TRUE";
 else if ($manager_filter === "nur_nicht_manager") $manager_sql = "AND v_perf.is_manager = FALSE";
 
-// Manager Filter für Participants Tabelle (Spalte 'p.is_manager')
 $manager_sql_p = "";
 if ($manager_filter === "nur_manager") $manager_sql_p = "AND p.is_manager = TRUE";
 else if ($manager_filter === "nur_nicht_manager") $manager_sql_p = "AND p.is_manager = FALSE";
@@ -57,7 +53,7 @@ else if ($manager_filter === "nur_nicht_manager") $manager_sql_p = "AND p.is_man
 try {
     require_once DB_CONFIG_PATH;
 
-    // 1. Matrix Details & Specific Comments holen (via VIEW)
+    // 1. Matrix Details & Specific Comments holen (via Shadow View V2)
     // Wir joinen den View mit sich selbst: Performance-Einträge mit passenden Importance-Einträgen desselben Teilnehmers.
     $sqlDetails = "
     WITH subdeps AS (
@@ -65,13 +61,14 @@ try {
     )
     SELECT 
         v_perf.criterion_name as name,
+        -- Hier nehmen wir den simulierten 1-5 Score aus dem View
         ROUND(AVG(v_imp.score)::numeric, 1) as imp,
         ROUND(AVG(v_perf.score)::numeric, 1) as perf,
         ROUND(AVG(v_perf.score) FILTER (WHERE v_perf.is_manager)::numeric, 1) as perf_mgr,
         ROUND(AVG(v_perf.score) FILTER (WHERE NOT v_perf.is_manager)::numeric, 1) as perf_team,
         JSON_AGG(v_perf.comment) FILTER (WHERE v_perf.comment IS NOT NULL AND trim(v_perf.comment) <> '') as comments
-    FROM view_ratings_extended v_perf
-    JOIN view_ratings_extended v_imp 
+    FROM view_ratings_v2 v_perf
+    JOIN view_ratings_v2 v_imp 
       ON v_perf.participant_id = v_imp.participant_id 
      AND v_perf.criterion_id = v_imp.criterion_id
     WHERE v_perf.partner_id = ?

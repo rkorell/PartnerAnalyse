@@ -4,6 +4,8 @@
   (c) - Dr. Ralf Korell, 2025/26
   
   # Created: 28.11.2025, 16:00 - AP 25: Extracted HTML templates from logic files
+  # Modified: 29.11.2025, 12:00 - AP 31: Added Awareness display to score row
+  # Modified: 29.11.2025, 14:30 - AP I.3: Added Diverging Bar Chart (DBC) and New Matrix Templates
 */
 
 import { escapeHtml } from './utils.js';
@@ -22,7 +24,6 @@ export function getSliderHTML(domId, type, min, max, value, options = {}) {
 
     const critAttr = rawId ? `data-crit-id="${rawId}"` : '';
     
-    // Kompakter HTML String
     const wrapperHTML = `<div class="slider-wrapper"><input type="range" id="${domId}" ${critAttr} class="fancy-slider ${extraInputClass}" min="${min}" max="${max}" value="${value}" data-type="${type}"><div class="slider-tooltip" id="tooltip_${domId}">${displayValue}</div></div>`;
 
     const leftLabel = showMinMaxLabels ? `<span class="slider-label">${min}</span>` : '';
@@ -81,7 +82,7 @@ export function getCommentIconHTML(domId, isVisible) {
     return `<span class="comment-icon" id="icon_${domId}" style="visibility:${visibility}; cursor:pointer; font-size:1.2em; margin-left:10px;" title="Kommentar hinzufügen">📝</span>`;
 }
 
-// --- SCORE ANALYSE TEMPLATES ---
+// --- SCORE ANALYSE TEMPLATES (V2.1) ---
 
 export function getScoreTableStartHTML(title) {
     return `
@@ -89,25 +90,58 @@ export function getScoreTableStartHTML(title) {
     <div class="criteria-table">
         <div class="criteria-row score-table-header">
             <div class="criteria-content col-partner">Partner</div>
-            <div class="criteria-content col-score-graph">Score</div>
-            <div class="criteria-content col-count">Anzahl Beurteiler</div>
+            <div class="criteria-content col-score-graph" style="text-align:center;">Partner-Bilanz (Defizit vs. Wert)</div>
+            <div class="criteria-content col-count">Antworten</div>
             <div class="criteria-content col-insights text-center">Insights</div>
         </div>`;
 }
 
-export function getScoreRowHTML(row, pct, rgb, slots) {
+export function getScoreRowHTML_DBC(row, slots, scaling) {
+    const {
+        posWidth, negWidth, 
+        posCount, negCount, 
+        posScore, negScore, 
+        awarenessColor 
+    } = scaling;
+
+    const awPct = row.awarenessPct || 0;
+    const pieStyle = `background: conic-gradient(${awarenessColor} 0% ${awPct}%, #ecf0f1 ${awPct}% 100%);`;
+
+    // AP I.3: Text im/am Balken: "Wert (Anzahl)"
+    // Wir prüfen, ob der Balken breit genug für Text ist (z.B. > 10%)
+    // Wenn nicht, rendern wir den Text leer oder daneben (hier einfach abgeschnitten durch overflow:hidden im CSS)
+    const txtPos = posWidth > 0 ? `${posScore} (${posCount})` : '';
+    const txtNeg = negWidth > 0 ? `${negScore} (${negCount})` : '';
+
     return `
     <div class="criteria-row partner-row-clickable score-table-row" data-partner-id="${row.partnerId}">
         <div class="criteria-content col-partner col-partner-link">${escapeHtml(row.partnerName)} ↗</div>
         
         <div class="criteria-content col-score-graph">
-            <div class="score-bar-wrapper">
-                <div class="score-bar-fill" style="width:${Math.round(pct*90)+10}%; background:${rgb};"></div>
+            <div class="dbc-container">
+                <div class="dbc-zero-line"></div>
+                
+                <div class="dbc-bar-left-wrapper">
+                    <div class="dbc-bar-left" style="width: ${negWidth}%;" title="Strategisches Defizit: ${negScore} (${negCount} Themen)">
+                       ${txtNeg}
+                    </div>
+                </div>
+                
+                <div class="dbc-bar-right-wrapper">
+                    <div class="dbc-bar-right" style="width: ${posWidth}%;" title="Strategischer Wert: +${posScore} (${posCount} Themen)">
+                        ${txtPos}
+                    </div>
+                </div>
             </div>
-            <div class="score-bar-text">${row.score}</div>
         </div>
         
-        <div class="criteria-content col-count">${row.totalAnswers}</div>
+        <div class="criteria-content col-count" style="display:flex; align-items:center; justify-content:center; gap:10px;">
+            <div style="font-weight:bold; font-size:1.1em;">${row.totalAnswers}</div>
+            <div class="awareness-container" title="Datenqualität: ${awPct}% der Fragen wurden bewertet">
+                <div class="awareness-pie" style="${pieStyle}"></div>
+                <span class="awareness-text">${awPct}%</span>
+            </div>
+        </div>
         
         <div class="criteria-content col-insights">
             <div class="insight-slot-nps">${slots.slot1}</div>
@@ -122,10 +156,10 @@ export function getLegendHTML() {
     return `
     <div class="icon-legend-box">
         <strong class="legend-label">Legende:</strong>
-        <span class="legend-item">📣 NPS-Score</span>
-        <span class="legend-item">💬 Kommentare vorhanden</span>
-        <span class="legend-item">⚠️ Handlungsfelder (Vorschläge)</span>
-        <span>⚡ Bewertungsunterschiede Mgmt/Field</span>
+        <span class="legend-item">🔴 Defizit (Links)</span>
+        <span class="legend-item">🟢 Wertbeitrag (Rechts)</span>
+        <span class="legend-item">📣 NPS</span>
+        <span class="legend-item">⚠️ Handlungsbedarf (Strategisch)</span>
     </div>`;
 }
 
@@ -187,21 +221,33 @@ export function getConflictTableHTML(conflicts) {
     return html;
 }
 
-export function getMatrixSVG(size, centerX, centerY, dotsHTML) {
-    const mid = size / 2;
-    // Basis SVG Struktur
+export function getMatrixSVG_Standard(dotsHTML) {
+    const size = 400;
+    const padding = 40; 
+    const plotSize = size - padding;
+    
     return `<svg viewBox="0 0 ${size} ${size}" class="matrix-svg">
-            <line x1="0" y1="${mid}" x2="${size}" y2="${mid}" stroke="#bdc3c7" stroke-width="2" stroke-dasharray="5,5" />
-            <line x1="${mid}" y1="0" x2="${mid}" y2="${size}" stroke="#bdc3c7" stroke-width="2" stroke-dasharray="5,5" />
-            <text x="10" y="20" fill="#95a5a6" font-size="12">Konzentrieren!</text>
-            <text x="${size-10}" y="20" fill="#95a5a6" font-size="12" text-anchor="end">Weiter so</text>
-            <text x="10" y="${size-10}" fill="#95a5a6" font-size="12">Niedrige Prio</text>
-            <text x="${size-10}" y="${size-10}" fill="#95a5a6" font-size="12" text-anchor="end">Overkill?</text>
-            <text x="${size-10}" y="${mid-10}" fill="#bdc3c7" font-size="11" text-anchor="end">
-                Zentrum: ${centerX.toFixed(2)} / ${centerY.toFixed(2)}
-            </text>
-            ${dotsHTML}
-        </svg>`;
+        <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#95a5a6" />
+            </marker>
+        </defs>
+        
+        <line x1="${padding}" y1="${plotSize}" x2="${padding}" y2="10" class="matrix-axis-line" />
+        <text x="10" y="${plotSize/2}" transform="rotate(-90 10,${plotSize/2})" class="matrix-axis-label" text-anchor="middle">Wichtigkeit (1-5)</text>
+        
+        <line x1="${padding}" y1="${plotSize}" x2="${size-10}" y2="${plotSize}" class="matrix-axis-line" />
+        <text x="${padding + plotSize/2}" y="${size-5}" class="matrix-axis-label" text-anchor="middle">Leistung (1-5)</text>
+
+        <line x1="220" y1="${plotSize}" x2="220" y2="0" class="matrix-grid-line" stroke-dasharray="4" />
+        <line x1="${padding}" y1="180" x2="${size}" y2="180" class="matrix-grid-line" stroke-dasharray="4" />
+        
+        <text x="${padding - 10}" y="${plotSize}" class="matrix-axis-label" style="font-size:10px;">1</text>
+        <text x="${padding - 10}" y="20" class="matrix-axis-label" style="font-size:10px;">5</text>
+        <text x="${size - 20}" y="${plotSize + 15}" class="matrix-axis-label" style="font-size:10px;">5</text>
+
+        ${dotsHTML}
+    </svg>`;
 }
 
 export function getMatrixDotHTML(cx, cy, name, imp, perf) {

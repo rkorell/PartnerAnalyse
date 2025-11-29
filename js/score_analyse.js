@@ -17,6 +17,8 @@
   # Modified: 28.11.2025, 15:45 - AP 24 FIX: Use central CONFIG/utils AND restored missing exportToCSV function
   # Modified: 28.11.2025, 16:00 - AP 25: Extracted HTML generation to templates.js
   # Modified: 28.11.2025, 20:15 - AP 29.3: Implement proactive login gatekeeper
+  # Modified: 29.11.2025, 12:00 - AP 31: Map awarenessPct to frontend
+  # Modified: 29.11.2025, 16:00 - CRITICAL FIX: Restored missing Tree-View logic & Implemented DBC Visuals (AP I.3)
 */
 
 import { CONFIG } from './config.js';
@@ -24,7 +26,7 @@ import { escapeHtml, toggleGlobalLoader, interpolateColor } from './utils.js';
 import * as Tpl from './templates.js';
 
 document.addEventListener("DOMContentLoaded", function() {
-    // ... (Selektoren)
+    // Selektoren
     const surveySelect = document.getElementById('survey-filter');
     const departmentTreeContainer = document.getElementById('department-collapsing-tree');
     const minAnswersSlider = document.getElementById('min-answers-slider');
@@ -42,19 +44,18 @@ document.addEventListener("DOMContentLoaded", function() {
     const matrixTitle = document.getElementById('matrix-title');
     const matrixTooltip = document.getElementById('matrix-tooltip');
     
-    // AP 29.3: Login Modal
     const loginModal = document.getElementById('login-modal');
     const loginForm = document.getElementById('login-form');
     const loginPasswordInput = document.getElementById('login-password');
     const loginError = document.getElementById('login-error');
     
-    const matrixRadios = document.querySelectorAll('input[name="matrix-center"]');
-
+    const matrixControls = document.querySelector('.matrix-controls');
+    
     let appTexts = {};
     const infoModal = document.getElementById('global-info-modal');
     const closeInfoBtn = document.getElementById('close-info-modal');
 
-    let analysisData = []; // Beinhaltet jetzt die camelCase Felder
+    let analysisData = []; 
     let currentPartnerDetails = null;
     let currentFilterState = null; 
 
@@ -76,7 +77,6 @@ document.addEventListener("DOMContentLoaded", function() {
 
     if(exportBtn) exportBtn.addEventListener('click', exportToCSV);
 
-    // AP 29.3: Login Form Handler
     if (loginForm) {
         loginForm.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -89,15 +89,7 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById('info-modal-body').innerHTML = content;
         infoModal.style.display = 'flex';
     }
-
-    matrixRadios.forEach(radio => {
-        radio.addEventListener('change', () => {
-            if (currentPartnerDetails) {
-                updateMatrixView(radio.value);
-            }
-        });
-    });
-
+    
     filterForm.addEventListener('submit', function(e) {
         e.preventDefault();
         analyseScores();
@@ -118,8 +110,7 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
     });
-
-    // --- FIX AP 20: Event Handler für Tooltip ---
+    
     matrixContainer.addEventListener('mouseenter', function(e) {
         const dot = e.target.closest('.matrix-dot');
         if (dot) {
@@ -137,6 +128,59 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }, true);
 
+    // Login Helper
+    function showLoginModal() {
+        if (loginModal) {
+            loginModal.style.display = 'flex';
+            if(loginPasswordInput) loginPasswordInput.focus();
+        }
+    }
+
+    function handleLogin(password) {
+        toggleGlobalLoader(true);
+        if(loginError) loginError.style.display = 'none';
+
+        fetch('php/login.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: password })
+        })
+        .then(response => response.json())
+        .then(data => {
+            toggleGlobalLoader(false);
+            if (data.success) {
+                location.reload();
+            } else {
+                if(loginError) {
+                    loginError.textContent = data.error || 'Login fehlgeschlagen';
+                    loginError.style.display = 'block';
+                }
+            }
+        })
+        .catch(err => {
+            toggleGlobalLoader(false);
+            if(loginError) {
+                loginError.textContent = 'Verbindungsfehler';
+                loginError.style.display = 'block';
+            }
+        });
+    }
+
+    function showLoader() { if(loadingOverlay) { loadingOverlay._timeout = setTimeout(() => { loadingOverlay.style.display = 'flex'; }, 300); } }
+    function hideLoader() { if(loadingOverlay) { clearTimeout(loadingOverlay._timeout); loadingOverlay.style.display = 'none'; } }
+    function showError(msg) { if(errorText && errorMessage) { errorText.textContent = msg; errorMessage.style.display = 'flex'; } }
+
+    function setExportButtonState(enabled) { 
+        if (!exportBtn) return;
+        exportBtn.disabled = !enabled;
+        if (enabled) {
+            exportBtn.classList.replace('btn-secondary', 'btn-primary');
+        } else {
+            exportBtn.classList.replace('btn-primary', 'btn-secondary');
+        }
+    }
+
+    // --- DATA LOADING LOGIC (Surveys & Departments) ---
 
     function fetchSurveys() { 
         fetch('php/get_data.php')
@@ -171,7 +215,7 @@ document.addEventListener("DOMContentLoaded", function() {
         fetch('php/get_data.php')
             .then(response => response.json())
             .then(data => {
-                // Auth check is implicitly handled by fetchSurveys as well, but safe to ignore here if blocked
+                // Auth check is implicitly handled by fetchSurveys as well
                 if (data.app_texts) appTexts = data.app_texts;
                 if (data && data.departments && departmentTreeContainer) {
                     departmentTreeContainer.innerHTML = '';
@@ -274,60 +318,15 @@ document.addEventListener("DOMContentLoaded", function() {
             });
     }
 
-    // AP 29.3: Login Functions
-    function showLoginModal() {
-        if (loginModal) {
-            loginModal.style.display = 'flex';
-            if(loginPasswordInput) loginPasswordInput.focus();
-        }
-    }
-
-    function handleLogin(password) {
-        toggleGlobalLoader(true);
-        loginError.style.display = 'none';
-
-        fetch('php/login.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: password })
-        })
-        .then(response => response.json())
-        .then(data => {
-            toggleGlobalLoader(false);
-            if (data.success) {
-                // Erfolg: Seite neu laden, um App sauber zu initialisieren
-                location.reload();
-            } else {
-                loginError.textContent = data.error || 'Login fehlgeschlagen';
-                loginError.style.display = 'block';
-            }
-        })
-        .catch(err => {
-            toggleGlobalLoader(false);
-            loginError.textContent = 'Verbindungsfehler';
-            loginError.style.display = 'block';
-        });
-    }
-
-    function showLoader() { loadingOverlay._timeout = setTimeout(() => { loadingOverlay.style.display = 'flex'; }, 300); }
-    function hideLoader() { clearTimeout(loadingOverlay._timeout); loadingOverlay.style.display = 'none'; }
-    function showError(msg) { errorText.textContent = msg; errorMessage.style.display = 'flex'; }
-
-    function setExportButtonState(enabled) { 
-        if (!exportBtn) return;
-        exportBtn.disabled = !enabled;
-        if (enabled) {
-            exportBtn.classList.replace('btn-secondary', 'btn-primary');
-        } else {
-            exportBtn.classList.replace('btn-primary', 'btn-secondary');
-        }
-    }
+    // --- CORE LOGIC (ANALYSE & VISUALISIERUNG V2.2) ---
 
     function analyseScores() {
         const surveyIds = Array.from(surveySelect.selectedOptions).map(opt => parseInt(opt.value));
         const departmentCheckboxes = departmentTreeContainer.querySelectorAll('input[type="checkbox"]:checked');
         const departmentIds = Array.from(departmentCheckboxes).map(cb => parseInt(cb.value));
-        const managerFilter = document.querySelector('input[name="manager-filter"]:checked').value;
+        let managerFilter = "alle";
+        const mgrRadio = document.querySelector('input[name="manager-filter"]:checked');
+        if(mgrRadio) managerFilter = mgrRadio.value;
         const minAnswers = parseInt(minAnswersSlider.value);
 
         if (!surveyIds.length || !departmentIds.length) {
@@ -354,7 +353,6 @@ document.addEventListener("DOMContentLoaded", function() {
             })
         })
         .then(resp => {
-            // AP 29.3: Falls Session abgelaufen ist (401), Login zeigen
             if (resp.status === 401) {
                 showLoginModal();
                 throw new Error("Login required");
@@ -370,6 +368,15 @@ document.addEventListener("DOMContentLoaded", function() {
                     score: row.score,
                     totalAnswers: row.total_answers,
                     globalParticipantCount: row.global_participant_count,
+                    
+                    // V2.2 Fields (DB Function)
+                    scorePositive: parseFloat(row.score_positive || 0),
+                    scoreNegative: Math.abs(parseFloat(row.score_negative || 0)), // Absolut
+                    countPositive: parseInt(row.count_positive || 0),
+                    countNegative: parseInt(row.count_negative || 0),
+                    
+                    awarenessPct: parseInt(row.awareness_pct || 0), 
+
                     npsScore: row.nps_score,
                     commentCount: row.comment_count,
                     maxDivergence: row.max_divergence,
@@ -405,19 +412,25 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function renderResultTable(rows) {
-        const scores = rows.map(r => r.score);
-        const min = Math.min(...scores); const max = Math.max(...scores);
-        
         const globalCount = rows.length > 0 && rows[0].globalParticipantCount ? rows[0].globalParticipantCount : 0;
+
+        // Globales Maximum für Skalierung finden
+        let maxBarValue = 0;
+        rows.forEach(r => {
+            if (r.scorePositive > maxBarValue) maxBarValue = r.scorePositive;
+            if (r.scoreNegative > maxBarValue) maxBarValue = r.scoreNegative;
+        });
+        if (maxBarValue === 0) maxBarValue = 1; 
 
         let html = Tpl.getScoreTableStartHTML(`Ergebnis: Partner Score Ranking (Basierend auf ${globalCount} Teilnehmern)`);
 
-        rows.forEach((row, idx) => {
-            const pct = (max === min) ? 1 : (row.score - min) / (max - min);
-            const color = pct < 0.5
-                ? interpolateColor(CONFIG.COLORS.HEATMAP_LOW, CONFIG.COLORS.HEATMAP_MID, pct * 2)
-                : interpolateColor(CONFIG.COLORS.HEATMAP_MID, CONFIG.COLORS.HEATMAP_HIGH, (pct - 0.5) * 2);
-            const rgb = `rgb(${color.join(',')})`;
+        rows.forEach((row) => {
+            const posWidth = (row.scorePositive / maxBarValue) * 100;
+            const negWidth = (row.scoreNegative / maxBarValue) * 100;
+
+            let awColor = '#e74c3c'; // Rot
+            if (row.awarenessPct >= 80) awColor = '#2ecc71'; // Grün
+            else if (row.awarenessPct >= 50) awColor = '#f1c40f'; // Gelb
 
             let slot1 = ''; 
             let slot2 = ''; 
@@ -446,7 +459,6 @@ document.addEventListener("DOMContentLoaded", function() {
             const maxDiv = parseFloat(row.maxDivergence || 0);
             const cntMgr = parseInt(row.numAssessorsMgr || 0);
             const cntTeam = parseInt(row.numAssessorsTeam || 0);
-            
             const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
             
             if (cntMgr >= 3 && cntTeam >= 3 && maxDiv > conflictThreshold) {
@@ -454,12 +466,16 @@ document.addEventListener("DOMContentLoaded", function() {
                 slot4 = Tpl.getInsightIconHTML('conflict', row.partnerId, title, '⚡');
             }
 
-            html += Tpl.getScoreRowHTML(row, pct, rgb, { slot1, slot2, slot3, slot4 });
+            // AP I.3: Aufruf des neuen Templates (Diverging Bar)
+            html += Tpl.getScoreRowHTML_DBC(row, { slot1, slot2, slot3, slot4 }, {
+                posWidth, negWidth,
+                posCount: row.countPositive, negCount: row.countNegative,
+                posScore: Math.round(row.scorePositive), negScore: Math.round(row.scoreNegative),
+                awarenessColor: awColor
+            });
         });
         html += `</div>`;
-
         html += Tpl.getLegendHTML();
-
         resultSection.innerHTML = html;
     }
 
@@ -479,7 +495,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 })
             });
             
-            // AP 29.3: Auth Check
             if (response.status === 401) {
                 showLoginModal();
                 throw new Error("Login required");
@@ -528,7 +543,7 @@ document.addEventListener("DOMContentLoaded", function() {
         else if (action === 'action') {
             title = `Handlungsfelder für ${escapeHtml(partner.partnerName)}`;
             if (partner.matrixDetails) {
-                const items = partner.matrixDetails.filter(d => parseFloat(d.imp) >= 8.0 && parseFloat(d.perf) <= 5.0);
+                const items = partner.matrixDetails.filter(d => parseFloat(d.imp) >= 4.0 && parseFloat(d.perf) <= 2.0);
                 if (items.length > 0) {
                     content += Tpl.getActionTableHTML(items);
                 }
@@ -536,21 +551,14 @@ document.addEventListener("DOMContentLoaded", function() {
         }
         else if (action === 'conflict') {
             title = `Signifikante Abweichungen: ${escapeHtml(partner.partnerName)}`;
-            
-            const partnerListRow = analysisData.find(p => p.partnerId == partnerId); 
-            
             if (partner.matrixDetails) {
                 const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
-                const conflicts = partner.matrixDetails.filter(d => {
-                    const mgr = parseFloat(d.perf_mgr || 0);
-                    const team = parseFloat(d.perf_team || 0);
-                    return Math.abs(mgr - team) > conflictThreshold;
-                });
+                const conflicts = partner.matrixDetails.filter(d => Math.abs(parseFloat(d.perf_mgr) - parseFloat(d.perf_team)) > 2.0);
                 
                 if (conflicts.length > 0) {
                     content += Tpl.getConflictTableHTML(conflicts);
                 } else {
-                    content += `<p>Keine Kriterien gefunden, die den Schwellenwert von ${conflictThreshold} überschreiten.</p>`;
+                    content += `<p>Keine Kriterien gefunden, die den Schwellenwert überschreiten.</p>`;
                 }
             }
         }
@@ -560,9 +568,7 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById('global-info-modal').style.display = 'flex';
     }
 
-    // ... (restliche Matrix-Logik bleibt gleich, da sie keine Fetch-Calls macht) ...
-    // Ich füge die restlichen Funktionen hier ein, um die Datei vollständig zu liefern.
-
+    // --- IPA Matrix Logik V2.2 ---
     function calculateStats(details) {
         const imps = details.map(d => parseFloat(d.imp));
         const perfs = details.map(d => parseFloat(d.perf));
@@ -581,8 +587,7 @@ document.addEventListener("DOMContentLoaded", function() {
         currentPartnerDetails = partner; 
         matrixTitle.textContent = "IPA Matrix: " + partner.partnerName;
 
-        const radios = document.querySelectorAll('input[name="matrix-center"]');
-        radios.forEach(r => { if(r.value === 'standard') r.checked = true; });
+        if(matrixControls) matrixControls.style.display = 'none';
         
         updateMatrixView('standard');
         matrixModal.style.display = 'flex';
@@ -590,49 +595,33 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function updateMatrixView(mode) {
         if (!currentPartnerDetails) return;
-        const stats = calculateStats(currentPartnerDetails.matrixDetails);
-        let centerX = 5.0;
-        let centerY = 5.0;
-        let maxDist = 5.0; 
-        if (mode === 'mean') {
-            centerX = stats.mean.perf;
-            centerY = stats.mean.imp;
-            maxDist = calculateMaxDeviation(currentPartnerDetails.matrixDetails, centerX, centerY);
-        }
-        renderMatrixSVG(currentPartnerDetails.matrixDetails, centerX, centerY, maxDist);
+        renderMatrixSVG(currentPartnerDetails.matrixDetails);
     }
 
-    function calculateMaxDeviation(details, cx, cy) {
-        let maxD = 0;
-        details.forEach(d => {
-            const dx = d.perf - cx;
-            const dy = d.imp - cy;
-            maxD = Math.max(maxD, dx, dy);
-        });
-        return Math.max(maxD * 1.1, 0.5); 
-    }
-
-    function renderMatrixSVG(details, centerX, centerY, rangeRadius) {
-        const size = CONFIG.UI.MATRIX_SIZE;
-        const scale = (size / 2) / rangeRadius;
-        const mid = size / 2;
+    function renderMatrixSVG(details) {
+        const size = CONFIG.UI.MATRIX_SIZE; 
+        const padding = 40;
+        const plotSize = size - padding; 
+        const step = plotSize / 4; 
 
         let dotsHTML = '';
         details.forEach(d => {
-            const dx = d.perf - centerX;
-            const dy = d.imp - centerY; 
-            const px = mid + (dx * scale);
-            const py = mid - (dy * scale); 
-            dotsHTML += Tpl.getMatrixDotHTML(px, py, d.name, d.imp, d.perf);
+            const valImp = parseFloat(d.imp);
+            const valPerf = parseFloat(d.perf);
+
+            const cx = padding + ((valPerf - 1) * step);
+            const cy = plotSize - ((valImp - 1) * step);
+
+            dotsHTML += Tpl.getMatrixDotHTML(cx, cy, d.name, valImp, valPerf);
         });
         
-        matrixContainer.innerHTML = Tpl.getMatrixSVG(size, centerX, centerY, dotsHTML);
+        matrixContainer.innerHTML = Tpl.getMatrixSVG_Standard(dotsHTML);
     }
 
     function exportToCSV() {
         if (!analysisData || analysisData.length === 0) return;
         
-        let csvContent = "Partner;Gesamt-Score;Anzahl Beurteiler;Kriterium (Matrix);Wichtigkeit (I);Performance (P)\n";
+        let csvContent = "Partner;Score;Positiv;Negativ;Awareness;Kriterium;Wichtigkeit;Performance\n";
 
         analysisData.forEach(partner => {
             if (partner.matrixDetails) {
@@ -640,18 +629,17 @@ document.addEventListener("DOMContentLoaded", function() {
                     let row = [
                         partner.partnerName,
                         partner.score,
-                        partner.totalAnswers,
+                        partner.scorePositive,
+                        partner.scoreNegative,
+                        partner.awarenessPct,
                         detail.name, 
                         detail.imp,
                         detail.perf
                     ].map((field, index) => {
-                        if (index === 1 || index === 4 || index === 5) {
-                            return field.toString().replace('.', ',');
-                        }
                         if (typeof field === 'string') {
                             return `"${field.replace(/"/g, '""')}"`;
                         }
-                        return field;
+                        return String(field).replace('.', ',');
                     }).join(";");
                     csvContent += row + "\n";
                 });
