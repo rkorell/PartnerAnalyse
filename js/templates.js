@@ -9,6 +9,8 @@
   # Modified: 29.11.2025, 23:15 - AP 35: Redesigned Matrix SVG (Solid Cross, No Origin Label, Larger End Labels)
   # Modified: 29.11.2025, 23:45 - AP 36: Added getParticipantStructureHTML
   # Modified: 30.11.2025, 00:15 - AP 37: Changed manager color in conflict table to primary blue (neutral)
+  # Modified: 30.11.2025, 09:54 - AP 37: Added introductory question text for performance criteria section
+  # Modified: 30.11.2025, 09:59 - AP 37: Fixed legend - replaced bar colors with correct insight icons + tooltips
 */
 
 import { escapeHtml } from './utils.js';
@@ -62,6 +64,9 @@ export function getPartnerHeaderHTML(partnerName, freqHTML, npsHTML, initialComm
             </div>
         </div>
         <hr style="margin-bottom:30px; border:0; border-top:1px solid #eee;">
+        <p style="font-size: 1.1em; margin-bottom: 20px; color: #555;">
+            Wie bewertest Du für den Partner <strong>${escapeHtml(partnerName)}</strong> die folgenden Fähigkeiten/Eigenschaften?
+        </p>
         <div id="performance-criteria-container-${partnerId}">`;
 }
 
@@ -156,10 +161,10 @@ export function getLegendHTML() {
     return `
     <div class="icon-legend-box">
         <strong class="legend-label">Legende:</strong>
-        <span class="legend-item">🔴 Defizit (Links)</span>
-        <span class="legend-item">🟢 Wertbeitrag (Rechts)</span>
-        <span class="legend-item">📣 NPS</span>
-        <span class="legend-item">⚠️ Handlungsbedarf (Strategisch)</span>
+        <span class="legend-item" title="Net Promoter Score - Weiterempfehlungsbereitschaft">📣 NPS</span>
+        <span class="legend-item" title="Allgemeine oder spezifische Kommentare vorhanden">💬 Kommentar(e) verfügbar</span>
+        <span class="legend-item" title="Strategisch wichtige Kriterien werden schlecht erfüllt">⚠️ Handlungsbedarf</span>
+        <span class="legend-item" title="Manager-Team-Konflikt: Divergente Bewertung zwischen Führungskräften und Team">⚡ Bewertungsunterschied</span>
     </div>`;
 }
 

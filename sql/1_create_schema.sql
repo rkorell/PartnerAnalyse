@@ -11,6 +11,7 @@
   # Modified: 28.11.2025, 18:00 - AP 29.1: Added admin_users table for authentication
   # Modified: 29.11.2025, 20:30 - AP 33: Added main analysis function calculate_partner_bilanz
   # Modified: 29.11.2025, 22:45 - AP 34: Updated calculate_partner_bilanz to use V2.3 Linear Model (No Rounding)
+  # Modified: 30.11.2025 - AP X: Changed ratings_score_check constraint from 1-10 to 1-5
 */
 
 DROP TABLE IF EXISTS admin_users CASCADE;
@@ -91,7 +92,7 @@ CREATE TABLE ratings (
     score INTEGER,
     comment TEXT,
     CONSTRAINT ratings_rating_type_check CHECK (rating_type IN ('importance', 'performance')),
-    CONSTRAINT ratings_score_check CHECK ((score BETWEEN 1 AND 10) OR score IS NULL),
+    CONSTRAINT ratings_score_check CHECK ((score BETWEEN 1 AND 5) OR score IS NULL),
     CONSTRAINT unique_vote_per_survey UNIQUE (participant_id, criterion_id, partner_id, rating_type)
 );
 

@@ -14,6 +14,7 @@
    # Modified: 28.11.2025, 18:45 - AP 29.2: Enable access protection
    # Modified: 28.11.2025, 19:30 - FIX AP 29.2: Removed protection (must be public for survey participants)
    # Modified: 28.11.2025, 20:00 - AP 29.3: Added CSRF token validation
+   # Modified: 30.11.2025 - AP X: Changed validation ranges from 1-10 to 1-5 for importance/performance
 */
 header('Content-Type: application/json');
 
@@ -75,22 +76,22 @@ if (!validateIntRange($surveyId, 1, PHP_INT_MAX) || !validateIntRange($departmen
     exit;
 }
 
-// 2. Importance (Muss 1-10 sein, Pflichtfeld)
+// 2. Importance (Muss 1-5 sein, Pflichtfeld)
 if (empty($input['importance']) || !is_array($input['importance'])) {
     http_response_code(400);
     echo json_encode(['error' => 'Wichtigkeitsbewertungen fehlen.']);
     exit;
 }
 foreach ($input['importance'] as $critId => $score) {
-    // Wichtigkeit MUSS zwischen 1 und 10 liegen (kein 0/N/A)
-    if (!validateIntRange($score, 1, 10)) {
+    // Wichtigkeit MUSS zwischen 1 und 5 liegen (kein 0/N/A)
+    if (!validateIntRange($score, 1, 5)) {
         http_response_code(400);
-        echo json_encode(['error' => "Ungültiger Wert für Wichtigkeit Kriterium {$critId}. Erlaubt: 1-10."]);
+        echo json_encode(['error' => "Ungültiger Wert für Wichtigkeit Kriterium {$critId}. Erlaubt: 1-5."]);
         exit;
     }
 }
 
-// 3. Performance (Muss 0-10 sein, 0 wird zu NULL gemappt)
+// 3. Performance (Muss 0-5 sein, 0 wird zu NULL gemappt)
 if (isset($input['performance']) && is_array($input['performance'])) {
     foreach ($input['performance'] as $partnerId => $criteriaList) {
         if (!is_array($criteriaList) || !validateIntRange($partnerId, 1, PHP_INT_MAX)) {
@@ -106,10 +107,10 @@ if (isset($input['performance']) && is_array($input['performance'])) {
                 $val = $data; // Legacy number format
             }
             
-            // Performance Score muss 0-10 sein
-            if (!validateIntRange($val, 0, 10)) {
-                http_response_code(4_00);
-                echo json_encode(['error' => "Ungültiger Performance-Score für Partner {$partnerId} / Kriterium {$critId}. Erlaubt: 0-10."]);
+            // Performance Score muss 0-5 sein
+            if (!validateIntRange($val, 0, 5)) {
+                http_response_code(400);
+                echo json_encode(['error' => "Ungültiger Performance-Score für Partner {$partnerId} / Kriterium {$critId}. Erlaubt: 0-5."]);
                 exit;
             }
         }
@@ -165,7 +166,7 @@ try {
     // A) Importance (Kriterien-Wichtigkeit)
     if (isset($input['importance'])) {
         foreach ($input['importance'] as $critId => $score) {
-            // Bereits validiert (1-10)
+            // Bereits validiert (1-5)
             $val = intval($score);
             $stmtRating->execute([$participantId, $critId, NULL, 'importance', $val, NULL]);
         }
@@ -175,7 +176,7 @@ try {
     if (isset($input['performance'])) {
         foreach ($input['performance'] as $partnerId => $criteriaList) {
             foreach ($criteriaList as $critId => $data) {
-                // Bereits validiert (0-10)
+                // Bereits validiert (0-5)
                 $val = 0;
                 $comment = NULL;
 

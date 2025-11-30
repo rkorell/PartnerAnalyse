@@ -13,6 +13,7 @@
   # Modified: 28.11.2025, 15:30 - AP 24: Use central CONFIG for render delays
   # Modified: 28.11.2025, 16:00 - AP 25: Extracted HTML generation to templates.js
   # Modified: 28.11.2025, 17:00 - AP 27: Prefer loaded state over default/random values in initialization
+  # Modified: 30.11.2025 - AP X: Migrated sliders to 1-5 scale, fixed tooltip mapping (feste Zuordnung), adjusted comment icon triggers (≤1 or ≥5)
 */
 
 import { CONFIG } from './config.js';
@@ -50,7 +51,6 @@ export class DataView {
     setupImportanceCriteria() {
         const { criteriaData, isTestMode, importanceData } = this.state;
 
-        // AP 24: Nutzung von CONFIG.UI.RENDER_DELAY_MS
         setTimeout(() => {
             const container = document.getElementById('importance-criteria-container');
             const groupedCriteria = this.groupCriteria(criteriaData);
@@ -64,22 +64,18 @@ export class DataView {
                     const rawId = criterion.id;
                     const domId = 'imp_' + rawId;
                     
-                    // AP 27: Daten aus State bevorzugen
                     let initialValue = 0;
                     if (importanceData && importanceData[rawId] !== undefined) {
                         initialValue = importanceData[rawId];
                     } else {
-                        // Fallback auf Test/Default
                         if (isTestMode) {
-                            initialValue = Math.floor(Math.random() * 10) + 1;
+                            initialValue = Math.floor(Math.random() * 5) + 1;
                         } else {
                             initialValue = 0;
                         }
-                        // Wert im State setzen, damit es konsistent ist
                         this.callbacks.setImportance(rawId, initialValue);
                     }
 
-                    // AP 25: Template Usage
                     const sliderHTML = this.createSliderHTML(domId, rawId, 'importance', initialValue);
                     rowsHTML += Tpl.getCriteriaRowHTML(criterion.name, criterion.description, sliderHTML);
                 });
@@ -111,7 +107,6 @@ export class DataView {
             }
         }
 
-        // AP 25: Template Usage
         return Tpl.getSliderHTML(domId, type, min, max, initialValue, {
             extraInputClass: extraInputClass,
             displayValue: displayValue,
@@ -127,12 +122,10 @@ export class DataView {
         let iconHTML = '';
         if (type === 'performance') {
             const isExtreme = (initialValue > 0 && initialValue <= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MIN) || initialValue >= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MAX;
-            // AP 25: Template Usage
             iconHTML = Tpl.getCommentIconHTML(domId, isExtreme);
         }
 
-        // AP 25: Template Usage
-        const sliderContainer = Tpl.getSliderHTML(domId, type, 0, 10, initialValue, {
+        const sliderContainer = Tpl.getSliderHTML(domId, type, 0, 5, initialValue, {
             rawId: rawId,
             extraInputClass: extraInputClass,
             displayValue: displayValue,
@@ -141,7 +134,6 @@ export class DataView {
             iconHTML: iconHTML
         });
 
-        // AP 25: Template Usage
         const commentHTML = type === 'performance' 
             ? Tpl.getCommentBoxHTML(domId, '[FREIWILLIG: Warum diese Bewertung?]')
             : '';
@@ -153,8 +145,6 @@ export class DataView {
         const { isTestMode, criteriaData, partnerFeedback, performanceData } = this.state;
         const partnerId = partner.id;
 
-        // AP 27: Hier prüfen wir auch den State, bevor wir initialisieren
-        // Da partnerFeedback direkt aus this.state kommt, ist es bereits geladen (durch _loadState im Controller)
         if (!partnerFeedback[partnerId]) {
             partnerFeedback[partnerId] = {
                 frequency: isTestMode ? (Math.floor(Math.random() * 4) + 1) : 0,
@@ -165,7 +155,6 @@ export class DataView {
         const pf = partnerFeedback[partnerId];
         const initialComment = pf.generalComment || '';
 
-        // AP 25: Header Template
         const freqSliderHTML = this.createHeaderSliderHTML(`freq_${partnerId}`, 'frequency', pf.frequency, 0, CONFIG.WIZARD.FREQUENCY_MAX, {1:"Selten", 2:"Monatlich / Gelegentlich", 4:"Täglich / Intensiv"});
         const npsSliderHTML = this.createHeaderSliderHTML(`nps_${partnerId}`, 'nps', pf.nps, CONFIG.WIZARD.NPS_RANGES.NA_VALUE, 10, {});
         
@@ -185,7 +174,6 @@ export class DataView {
                     performanceData[partnerId] = {};
                 }
                 
-                // AP 27: Daten aus State verwenden
                 let storedData = performanceData[partnerId][rawId];
                 let currentVal = 0;
                 let currentComment = '';
@@ -198,7 +186,7 @@ export class DataView {
                         currentVal = storedData;
                     }
                 } else if (isTestMode) {
-                    currentVal = Math.floor(Math.random() * 10) + 1; 
+                    currentVal = Math.floor(Math.random() * 5) + 1; 
                     performanceData[partnerId][rawId] = { score: currentVal, comment: '' };
                 } else {
                     performanceData[partnerId][rawId] = { score: 0, comment: '' };
@@ -214,7 +202,6 @@ export class DataView {
         return `<div id="partner-view-${partnerId}" style="display: none;">${headerHTML}${criteriaHTML}</div></div>`;
     }
 
-    // Hilfsmethode für AP 25 Refactoring (Kommentar-Support)
     createSliderHTMLWithComment(domId, rawId, type, initialValue, initialComment) {
         const extraInputClass = initialValue === 0 ? 'slider-neutral' : '';
         const displayValue = initialValue === 0 ? 'N/A' : initialValue;
@@ -223,7 +210,7 @@ export class DataView {
         const isExtreme = (initialValue > 0 && initialValue <= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MIN) || initialValue >= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MAX;
         iconHTML = Tpl.getCommentIconHTML(domId, isExtreme);
 
-        const sliderContainer = Tpl.getSliderHTML(domId, type, 0, 10, initialValue, {
+        const sliderContainer = Tpl.getSliderHTML(domId, type, 0, 5, initialValue, {
             rawId: rawId,
             extraInputClass: extraInputClass,
             displayValue: displayValue,
@@ -335,10 +322,16 @@ export class DataView {
                 isNeutral = true;
                 displayValue = 'N/A';
                 tooltipText = 'Keine Angabe';
-            } else {
-                if (value <= CONFIG.WIZARD.IMPORTANCE_TOOLTIP_THRESHOLD.MIN) tooltipText = `${value} - ist mir eher unwichtig`;
-                else if (value >= CONFIG.WIZARD.IMPORTANCE_TOOLTIP_THRESHOLD.MAX) tooltipText = `${value} - ist mir extrem wichtig`;
-                else tooltipText = `${value} - wichtig`;
+            } else if (value === 1) {
+                tooltipText = '1 - Völlig unwichtig';
+            } else if (value === 2) {
+                tooltipText = '2 - Nicht so wichtig';
+            } else if (value === 3) {
+                tooltipText = '3 - Egal';
+            } else if (value === 4) {
+                tooltipText = '4 - Wichtiger';
+            } else if (value === 5) {
+                tooltipText = '5 - SEHR wichtig';
             }
             this.callbacks.setImportance(rawId, value);
 
@@ -347,10 +340,16 @@ export class DataView {
                 isNeutral = true;
                 displayValue = 'N/A';
                 tooltipText = 'Keine Angabe';
-            } else {
-                if (value <= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MIN) tooltipText = `${value} - erfüllt der Partner sehr schlecht`;
-                else if (value >= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MAX) tooltipText = `${value} - erfüllt der Partner sehr gut`;
-                else tooltipText = `${value} - neutral`;
+            } else if (value === 1) {
+                tooltipText = '1 - GAR nicht';
+            } else if (value === 2) {
+                tooltipText = '2 - Einigermaßen';
+            } else if (value === 3) {
+                tooltipText = '3 - OK';
+            } else if (value === 4) {
+                tooltipText = '4 - Gut';
+            } else if (value === 5) {
+                tooltipText = '5 - Sehr, sehr GUT';
             }
             
             const partnerId = this.callbacks.getCurrentPartnerId(); 
@@ -362,7 +361,7 @@ export class DataView {
                 const textarea = document.getElementById(`comment_${domId}`);
                 
                 if (icon) {
-                    const isExtreme = (value > 0 && value <= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MIN) || value >= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MAX;
+                    const isExtreme = (value > 0 && value <= 1) || value >= 5;
                     const hasText = textarea && textarea.value.trim() !== '';
                     
                     if (isExtreme || hasText) {

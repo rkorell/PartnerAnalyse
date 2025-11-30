@@ -8,6 +8,7 @@
   # Modified: 28.11.2025, 15:30 - AP 24: Added COLORS and UI constants for modularization
   # Modified: 28.11.2025, 17:00 - AP 27: Added USE_LOCAL_STORAGE switch
   # Modified: 29.11.2025, 20:30 - AP 32: Configured Analysis thresholds (Min Answers Limit, Conflict)
+  # Modified: 30.11.2025 - AP X: Adjusted thresholds for 1-5 scale, removed IMPORTANCE_TOOLTIP_THRESHOLD (fixed mapping now)
 */
 
 export const CONFIG = {
@@ -32,17 +33,9 @@ export const CONFIG = {
         USE_LOCAL_STORAGE: false, 
 
         // Schwellenwerte für die Anzeige des Kommentar-Icons (Performance)
-        // Hartcodiert in app.js: <= 3 ODER >= 8
         PERFORMANCE_COMMENT_THRESHOLD: {
             MIN: 1, 
-            MAX: 10 
-        },
-        
-        // Schwellenwerte für die Tooltips (Importance)
-        // Hartcodiert in app.js: <= 2 ODER >= 8
-        IMPORTANCE_TOOLTIP_THRESHOLD: {
-            MIN: 2, 
-            MAX: 8 
+            MAX: 5 
         },
         
         // NPS-Kategorisierung (Promoter, Detractor)
