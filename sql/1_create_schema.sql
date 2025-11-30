@@ -11,7 +11,8 @@
   # Modified: 28.11.2025, 18:00 - AP 29.1: Added admin_users table for authentication
   # Modified: 29.11.2025, 20:30 - AP 33: Added main analysis function calculate_partner_bilanz
   # Modified: 29.11.2025, 22:45 - AP 34: Updated calculate_partner_bilanz to use V2.3 Linear Model (No Rounding)
-  # Modified: 30.11.2025 - AP X: Changed ratings_score_check constraint from 1-10 to 1-5
+  # Modified: 30.11.2025 - AP 36: Changed ratings_score_check constraint from 1-10 to 1-5
+  # Modified: 30.11.2025, 11:55 - AP 40: Fixed criteria sorting in get_partner_matrix_details (sort_order instead of name)
 */
 
 DROP TABLE IF EXISTS admin_users CASCADE;
@@ -25,6 +26,8 @@ DROP TABLE IF EXISTS departments CASCADE;
 DROP TABLE IF EXISTS surveys CASCADE;
 DROP FUNCTION IF EXISTS get_department_subtree CASCADE;
 DROP FUNCTION IF EXISTS calculate_partner_bilanz CASCADE;
+DROP FUNCTION IF EXISTS get_partner_matrix_details CASCADE;
+DROP FUNCTION IF EXISTS get_partner_structure_stats CASCADE;
 DROP VIEW IF EXISTS view_ratings_extended CASCADE;
 
 -- 1. App Texte (Tooltips & Statische Texte)
@@ -355,10 +358,11 @@ END;
 $$ LANGUAGE plpgsql;
 
 
-/* Funktion: get_partner_matrix_details (AP 36)
+/* Funktion: get_partner_matrix_details (AP 36 / AP 40 Fix)
   Zweck: Liefert die Punkte für die IPA-Matrix.
   WICHTIG: Nutzt Frequenz-Gewichtung für Performance, damit Matrix und Score konsistent sind.
   Skala: 1-5 (für die Grafik), nicht Netto-Wert.
+  AP 40: Sortierung nach sort_order statt name
 */
 CREATE OR REPLACE FUNCTION get_partner_matrix_details(
     p_partner_id INT,
@@ -425,7 +429,7 @@ BEGIN
     FROM perf_data p
     JOIN imp_data i ON p.criterion_id = i.criterion_id
     JOIN criteria c ON p.criterion_id = c.id
-    ORDER BY c.name;
+    ORDER BY c.sort_order, c.id;
 END;
 $$ LANGUAGE plpgsql;
 

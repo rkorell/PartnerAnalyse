@@ -1314,3 +1314,168 @@ input[type=range].slider-neutral {
     font-size: 0.9em;
 }
 
+
+/* Hover für inline-Variante: Kombinierter Transform */
+.info-trigger-inline:hover {
+    transform: translateY(-50%) scale(1.1);
+}
+
+/* ============================================================
+   AP 40: Design-Upgrade - Cards, Gradients, Pills, Header
+   Added: 30.11.2025, 14:15
+   Einfach am Ende der style.css anhängen
+   ============================================================ */
+
+/* --- A: Cards statt flache Tabellenzeilen --- */
+.score-table-row {
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    margin-bottom: 12px;
+    padding: 12px 15px;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.score-table-row:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+}
+
+/* Header-Zeile als Card ausschließen */
+.score-table-header {
+    background: transparent;
+    box-shadow: none;
+    margin-bottom: 8px;
+    padding: 8px 15px;
+    border-radius: 0;
+    border-bottom: 2px solid #ecf0f1;
+}
+
+.score-table-header:hover {
+    box-shadow: none;
+    transform: none;
+}
+
+/* --- B: Gradient-Balken statt Flat-Color --- */
+.dbc-bar-right {
+    background: linear-gradient(90deg, #66bb6a, #43a047);
+    border-radius: 0 4px 4px 0;
+}
+
+.dbc-bar-left {
+    background: linear-gradient(90deg, #ef5350, #e57373);
+    border-radius: 4px 0 0 4px;
+}
+
+/* --- D: Pills für Insight-Icons --- */
+.insight-slot-nps .nps-display {
+    background: #f8f9fa;
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 0.9em;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid #e9ecef;
+}
+
+.insight-slot-icon .insight-icon,
+.insight-slot-mini .insight-icon {
+    background: #f8f9fa;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e9ecef;
+    font-size: 1em;
+    transition: background-color 0.2s ease;
+}
+
+.insight-slot-icon .insight-icon:hover,
+.insight-slot-mini .insight-icon:hover {
+    background: #e9ecef;
+}
+
+/* Kommentar-Icon (💬) mit Count */
+.insight-icon .action-count {
+    font-size: 0.75em;
+    margin-left: 2px;
+}
+
+/* --- E: Header-Redesign --- */
+.criteria-group-title {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    border-radius: 8px 8px 0 0;
+    padding: 14px 20px;
+    font-size: 1.1em;
+    letter-spacing: 0.3px;
+}
+
+/* --- Zusätzliche Feinheiten --- */
+
+/* Mehr Weißraum um die Tabelle */
+.criteria-table {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 0 0 8px 8px;
+}
+
+/* Partner-Link dezenter */
+.col-partner-link {
+    color: #2c3e50;
+    font-weight: 600;
+    transition: color 0.2s ease;
+}
+
+.col-partner-link:hover {
+    color: #3498db;
+}
+
+/* Awareness-Pie etwas größer und mit Schatten */
+.awareness-pie {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Legende als Card */
+.icon-legend-box {
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    padding: 12px 20px;
+    margin-top: 20px;
+}
+
+/* ============================================================
+   Ende AP 40
+   ============================================================ */
+
+.dbc-bar-left,
+.dbc-bar-right {
+    text-shadow: 
+        0 0 3px rgba(0, 0, 0, 0.7),
+        0 0 6px rgba(0, 0, 0, 0.5);
+}
+
+
+/* Text außerhalb bei kleinen Balken */
+.dbc-bar-left.text-outside,
+.dbc-bar-right.text-outside {
+    overflow: visible;
+}
+
+.dbc-bar-right.text-outside {
+    color: #2c3e50;
+    text-shadow: none;
+}
+
+.dbc-bar-left.text-outside {
+    color: #2c3e50;
+    text-shadow: none;
+}
+
+.dbc-bar-left-wrapper,
+.dbc-bar-right-wrapper {
+    overflow: visible;
+}

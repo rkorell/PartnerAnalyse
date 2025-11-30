@@ -13,6 +13,7 @@
   # Modified: 30.11.2025, 09:59 - AP 37: Fixed legend - replaced bar colors with correct insight icons + tooltips
   # Modified: 30.11.2025, 10:04 - AP 38: Added NPS explanation link in partner header
   # Modified: 30.11.2025, 10:39 - AP 39: Matrix redesign - German labels, pastel colors, adjusted line weights, removed center display
+  # Modified: 30.11.2025, 11:45 - AP 40: Moved info icon from filter section to result table header
 */
 
 import { escapeHtml } from './utils.js';
@@ -94,9 +95,13 @@ export function getCommentIconHTML(domId, isVisible) {
 
 // --- SCORE ANALYSE TEMPLATES (V2.1) ---
 
+// AP 40: Info-Icon in Tabellen-Header eingefügt
 export function getScoreTableStartHTML(title) {
     return `
-    <div class="criteria-group-title">${escapeHtml(title)}</div>
+    <div class="criteria-group-title" style="position: relative;">
+        ${escapeHtml(title)}
+        <span class="info-trigger info-trigger-inline" onclick="window.openInfoModal('analytic-mask')" title="Lesehilfe & Methodik">i</span>
+    </div>
     <div class="criteria-table">
         <div class="criteria-row score-table-header">
             <div class="criteria-content col-partner">Partner</div>
@@ -105,6 +110,7 @@ export function getScoreTableStartHTML(title) {
             <div class="criteria-content col-insights text-center">Insights</div>
         </div>`;
 }
+
 
 export function getScoreRowHTML_DBC(row, slots, scaling) {
     const {
@@ -158,6 +164,7 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
         </div>
     </div>`;
 }
+
 
 export function getLegendHTML() {
     return `
