@@ -22,6 +22,7 @@
   # Modified: 29.11.2025, 20:30 - AP 32: Implemented soft filter initialization (set min only, keep html default value)
   # Modified: 29.11.2025, 23:15 - AP 35: Added Jitter logic to Matrix generation to solve overplotting
   # Modified: 29.11.2025, 23:45 - AP 36: Integration of Structure Table and new DB-based data loading
+  # Modified: 30.11.2025, 10:39 - AP 39: Matrix redesign - coordinate mapping with padding buffer to prevent clipping
 */
 
 import { CONFIG } from './config.js';
@@ -132,12 +133,9 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }, true);
 
-    // AP 32: Soft Initialization (Setze nur Grenzen, überschreibe nicht den HTML-Default-Value)
     function initializeFilters() {
         if (CONFIG.ANALYSIS.MIN_ANSWERS_LIMIT) {
             minAnswersSlider.min = CONFIG.ANALYSIS.MIN_ANSWERS_LIMIT;
-            // Wir lassen den 'value' unangetastet, damit der HTML-Standard (5) greift.
-            // Aktualisieren aber den Text, damit er synchron zum Slider steht.
             minAnswersValue.textContent = minAnswersSlider.value;
         }
     }
@@ -200,7 +198,6 @@ document.addEventListener("DOMContentLoaded", function() {
         fetch('php/get_data.php')
             .then(response => response.json())
             .then(data => {
-                // AP 29.3: Check Auth Status Proactively
                 if (data.auth_status && data.auth_status.enabled && !data.auth_status.logged_in) {
                     showLoginModal();
                     return;
@@ -229,7 +226,6 @@ document.addEventListener("DOMContentLoaded", function() {
         fetch('php/get_data.php')
             .then(response => response.json())
             .then(data => {
-                // Auth check is implicitly handled by fetchSurveys as well
                 if (data.app_texts) appTexts = data.app_texts;
                 if (data && data.departments && departmentTreeContainer) {
                     departmentTreeContainer.innerHTML = '';
@@ -383,9 +379,8 @@ document.addEventListener("DOMContentLoaded", function() {
                     totalAnswers: row.total_answers,
                     globalParticipantCount: row.global_participant_count,
                     
-                    // V2.2 Fields (DB Function)
                     scorePositive: parseFloat(row.score_positive || 0),
-                    scoreNegative: Math.abs(parseFloat(row.score_negative || 0)), // Absolut
+                    scoreNegative: Math.abs(parseFloat(row.score_negative || 0)),
                     countPositive: parseInt(row.count_positive || 0),
                     countNegative: parseInt(row.count_negative || 0),
                     
@@ -428,7 +423,6 @@ document.addEventListener("DOMContentLoaded", function() {
     function renderResultTable(rows) {
         const globalCount = rows.length > 0 && rows[0].globalParticipantCount ? rows[0].globalParticipantCount : 0;
 
-        // Globales Maximum für Skalierung finden
         let maxBarValue = 0;
         rows.forEach(r => {
             if (r.scorePositive > maxBarValue) maxBarValue = r.scorePositive;
@@ -442,9 +436,9 @@ document.addEventListener("DOMContentLoaded", function() {
             const posWidth = (row.scorePositive / maxBarValue) * 100;
             const negWidth = (row.scoreNegative / maxBarValue) * 100;
 
-            let awColor = '#e74c3c'; // Rot
-            if (row.awarenessPct >= 80) awColor = '#2ecc71'; // Grün
-            else if (row.awarenessPct >= 50) awColor = '#f1c40f'; // Gelb
+            let awColor = '#e74c3c';
+            if (row.awarenessPct >= 80) awColor = '#2ecc71';
+            else if (row.awarenessPct >= 50) awColor = '#f1c40f';
 
             let slot1 = ''; 
             let slot2 = ''; 
@@ -474,15 +468,13 @@ document.addEventListener("DOMContentLoaded", function() {
             const cntMgr = parseInt(row.numAssessorsMgr || 0);
             const cntTeam = parseInt(row.numAssessorsTeam || 0);
             const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
-            const conflictMinAssessors = CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS || 1; // Default 1 (aus AP 32)
+            const conflictMinAssessors = CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS || 1;
             
-            // AP 32: Nutze Config-Wert für Konflikt-Erkennung
             if (cntMgr >= conflictMinAssessors && cntTeam >= conflictMinAssessors && maxDiv > conflictThreshold) {
                 const title = `Maximale Divergenz: ${maxDiv.toFixed(1)} (Schwellenwert: ${conflictThreshold})`;
                 slot4 = Tpl.getInsightIconHTML('conflict', row.partnerId, title, '⚡');
             }
 
-            // AP I.3: Aufruf des neuen Templates (Diverging Bar)
             html += Tpl.getScoreRowHTML_DBC(row, { slot1, slot2, slot3, slot4 }, {
                 posWidth, negWidth,
                 posCount: row.countPositive, negCount: row.countNegative,
@@ -496,7 +488,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     async function ensurePartnerDetails(partner) {
-        // Prüfen, ob wir alles haben (inkl. Stats) - AP 36
         if (partner.matrixDetails && partner.generalComments && partner.structureStats) {
             return partner; 
         }
@@ -523,7 +514,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
             partner.matrixDetails = details.matrix_details;
             partner.generalComments = details.general_comments;
-            partner.structureStats = details.structure_stats; // NEU AP 36
+            partner.structureStats = details.structure_stats;
             
             return partner;
         } catch (e) {
@@ -536,7 +527,6 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    // UPDATE: handleInsightClickAsync zeigt jetzt Struktur-Tabelle an
     async function handleInsightClickAsync(action, partnerId) {
         let partner = analysisData.find(p => p.partnerId == partnerId);
         if (!partner) return;
@@ -547,7 +537,6 @@ document.addEventListener("DOMContentLoaded", function() {
         let title = "";
         let content = "";
         
-        // AP 36: Struktur-Tabelle immer anzeigen
         content += Tpl.getParticipantStructureHTML(partner.structureStats);
         content += "<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>";
 
@@ -566,7 +555,6 @@ document.addEventListener("DOMContentLoaded", function() {
         else if (action === 'action') {
             title = `Handlungsfelder für ${escapeHtml(partner.partnerName)}`;
             if (partner.matrixDetails) {
-                // Nutzung der DB-Werte (V2.3 Konsistenz)
                 const items = partner.matrixDetails.filter(d => parseFloat(d.imp) >= 4.0 && parseFloat(d.perf) <= 2.0);
                 if (items.length > 0) {
                     content += Tpl.getActionTableHTML(items);
@@ -594,7 +582,7 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById('global-info-modal').style.display = 'flex';
     }
 
-    // IPA Matrix Logic V2.2
+    // IPA Matrix Logic - AP 39: Coordinate mapping with padding buffer
     function calculateStats(details) {
         const imps = details.map(d => parseFloat(d.imp));
         const perfs = details.map(d => parseFloat(d.perf));
@@ -624,14 +612,22 @@ document.addEventListener("DOMContentLoaded", function() {
         renderMatrixSVG(currentPartnerDetails.matrixDetails);
     }
 
+    // AP 39: Matrix rendering with padding buffer to prevent clipping
     function renderMatrixSVG(details) {
         const size = CONFIG.UI.MATRIX_SIZE; 
-        const padding = 40;
-        const plotSize = size - padding; 
-        const step = plotSize / 4; 
+        const padding = 50;
+        const plotSize = size - (padding * 2);
+        
+        // AP 39: Wertbereich 1-5 mit 0.2 Puffer auf jeder Seite (effektiv 0.8-5.2)
+        const valueMin = 0.8;
+        const valueMax = 5.2;
+        const valueRange = valueMax - valueMin;
+        
+        // Skalierungsfunktion: Wert (0.8-5.2) -> Pixel
+        const scaleX = (val) => padding + ((val - valueMin) / valueRange) * plotSize;
+        const scaleY = (val) => padding + plotSize - ((val - valueMin) / valueRange) * plotSize;
 
-        // AP 35: Jittering für Overplotting-Lösung (+/- 5px)
-        const jitterRange = 10; 
+        const jitterRange = 0.15;
         const jitter = () => (Math.random() - 0.5) * jitterRange;
 
         let dotsHTML = '';
@@ -639,17 +635,13 @@ document.addEventListener("DOMContentLoaded", function() {
             const valImp = parseFloat(d.imp);
             const valPerf = parseFloat(d.perf);
 
-            // Jitter auf Koordinaten addieren
-            let cx = padding + ((valPerf - 1) * step);
-            let cy = plotSize - ((valImp - 1) * step);
-            
-            cx += jitter();
-            cy += jitter();
+            const cx = scaleX(valPerf + jitter());
+            const cy = scaleY(valImp + jitter());
 
             dotsHTML += Tpl.getMatrixDotHTML(cx, cy, d.name, valImp, valPerf);
         });
         
-        matrixContainer.innerHTML = Tpl.getMatrixSVG_Standard(dotsHTML);
+        matrixContainer.innerHTML = Tpl.getMatrixSVG_Standard(dotsHTML, size, padding, plotSize);
     }
 
     function exportToCSV() {

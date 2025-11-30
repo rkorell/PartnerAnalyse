@@ -13,6 +13,7 @@
   # Modified: 28.11.2025, 16:30 - AP 26: Implemented dynamic button coloring (Blue=Active, Grey=Inactive)
   # Modified: 28.11.2025, 17:00 - AP 27: Added LocalStorage persistence (Light version)
   # Modified: 28.11.2025, 20:00 - AP 29.3: Integrated CSRF token handling
+  # Modified: 30.11.2025, 10:04 - AP 38: Added openInfoModal() method for app_texts integration
 */
 
 import { CONFIG } from './config.js';
@@ -205,17 +206,14 @@ export class WizardController {
         document.getElementById('prev-partner').addEventListener('click', () => this.flow.previousPartner());
         document.getElementById('next-partner').addEventListener('click', () => this.flow.nextPartner());
         document.getElementById('close-error').addEventListener('click', () => this.hideError());
-
+    }
+    
+    // --- AP 38: INFO MODAL ---
+    openInfoModal(category) {
+        const content = this.appTexts[category] || "<p>Information wird geladen oder ist nicht verfügbar.</p>";
+        document.getElementById('info-modal-body').innerHTML = content;
         const modal = document.getElementById('global-info-modal');
-        const closeBtn = document.getElementById('close-info-modal'); 
-        const closeBtnClass = document.querySelector('.info-modal-close');
-        
-        if(closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
-        else if(closeBtnClass) closeBtnClass.addEventListener('click', () => { modal.style.display = 'none'; });
-
-        if(modal) modal.addEventListener('click', (e) => {
-            if (e.target === modal) modal.style.display = 'none';
-        });
+        if(modal) modal.style.display = 'flex';
     }
     
     // --- HIERARCHIE & PARTNER SELECTION ---

@@ -791,7 +791,7 @@ input[type=range].slider-neutral {
 
 .matrix-wrapper {
     width: 100%;
-    max-width: 450px; /* Quadratisch halten */
+    max-width: 650px; /* Quadratisch halten WAR 450 - RKORELL*/
     aspect-ratio: 1 / 1;
     background: #fdfdfd;
     border: 1px solid #eee;

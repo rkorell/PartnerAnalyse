@@ -9,6 +9,8 @@
 // # Modified: 27.11.2025, 14:05 - DOM performance optimization (AP 5a): Pre-render all partner views, only toggle visibility. (INKLUSIVE bindEvents FIX)
 // # Modified: 27.11.2025, 14:15 - FIX: Missing Submit button (Regression from AP 5a). Added missing updateNavigationButtons call.
 // # Modified: 27.11.2025, 14:30 - Centralized configuration via config.js (AP 6)
+// # Modified: 27.11.2025, 14:50 - Converted to ES6 module entry point (AP 8)
+// # Modified: 30.11.2025, 10:04 - AP 38: Bound close event listeners for global info modal
 
 /*
   
@@ -27,6 +29,22 @@ document.addEventListener('DOMContentLoaded', () => {
             window.wizardInstance.openInfoModal(category);
         }
     };
+    
+    // AP 38: Modal Close Event-Listener binden
+    const infoModal = document.getElementById('global-info-modal');
+    const closeInfoBtn = document.getElementById('close-info-modal');
+    
+    if(closeInfoBtn) {
+        closeInfoBtn.addEventListener('click', () => { 
+            if(infoModal) infoModal.style.display = 'none'; 
+        });
+    }
+    
+    if(infoModal) {
+        infoModal.addEventListener('click', (e) => {
+            if (e.target === infoModal) infoModal.style.display = 'none';
+        });
+    }
     
     // Starte die Anwendung
     window.wizardInstance = new WizardController();

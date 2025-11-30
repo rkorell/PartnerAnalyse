@@ -11,6 +11,8 @@
   # Modified: 30.11.2025, 00:15 - AP 37: Changed manager color in conflict table to primary blue (neutral)
   # Modified: 30.11.2025, 09:54 - AP 37: Added introductory question text for performance criteria section
   # Modified: 30.11.2025, 09:59 - AP 37: Fixed legend - replaced bar colors with correct insight icons + tooltips
+  # Modified: 30.11.2025, 10:04 - AP 38: Added NPS explanation link in partner header
+  # Modified: 30.11.2025, 10:39 - AP 39: Matrix redesign - German labels, pastel colors, adjusted line weights, removed center display
 */
 
 import { escapeHtml } from './utils.js';
@@ -58,7 +60,7 @@ export function getPartnerHeaderHTML(partnerName, freqHTML, npsHTML, initialComm
             </div>
             <div class="form-row" style="margin-top:20px;">
                 <div class="form-group" style="width:100%;">
-                    <label>Würdest Du ${escapeHtml(partnerName)} weiterempfehlen? (NPS) *</label>
+                    <label>Würdest Du ${escapeHtml(partnerName)} weiterempfehlen? <a href="#" style="color: #3498db;" onclick="window.openInfoModal('nps-explanation'); return false;">(NPS)</a> *</label>
                     ${npsHTML}
                 </div>
             </div>
@@ -179,13 +181,11 @@ export function getInsightIconHTML(action, id, title, content) {
 
 // --- MODAL & MATRIX TEMPLATES ---
 
-// NEU AP 36: Struktur-Tabelle im Modal
 export function getParticipantStructureHTML(stats) {
     if (!stats || stats.length === 0) return '';
 
     let rows = '';
     stats.forEach(s => {
-        // Hervorhebung für die Gesamt-Zeile
         const style = s.role.includes('Gesamt') ? 'font-weight:bold; background:#f1f2f6;' : '';
         rows += `<tr style="${style}">
             <td>${escapeHtml(s.role)}</td>
@@ -261,36 +261,32 @@ export function getConflictTableHTML(conflicts) {
     return html;
 }
 
-// UPDATE AP 35/36: Design-Optimierung & Quadranten
-export function getMatrixSVG_Standard(dotsHTML) {
-    const size = 400;
-    const padding = 40; 
-    const plotSize = size - padding;
+// AP 39: Matrix Redesign - German labels, pastel colors, adjusted line weights
+export function getMatrixSVG_Standard(dotsHTML, size, padding, plotSize) {
+    const mid = padding + (plotSize / 2);
     
     return `<svg viewBox="0 0 ${size} ${size}" class="matrix-svg">
-        <defs>
-            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-                <path d="M0,0 L0,6 L9,3 z" fill="#95a5a6" />
-            </marker>
-        </defs>
+        <!-- Koordinatenkreuz (prominent, 1.2px solid) -->
+        <line x1="${padding}" y1="${mid}" x2="${padding + plotSize}" y2="${mid}" stroke="#95a5a6" stroke-width="1.2" />
+        <line x1="${mid}" y1="${padding}" x2="${mid}" y2="${padding + plotSize}" stroke="#95a5a6" stroke-width="1.2" />
         
-        <line x1="${padding}" y1="${plotSize}" x2="${padding}" y2="10" class="matrix-axis-line" />
-        <text x="10" y="${plotSize/2}" transform="rotate(-90 10,${plotSize/2})" class="matrix-axis-label" text-anchor="middle">Wichtigkeit</text>
+        <!-- Achsen (dezent, 1px) -->
+        <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${padding + plotSize}" stroke="#bdc3c7" stroke-width="1" />
+        <line x1="${padding}" y1="${padding + plotSize}" x2="${padding + plotSize}" y2="${padding + plotSize}" stroke="#bdc3c7" stroke-width="1" />
+        <line x1="${padding + plotSize}" y1="${padding}" x2="${padding + plotSize}" y2="${padding + plotSize}" stroke="#bdc3c7" stroke-width="1" />
+        <line x1="${padding}" y1="${padding}" x2="${padding + plotSize}" y2="${padding}" stroke="#bdc3c7" stroke-width="1" />
         
-        <line x1="${padding}" y1="${plotSize}" x2="${size-10}" y2="${plotSize}" class="matrix-axis-line" />
-        <text x="${padding + plotSize/2}" y="${size-5}" class="matrix-axis-label" text-anchor="middle">Leistung</text>
-
-        <line x1="220" y1="${plotSize}" x2="220" y2="0" class="matrix-cross-line" />
-        <line x1="${padding}" y1="180" x2="${size}" y2="180" class="matrix-cross-line" />
+        <!-- Achsenbeschriftung -->
+        <text x="${padding - 25}" y="${mid}" fill="#7f8c8d" font-size="11" text-anchor="middle" transform="rotate(-90 ${padding - 25},${mid})">Wichtigkeit</text>
+        <text x="${mid}" y="${padding + plotSize + 25}" fill="#7f8c8d" font-size="11" text-anchor="middle">Leistung</text>
         
-        <text x="${padding - 15}" y="20" class="matrix-axis-label-large">5</text>
-        <text x="${size - 20}" y="${plotSize + 20}" class="matrix-axis-label-large">5</text>
-
-        <text x="60" y="40" fill="#e74c3c" font-size="14" font-weight="bold">ACTION</text>
-        <text x="340" y="40" fill="#2ecc71" font-size="14" font-weight="bold" text-anchor="end">PROMOTE</text>
-        <text x="60" y="340" fill="#bdc3c7" font-size="14" font-weight="bold">MONITOR</text>
-        <text x="340" y="340" fill="#bdc3c7" font-size="14" font-weight="bold" text-anchor="end">MAINTAIN</text>
-
+        <!-- Quadranten-Texte (deutsche Labels, pastell-Farben für oben) -->
+        <text x="${padding + 10}" y="${padding + 20}" fill="#e57373" font-size="12" font-weight="bold">Konzentrieren!</text>
+        <text x="${padding + plotSize - 10}" y="${padding + 20}" fill="#81c784" font-size="12" font-weight="bold" text-anchor="end">Weiter so</text>
+        <text x="${padding + 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12">Niedrige Prio</text>
+        <text x="${padding + plotSize - 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12" text-anchor="end">Overkill?</text>
+        
+        <!-- Datenpunkte -->
         ${dotsHTML}
     </svg>`;
 }
