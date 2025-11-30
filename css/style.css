@@ -1302,3 +1302,15 @@ input[type=range].slider-neutral {
     fill: #7f8c8d;
 }
 
+/* Info-Icon inline im Tabellen-Header */
+.info-trigger-inline {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    font-size: 0.9em;
+}
+
