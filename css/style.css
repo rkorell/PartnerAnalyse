@@ -208,10 +208,20 @@ body {
 .criteria-row {
     display: flex;
     border-bottom: 1px solid #ecf0f1;
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    margin-bottom: 12px;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .criteria-row:last-child {
-    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.criteria-row:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
 }
 
 .criteria-content {
@@ -1180,7 +1190,7 @@ input[type=range].slider-neutral {
     background: #fff; 
     padding: 20px; 
     border-radius: 8px; 
-    border: 1px solid #ecf0f1; 
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     margin-bottom: 30px;
 }
 
@@ -1573,4 +1583,63 @@ input[type=range].slider-neutral {
 .dbc-bar-left-wrapper,
 .dbc-bar-right-wrapper {
     overflow: visible;
+}
+
+/* =========================================
+   AP 42: Slider Modernisierung (3D-Effekte)
+   Added: 02.12.2025
+   ========================================= */
+
+/* Basis-Reset für Custom-Styling */
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 8px;
+    background: #ecf0f1;
+    border-radius: 4px;
+    outline: none;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* Track - Firefox */
+input[type="range"]::-moz-range-track {
+    height: 8px;
+    background: #ecf0f1;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* Thumb - Chrome/Safari/Edge */
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #3498db;
+    border: 3px solid #ffffff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+/* Thumb - Firefox */
+input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #3498db;
+    border: 3px solid #ffffff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+/* Hover-Effekt für Thumb */
+input[type="range"]::-webkit-slider-thumb:hover {
+    background: #2980b9;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+    background: #2980b9;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
 }
