@@ -14,6 +14,7 @@
   # Modified: 30.11.2025, 10:04 - AP 38: Added NPS explanation link in partner header
   # Modified: 30.11.2025, 10:39 - AP 39: Matrix redesign - German labels, pastel colors, adjusted line weights, removed center display
   # Modified: 30.11.2025, 11:45 - AP 40: Moved info icon from filter section to result table header
+  # Modified: 02.12.2025, 15:45 - AP 41: Changed info-trigger to help-beacon-header class
 */
 
 import { escapeHtml } from './utils.js';
@@ -95,12 +96,12 @@ export function getCommentIconHTML(domId, isVisible) {
 
 // --- SCORE ANALYSE TEMPLATES (V2.1) ---
 
-// AP 40: Info-Icon in Tabellen-Header eingefügt
+// AP 41: Changed to help-beacon-header class
 export function getScoreTableStartHTML(title) {
     return `
     <div class="criteria-group-title" style="position: relative;">
         ${escapeHtml(title)}
-        <span class="info-trigger info-trigger-inline" onclick="window.openInfoModal('analytic-mask')" title="Lesehilfe & Methodik">i</span>
+        <span class="help-beacon-header" onclick="window.openInfoModal('analytic-mask')" title="Lesehilfe & Methodik">i</span>
     </div>
     <div class="criteria-table">
         <div class="criteria-row score-table-header">

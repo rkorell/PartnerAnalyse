@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- # Modified: 02.12.2025, 16:30 - AP 41: Moved help-beacon outside of wizard-step to prevent fadeIn animation conflict -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -27,10 +28,9 @@
         </div>
 
         <div class="wizard-container" style="position: relative;">
+            <div class="help-beacon" onclick="window.openInfoModal('entry-mask')" title="Methodik & Zielsetzung">i</div>
             
             <div class="wizard-step active" id="wizard-step-1">
-                <div class="info-trigger" onclick="window.openInfoModal('entry-mask')" title="Methodik & Zielsetzung">i</div>
-
                 <h2>Persönliche Angaben</h2>
                 <div class="form-section">
                     <div class="form-row">
