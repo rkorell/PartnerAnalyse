@@ -23,6 +23,7 @@
   # Modified: 29.11.2025, 23:15 - AP 35: Added Jitter logic to Matrix generation to solve overplotting
   # Modified: 29.11.2025, 23:45 - AP 36: Integration of Structure Table and new DB-based data loading
   # Modified: 30.11.2025, 10:39 - AP 39: Matrix redesign - coordinate mapping with padding buffer to prevent clipping
+  # Modified: 02.12.2025, 17:30 - AP 43: Replaced all Magic Numbers with CONFIG references
 */
 
 import { CONFIG } from './config.js';
@@ -448,9 +449,13 @@ document.addEventListener("DOMContentLoaded", function() {
             if (row.npsScore !== null && row.npsScore !== undefined) {
                 const nps = parseInt(row.npsScore);
                 let npsColor = CONFIG.COLORS.NPS_DETRACTOR; 
-                if (nps >= 0 && nps <= 30) npsColor = CONFIG.COLORS.NPS_PASSIVE_LOW; 
-                else if (nps > 30 && nps <= 70) npsColor = CONFIG.COLORS.NPS_PASSIVE_HIGH; 
-                else if (nps > 70) npsColor = CONFIG.COLORS.NPS_PROMOTER; 
+                if (nps >= 0 && nps <= CONFIG.ANALYSIS.NPS_THRESHOLDS.PASSIVE_LOW_MAX) {
+                    npsColor = CONFIG.COLORS.NPS_PASSIVE_LOW;
+                } else if (nps > CONFIG.ANALYSIS.NPS_THRESHOLDS.PASSIVE_LOW_MAX && nps <= CONFIG.ANALYSIS.NPS_THRESHOLDS.PASSIVE_HIGH_MAX) {
+                    npsColor = CONFIG.COLORS.NPS_PASSIVE_HIGH;
+                } else if (nps > CONFIG.ANALYSIS.NPS_THRESHOLDS.PASSIVE_HIGH_MAX) {
+                    npsColor = CONFIG.COLORS.NPS_PROMOTER;
+                }
                 
                 slot1 = Tpl.getInsightNpsHTML(nps, npsColor);
             }
@@ -467,11 +472,9 @@ document.addEventListener("DOMContentLoaded", function() {
             const maxDiv = parseFloat(row.maxDivergence || 0);
             const cntMgr = parseInt(row.numAssessorsMgr || 0);
             const cntTeam = parseInt(row.numAssessorsTeam || 0);
-            const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
-            const conflictMinAssessors = CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS || 1;
             
-            if (cntMgr >= conflictMinAssessors && cntTeam >= conflictMinAssessors && maxDiv > conflictThreshold) {
-                const title = `Maximale Divergenz: ${maxDiv.toFixed(1)} (Schwellenwert: ${conflictThreshold})`;
+            if (cntMgr >= CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS && cntTeam >= CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS && maxDiv > CONFIG.ANALYSIS.CONFLICT_THRESHOLD) {
+                const title = `Maximale Divergenz: ${maxDiv.toFixed(1)} (Schwellenwert: ${CONFIG.ANALYSIS.CONFLICT_THRESHOLD})`;
                 slot4 = Tpl.getInsightIconHTML('conflict', row.partnerId, title, '⚡');
             }
 
@@ -555,7 +558,10 @@ document.addEventListener("DOMContentLoaded", function() {
         else if (action === 'action') {
             title = `Handlungsfelder für ${escapeHtml(partner.partnerName)}`;
             if (partner.matrixDetails) {
-                const items = partner.matrixDetails.filter(d => parseFloat(d.imp) >= 4.0 && parseFloat(d.perf) <= 2.0);
+                const items = partner.matrixDetails.filter(d => 
+                    parseFloat(d.imp) >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN && 
+                    parseFloat(d.perf) <= CONFIG.ANALYSIS.ACTION_ITEM.PERFORMANCE_MAX
+                );
                 if (items.length > 0) {
                     content += Tpl.getActionTableHTML(items);
                 } else {
@@ -566,8 +572,9 @@ document.addEventListener("DOMContentLoaded", function() {
         else if (action === 'conflict') {
             title = `Signifikante Abweichungen: ${escapeHtml(partner.partnerName)}`;
             if (partner.matrixDetails) {
-                const conflictThreshold = CONFIG.ANALYSIS.CONFLICT_THRESHOLD || 2.0;
-                const conflicts = partner.matrixDetails.filter(d => Math.abs(parseFloat(d.perf_mgr) - parseFloat(d.perf_team)) > 2.0);
+                const conflicts = partner.matrixDetails.filter(d => 
+                    Math.abs(parseFloat(d.perf_mgr) - parseFloat(d.perf_team)) > CONFIG.ANALYSIS.CONFLICT_THRESHOLD
+                );
                 
                 if (conflicts.length > 0) {
                     content += Tpl.getConflictTableHTML(conflicts);
@@ -582,7 +589,7 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById('global-info-modal').style.display = 'flex';
     }
 
-    // IPA Matrix Logic - AP 39: Coordinate mapping with padding buffer
+    // IPA Matrix Logic - AP 39/43: Coordinate mapping with padding buffer, CONFIG values
     function calculateStats(details) {
         const imps = details.map(d => parseFloat(d.imp));
         const perfs = details.map(d => parseFloat(d.perf));
@@ -612,22 +619,21 @@ document.addEventListener("DOMContentLoaded", function() {
         renderMatrixSVG(currentPartnerDetails.matrixDetails);
     }
 
-    // AP 39: Matrix rendering with padding buffer to prevent clipping
+    // AP 43: Matrix rendering with CONFIG values
     function renderMatrixSVG(details) {
         const size = CONFIG.UI.MATRIX_SIZE; 
-        const padding = 50;
+        const padding = CONFIG.UI.MATRIX_PADDING;
         const plotSize = size - (padding * 2);
         
-        // AP 39: Wertbereich 1-5 mit 0.2 Puffer auf jeder Seite (effektiv 0.8-5.2)
-        const valueMin = 0.8;
-        const valueMax = 5.2;
+        const valueMin = CONFIG.UI.MATRIX_VALUE_MIN;
+        const valueMax = CONFIG.UI.MATRIX_VALUE_MAX;
         const valueRange = valueMax - valueMin;
         
         // Skalierungsfunktion: Wert (0.8-5.2) -> Pixel
         const scaleX = (val) => padding + ((val - valueMin) / valueRange) * plotSize;
         const scaleY = (val) => padding + plotSize - ((val - valueMin) / valueRange) * plotSize;
 
-        const jitterRange = 0.15;
+        const jitterRange = CONFIG.UI.MATRIX_JITTER;
         const jitter = () => (Math.random() - 0.5) * jitterRange;
 
         let dotsHTML = '';

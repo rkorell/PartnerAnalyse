@@ -9,6 +9,7 @@
   # Modified: 28.11.2025, 17:00 - AP 27: Added USE_LOCAL_STORAGE switch
   # Modified: 29.11.2025, 20:30 - AP 32: Configured Analysis thresholds (Min Answers Limit, Conflict)
   # Modified: 30.11.2025 - AP X: Adjusted thresholds for 1-5 scale, removed IMPORTANCE_TOOLTIP_THRESHOLD (fixed mapping now)
+  # Modified: 02.12.2025, 17:30 - AP 43: Consolidated all Magic Numbers (NPS, Action-Item, Matrix, Slider-Tooltips)
 */
 
 export const CONFIG = {
@@ -18,13 +19,23 @@ export const CONFIG = {
         CONFLICT_THRESHOLD: 2.0, 
         
         // Unteres Limit für den Slider "Mindestanzahl Antworten".
-        // Validierung: 1 (Einzelmeinungen zugelassen). Produktiv: 2 (Seriosität).
-        // Das JS setzt das HTML-Attribut 'min' auf diesen Wert.
         MIN_ANSWERS_LIMIT: 1,
 
         // Mindestanzahl von Bewertern (pro Gruppe: Mgr/Team), damit ein Konflikt angezeigt wird
-        // Für Validierung auf 1 gesetzt (damit "Der Konflikt" auch bei kleinen Datenmengen sichtbar ist)
         CONFLICT_MIN_ASSESSORS: 1,
+
+        // NPS-Schwellenwerte für Farbkodierung
+        NPS_THRESHOLDS: {
+            PASSIVE_LOW_MAX: 30,   // 0-30: Rot/Orange
+            PASSIVE_HIGH_MAX: 70,  // 31-70: Gelb
+            // >70: Grün (Promoter)
+        },
+
+        // Action-Item-Schwellenwerte (Handlungsbedarf)
+        ACTION_ITEM: {
+            IMPORTANCE_MIN: 4.0,   // Wichtigkeit >= 4
+            PERFORMANCE_MAX: 2.0,  // Performance <= 2
+        },
     },
     
     // --- Konfiguration für den Eingabe-Wizard (app.js) ---
@@ -40,7 +51,6 @@ export const CONFIG = {
         
         // NPS-Kategorisierung (Promoter, Detractor)
         NPS_RANGES: {
-            // Wert für "Bitte wählen"
             NA_VALUE: -2 
         },
         
@@ -51,15 +61,15 @@ export const CONFIG = {
     // --- Farben (AP 24) ---
     COLORS: {
         // NPS Ampel
-        NPS_DETRACTOR: '#e74c3c', // Rot
-        NPS_PASSIVE_LOW: '#f39c12', // Orange
-        NPS_PASSIVE_HIGH: '#f1c40f', // Gelb
-        NPS_PROMOTER: '#2ecc71', // Grün
+        NPS_DETRACTOR: '#e74c3c',
+        NPS_PASSIVE_LOW: '#f39c12',
+        NPS_PASSIVE_HIGH: '#f1c40f',
+        NPS_PROMOTER: '#2ecc71',
 
         // Score Heatmap (RGB Arrays für Interpolation)
-        HEATMAP_LOW: [231, 76, 60],   // Rot
-        HEATMAP_MID: [243, 156, 18],  // Orange
-        HEATMAP_HIGH: [46, 204, 113], // Grün
+        HEATMAP_LOW: [231, 76, 60],
+        HEATMAP_MID: [243, 156, 18],
+        HEATMAP_HIGH: [46, 204, 113],
     },
 
     // --- UI Konstanten (AP 24) ---
@@ -67,5 +77,46 @@ export const CONFIG = {
         MATRIX_SIZE: 400,
         LOADER_DELAY_MS: 300,
         RENDER_DELAY_MS: 10,
-    }
+
+        // Matrix-Konfiguration (AP 43)
+        MATRIX_PADDING: 50,
+        MATRIX_VALUE_MIN: 0.8,
+        MATRIX_VALUE_MAX: 5.2,
+        MATRIX_JITTER: 0.15,
+    },
+
+    // --- Slider-Tooltip-Texte (AP 43) ---
+    SLIDER_TOOLTIPS: {
+        IMPORTANCE: {
+            0: 'Keine Angabe',
+            1: '1 - Völlig unwichtig',
+            2: '2 - Nicht so wichtig',
+            3: '3 - Egal',
+            4: '4 - Wichtiger',
+            5: '5 - SEHR wichtig',
+        },
+        PERFORMANCE: {
+            0: 'Keine Angabe',
+            1: '1 - GAR nicht',
+            2: '2 - Einigermaßen',
+            3: '3 - OK',
+            4: '4 - Gut',
+            5: '5 - Sehr, sehr GUT',
+        },
+        FREQUENCY: {
+            0: 'Bitte wählen...',
+            1: 'Selten / Einmalig',
+            2: 'Monatlich / Gelegentlich',
+            3: 'Wöchentlich / Regelmäßig',
+            4: 'Täglich / Intensiv',
+        },
+        NPS: {
+            '-2': 'Bitte wählen...',
+            '-1': 'Möchte ich nicht bewerten',
+            '0': '0 - Auf keinen Fall',
+            '1-3': '{value} - Eher nicht',
+            '4-6': '{value} - Eher schon',
+            '7-10': '{value} - Auf jeden Fall',
+        },
+    },
 };

@@ -14,6 +14,7 @@
   # Modified: 28.11.2025, 16:00 - AP 25: Extracted HTML generation to templates.js
   # Modified: 28.11.2025, 17:00 - AP 27: Prefer loaded state over default/random values in initialization
   # Modified: 30.11.2025 - AP X: Migrated sliders to 1-5 scale, fixed tooltip mapping (feste Zuordnung), adjusted comment icon triggers (≤1 or ≥5)
+  # Modified: 02.12.2025, 17:30 - AP 43: Slider tooltips from CONFIG.SLIDER_TOOLTIPS
 */
 
 import { CONFIG } from './config.js';
@@ -44,6 +45,18 @@ export class DataView {
         if (tooltip) {
             tooltip.style.opacity = show ? '1' : '0';
         }
+    }
+
+    // Helper für NPS-Tooltip-Text
+    getNpsTooltipText(value) {
+        const tooltips = CONFIG.SLIDER_TOOLTIPS.NPS;
+        if (value === -2) return tooltips['-2'];
+        if (value === -1) return tooltips['-1'];
+        if (value === 0) return tooltips['0'];
+        if (value >= 1 && value <= 3) return tooltips['1-3'].replace('{value}', value);
+        if (value >= 4 && value <= 6) return tooltips['4-6'].replace('{value}', value);
+        if (value >= 7 && value <= 10) return tooltips['7-10'].replace('{value}', value);
+        return String(value);
     }
     
     // --- HAUPT VIEW METHODEN ---
@@ -93,18 +106,10 @@ export class DataView {
 
         if (type === 'frequency' && initialValue > 0) {
             extraInputClass = '';
-            displayValue = labels[initialValue] || initialValue;
+            displayValue = CONFIG.SLIDER_TOOLTIPS.FREQUENCY[initialValue] || String(initialValue);
         } else if (type === 'nps' && initialValue > CONFIG.WIZARD.NPS_RANGES.NA_VALUE) {
             extraInputClass = '';
-            if (labels[initialValue]) {
-                displayValue = labels[initialValue].replace('{Val}', initialValue);
-            } else {
-                if (initialValue === 0) displayValue = "0 - Auf keinen Fall";
-                else if (initialValue >= 1 && initialValue <= 3) displayValue = initialValue + " - Eher nicht";
-                else if (initialValue >= 4 && initialValue <= 6) displayValue = initialValue + " - Eher schon";
-                else if (initialValue >= 7 && initialValue <= 10) displayValue = initialValue + " - Auf jeden Fall";
-                else if (initialValue === -1) displayValue = "Möchte ich nicht bewerten";
-            }
+            displayValue = this.getNpsTooltipText(initialValue);
         }
 
         return Tpl.getSliderHTML(domId, type, min, max, initialValue, {
@@ -117,7 +122,8 @@ export class DataView {
 
     createSliderHTML(domId, rawId, type, initialValue = 0) {
         const extraInputClass = initialValue === 0 ? 'slider-neutral' : '';
-        const displayValue = initialValue === 0 ? 'N/A' : initialValue;
+        const tooltips = type === 'importance' ? CONFIG.SLIDER_TOOLTIPS.IMPORTANCE : CONFIG.SLIDER_TOOLTIPS.PERFORMANCE;
+        const displayValue = initialValue === 0 ? tooltips[0] : String(initialValue);
         
         let iconHTML = '';
         if (type === 'performance') {
@@ -155,7 +161,7 @@ export class DataView {
         const pf = partnerFeedback[partnerId];
         const initialComment = pf.generalComment || '';
 
-        const freqSliderHTML = this.createHeaderSliderHTML(`freq_${partnerId}`, 'frequency', pf.frequency, 0, CONFIG.WIZARD.FREQUENCY_MAX, {1:"Selten", 2:"Monatlich / Gelegentlich", 4:"Täglich / Intensiv"});
+        const freqSliderHTML = this.createHeaderSliderHTML(`freq_${partnerId}`, 'frequency', pf.frequency, 0, CONFIG.WIZARD.FREQUENCY_MAX, {});
         const npsSliderHTML = this.createHeaderSliderHTML(`nps_${partnerId}`, 'nps', pf.nps, CONFIG.WIZARD.NPS_RANGES.NA_VALUE, 10, {});
         
         const headerHTML = Tpl.getPartnerHeaderHTML(partner.name, freqSliderHTML, npsSliderHTML, initialComment, partnerId);
@@ -204,7 +210,8 @@ export class DataView {
 
     createSliderHTMLWithComment(domId, rawId, type, initialValue, initialComment) {
         const extraInputClass = initialValue === 0 ? 'slider-neutral' : '';
-        const displayValue = initialValue === 0 ? 'N/A' : initialValue;
+        const tooltips = CONFIG.SLIDER_TOOLTIPS.PERFORMANCE;
+        const displayValue = initialValue === 0 ? tooltips[0] : String(initialValue);
         
         let iconHTML = '';
         const isExtreme = (initialValue > 0 && initialValue <= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MIN) || initialValue >= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MAX;
@@ -285,17 +292,17 @@ export class DataView {
         const tooltip = document.getElementById(`tooltip_${domId}`);
         
         let displayValue = value; 
-        let tooltipText = `${value} - Neutral`;
+        let tooltipText = '';
         let isNeutral = false;
 
         if (type === 'frequency') {
-            const labels = {1: "Selten / Einmalig", 2: "Monatlich / Gelegentlich", 3: "Wöchentlich / Regelmäßig", 4: "Täglich / Intensiv"};
+            const tooltips = CONFIG.SLIDER_TOOLTIPS.FREQUENCY;
             if (value === 0) {
                 isNeutral = true;
-                displayValue = "Bitte wählen...";
+                displayValue = tooltips[0];
                 tooltipText = displayValue;
             } else {
-                displayValue = labels[value] || value; 
+                displayValue = tooltips[value] || String(value);
                 tooltipText = displayValue;
             }
             this.callbacks.setFeedback(this.callbacks.getCurrentPartnerId(), 'frequency', value);
@@ -303,53 +310,35 @@ export class DataView {
         } else if (type === 'nps') {
             if (value === CONFIG.WIZARD.NPS_RANGES.NA_VALUE || value === -2) {
                 isNeutral = true;
-                displayValue = "Bitte wählen...";
+                displayValue = CONFIG.SLIDER_TOOLTIPS.NPS['-2'];
                 tooltipText = displayValue;
             } else {
-                if (value === -1) displayValue = "Möchte ich nicht bewerten";
-                else if (value === 0) displayValue = "0 - Auf keinen Fall";
-                else if (value >= 1 && value <= 3) displayValue = value + " - Eher nicht";
-                else if (value >= 4 && value <= 6) displayValue = value + " - Eher schon";
-                else if (value >= 7 && value <= 10) displayValue = value + " - Auf jeden Fall";
-                else displayValue = value; 
-                
+                displayValue = this.getNpsTooltipText(value);
                 tooltipText = displayValue;
             }
             this.callbacks.setFeedback(this.callbacks.getCurrentPartnerId(), 'nps', value);
 
         } else if (type === 'importance') {
+            const tooltips = CONFIG.SLIDER_TOOLTIPS.IMPORTANCE;
             if (value === 0) {
                 isNeutral = true;
                 displayValue = 'N/A';
-                tooltipText = 'Keine Angabe';
-            } else if (value === 1) {
-                tooltipText = '1 - Völlig unwichtig';
-            } else if (value === 2) {
-                tooltipText = '2 - Nicht so wichtig';
-            } else if (value === 3) {
-                tooltipText = '3 - Egal';
-            } else if (value === 4) {
-                tooltipText = '4 - Wichtiger';
-            } else if (value === 5) {
-                tooltipText = '5 - SEHR wichtig';
+                tooltipText = tooltips[0];
+            } else {
+                displayValue = value;
+                tooltipText = tooltips[value] || String(value);
             }
             this.callbacks.setImportance(rawId, value);
 
         } else if (type === 'performance') {
+            const tooltips = CONFIG.SLIDER_TOOLTIPS.PERFORMANCE;
             if (value === 0) {
                 isNeutral = true;
                 displayValue = 'N/A';
-                tooltipText = 'Keine Angabe';
-            } else if (value === 1) {
-                tooltipText = '1 - GAR nicht';
-            } else if (value === 2) {
-                tooltipText = '2 - Einigermaßen';
-            } else if (value === 3) {
-                tooltipText = '3 - OK';
-            } else if (value === 4) {
-                tooltipText = '4 - Gut';
-            } else if (value === 5) {
-                tooltipText = '5 - Sehr, sehr GUT';
+                tooltipText = tooltips[0];
+            } else {
+                displayValue = value;
+                tooltipText = tooltips[value] || String(value);
             }
             
             const partnerId = this.callbacks.getCurrentPartnerId(); 
@@ -361,7 +350,7 @@ export class DataView {
                 const textarea = document.getElementById(`comment_${domId}`);
                 
                 if (icon) {
-                    const isExtreme = (value > 0 && value <= 1) || value >= 5;
+                    const isExtreme = (value > 0 && value <= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MIN) || value >= CONFIG.WIZARD.PERFORMANCE_COMMENT_THRESHOLD.MAX;
                     const hasText = textarea && textarea.value.trim() !== '';
                     
                     if (isExtreme || hasText) {
