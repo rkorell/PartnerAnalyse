@@ -48,7 +48,7 @@ export function getCommentBoxHTML(domId, placeholder, initialValue = '', isHidde
 
 export function getPartnerHeaderHTML(partnerName, freqHTML, npsHTML, initialComment, partnerId) {
     return `
-        <h3>Bewertung: ${escapeHtml(partnerName)}</h3>
+        <h3>Allgemeines für: ${escapeHtml(partnerName)}</h3><BR>
         <div class="partner-header-box">
             <div class="form-row">
                 <div class="form-group">
@@ -68,8 +68,11 @@ export function getPartnerHeaderHTML(partnerName, freqHTML, npsHTML, initialComm
             </div>
         </div>
         <hr style="margin-bottom:30px; border:0; border-top:1px solid #eee;">
-        <p style="font-size: 1.1em; margin-bottom: 20px; color: #555;">
-            Wie bewertest Du für den Partner <strong>${escapeHtml(partnerName)}</strong> die folgenden Fähigkeiten/Eigenschaften?
+        <p style="font-size: 1.1em; margin-bottom: 20px; color: #555;">Hier bitte die Kriterien, die Du vorab gewichtet hast, für die Partner Deiner Wahl bewerten:<BR><BR>
+            Wie erfüllt aus Deiner Sicht der Partner <strong>${escapeHtml(partnerName)}</strong> die folgenden Kriterien?<BR>
+            (Auf der Skala 1-5 entspricht die 1 "erfüllt das Kriterium GAR nicht" und am anderen Ende entspricht die 5 "erfüllt dieses Kriterium sehr, sehr GUT")<BR>
+            Wenn Du einen dieser Endpunkte (1 oder 5) der Bewertungsskala auswählst, erscheint am Balken ein "Kommentar"-Icon. Wenn Du darauf klickst, erscheint ein an dieses Kriterium "angehangenes" Kommentarfeld. Dieses ist genauso freiwillig auszufüllen, wie das Kommentarfeld oben rechts im Header<BR>
+            Wenn Du eines der Kriterien nicht bewerten kannst, lass es auf "N/A" stehen - das ist dann ausdrücklich "Keine Aussage".<BR>
         </p>
         <div id="performance-criteria-container-${partnerId}">`;
 }
