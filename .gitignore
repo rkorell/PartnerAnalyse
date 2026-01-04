@@ -220,3 +220,7 @@ __marimo__/
 test*
 ld2450_p*
 serial_protocol.py
+
+# Claude Code Dokumentation
+CLAUDE.md
+.claude/

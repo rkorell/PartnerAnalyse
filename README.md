@@ -3,6 +3,8 @@
 **Version:** 1.2
 **Datum:** 28.11.2025
 
+> 📖 **Ausführliche Dokumentation:** [docs/cpqi_gesamtdoku.md](docs/cpqi_gesamtdoku.md) – Methodik, Kriterienkatalog, Scoring-Modell, Datenmodell
+
 ## 1. Einleitung & Methodik
 
 ### 1.1. Zielsetzung
