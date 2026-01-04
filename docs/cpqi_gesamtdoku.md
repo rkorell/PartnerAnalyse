@@ -294,6 +294,27 @@ PostgreSQL-Abfragebeispiel für numerische Vergleiche:
 
 WHERE (value->>'v')::numeric < 3
 
+### 9.3.1 Eingabe-Konventionen
+
+| Metrik-Typ | Eingabe-Format | Beispiel | Speicherung |
+|------------|----------------|----------|-------------|
+| Währung (USD) | Ganzzahl, ohne Symbol | 2450000 | `{"v": 2450000}` |
+| Prozent | Zahl ohne "%", nicht als Dezimalbruch | 12,5 (nicht 0,125) | `{"v": 12.5}` |
+| Anzahl | Ganzzahl | 8 | `{"v": 8}` |
+| Split-Werte | Ganze Prozent, Summe = 100 | 40, 30, 20, 10 | `{"nw": 40, "sec": 30, ...}` |
+| Kategorisch | Exakter Text aus allowed_values | "hoch" | `{"v": "hoch"}` |
+| Fiscal Year | "FYxx" Format | FY25 | Spalte `fiscal_year` |
+
+**NULL-Handling:**
+
+| Situation | Eingabe | Speicherung |
+|-----------|---------|-------------|
+| Nicht erfasst | Leer lassen | Kein Datensatz |
+| Explizit 0 | 0 eingeben | `{"v": 0}` |
+| Unbekannt/n.a. | Leer lassen | Kein Datensatz |
+
+**Hinweis:** Diese Konventionen gelten einheitlich für XLS-Import und Einzeleingabe.
+
 ## 9.4 Datenerfassung
 
 ### 9.4.1 Erfassungswege
@@ -316,6 +337,14 @@ Horizontales Format - eine Zeile pro Partner, Metriken als Spalten:
 - Mehrere Fiscal Years in einer Datei möglich
 - Leere Zellen = kein Datensatz (nicht NULL)
 - Portfolio-Split als einzelne Spalten (Parser fügt zu JSONB zusammen)
+
+**Formatierung im XLS:**
+- Dezimaltrenner: Komma (12,5)
+- Tausender-Trennzeichen: Vermeiden oder Punkt (2.450.000)
+- Keine Einheiten in Zellen ($, %, etc.)
+- Kategorische Werte: Exakte Schreibweise ("hoch", nicht "Hoch")
+
+**Hinweis:** Der PHP-Parser konvertiert deutsches Zahlenformat (Komma) in DB-Format (Punkt).
 
 ### 9.4.3 Import-Regeln
 
