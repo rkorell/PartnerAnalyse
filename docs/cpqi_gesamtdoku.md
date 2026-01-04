@@ -362,6 +362,31 @@ Einzeleingabe dient für PAM-Einschätzungen und Korrekturen.
 | Löschen | Nicht vorgesehen |
 | Ändern | Ja, über dieselbe Eingabemaske (UPDATE) |
 
+### 9.5.3 Integration in score_analyse.html
+
+**Ranking-Tabelle:**
+- Neues Insight-Icon 📊 für quantitative Daten
+- Farbcodierung: grün = Daten vorhanden, rot = Anomalie erkannt
+- Anomalie-Logik basiert auf Synergie-Mapping (Kapitel 5)
+
+**Matrix-Modal (erweitertes Partner-Detail):**
+
+| Element | Beschreibung |
+|---------|--------------|
+| Tab-System | [IPA Matrix] / [Kennzahlen] |
+| Kurzübersicht | Unter Matrix: Umsatz, CAGR, PVI, Certs, Portfolio-Split |
+| Anomalie-Hinweis | Automatischer Hinweis bei IPA ↔ Quant Divergenz |
+| Detail-Tab | Vollständige Metriken-Tabelle (alle FYs) |
+
+**Progressive Disclosure:**
+1. Tabelle: Icon-Scan (Überblick)
+2. Matrix + Kurzübersicht (Kontext)
+3. Detail-Tab (vollständige Analyse)
+
+**Export:**
+- Erweitertes CSV mit allen IPA- und Quant-Spalten kombiniert
+- Ermöglicht Pivot-Analysen in Excel
+
 _- Ende des Dokuments -_
 
-CPQI-Projekt | Dr. Ralf Korell | Stand: 21.12.2025
+CPQI-Projekt | Dr. Ralf Korell | Stand: 04.01.2026
