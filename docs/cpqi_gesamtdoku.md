@@ -2,7 +2,7 @@ CPQI - Gesamtdokumentation
 
 Cisco Partner Quality Index Methodik, Kriterienkatalog & Datenmodell
 
-Stand: 21.12.2025 | Dr. Ralf Korell
+Stand: 04.01.2026 | Dr. Ralf Korell
 
 # 1\. Einleitung & Methodischer Rahmen
 
