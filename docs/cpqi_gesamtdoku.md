@@ -294,7 +294,7 @@ Neue Spalte für externe Identifikation:
 | Conscia | 50058 |
 | Controlware | 55017 |
 | Damovo | 66698 |
-| Deutsche Telekom | — |
+| Telekom | — |
 | Fundamental | 46304 |
 | Logicalis | 1865 |
 | NTS | 657066 |
@@ -453,7 +453,7 @@ Für die Entwicklung und Validierung der Visualisierungen wurden spezifische Tes
 | **"Der Spezialist"** | Avodaq | Nur 2 Kriterien bewertet (Security/Akquise), diese aber Top. Rest N/A. | Kurzer/mittlerer grüner Balken, kein Rot. Niedrige Awareness. |
 | **"Der Solide"** | Bechtle | Alles Mittelmaß (3-4). Wichtigkeit normal. | Kaum Ausschlag um die Mitte. |
 | **"Der Sanierungsfall"** | Cancom | Wichtige Themen werden schlecht erfüllt. Nur 1 Bewertung. | Langer roter Balken. |
-| **"Der Konflikt"** | Deutsche Telekom | Manager bewertet Top (5), Team bewertet Flop (1). | Score in der Mitte, aber Blitz-Icon (⚡) wegen hoher Divergenz. |
+| **"Der Konflikt"** | Telekom | Manager bewertet Top (5), Team bewertet Flop (1). | Score in der Mitte, aber Blitz-Icon (⚡) wegen hoher Divergenz. |
 
 Diese Archetypen dienen als Referenz für:
 - Validierung der Heatmap-Balken (grün/rot)

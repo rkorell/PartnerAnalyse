@@ -126,7 +126,7 @@ INSERT INTO partners (name, be_geo_id) VALUES
 ('Conscia', 50058),
 ('Controlware', 55017),
 ('Damovo', 66698),
-('Deutsche Telekom', NULL),
+('Telekom', NULL),
 ('Fundamental', 46304),
 ('Logicalis', 1865),
 ('NTS', 657066),
