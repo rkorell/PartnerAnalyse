@@ -2,7 +2,7 @@ CPQI - Gesamtdokumentation
 
 Cisco Partner Quality Index Methodik, Kriterienkatalog & Datenmodell
 
-Stand: 04.01.2026 | Dr. Ralf Korell
+Stand: 22.01.2026 | Dr. Ralf Korell
 
 # 1\. Einleitung & Methodischer Rahmen
 
@@ -279,7 +279,7 @@ Neue Spalte für externe Identifikation:
 
 | **Spalte** | **Typ** | **Beschreibung** |
 | --- | --- | --- |
-| cisco_partner_id | TEXT UNIQUE | Eindeutige ID aus Cisco-Systemen |
+| be_geo_id | INTEGER UNIQUE | Eindeutige Partner-ID (BE_GEO_ID, max. 7-stellig) |
 
 ## 9.3 JSONB-Wert-Konvention
 
@@ -328,7 +328,7 @@ WHERE (value->>'v')::numeric < 3
 
 Horizontales Format - eine Zeile pro Partner, Metriken als Spalten:
 
-| **cisco_partner_id** | **fiscal_year** | **revenue_total** | **revenue_cagr** | **cert_tech** | **...** |
+| **be_geo_id** | **fiscal_year** | **revenue_total** | **revenue_cagr** | **cert_tech** | **...** |
 | --- | --- | --- | --- | --- | --- |
 | 12345678 | FY25 | 2450000 | 12.5 | 8   | ... |
 | 87654321 | FY24 | 1200000 | \-3.2 | 3   | ... |
@@ -361,7 +361,7 @@ Horizontales Format - eine Zeile pro Partner, Metriken als Spalten:
 **Stufe 1 (Pflicht - blockiert Import):**
 
 - Formatprüfung (Zahlen sind Zahlen)
-- Pflichtfelder vorhanden (cisco_partner_id)
+- Pflichtfelder vorhanden (be_geo_id)
 - Partner existiert im System
 - Portfolio-Split = 100%
 
@@ -418,4 +418,4 @@ Einzeleingabe dient für PAM-Einschätzungen und Korrekturen.
 
 _- Ende des Dokuments -_
 
-CPQI-Projekt | Dr. Ralf Korell | Stand: 04.01.2026
+CPQI-Projekt | Dr. Ralf Korell | Stand: 22.01.2026
