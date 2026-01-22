@@ -13,6 +13,7 @@
   # Modified: 29.11.2025, 22:45 - AP 34: Updated calculate_partner_bilanz to use V2.3 Linear Model (No Rounding)
   # Modified: 30.11.2025 - AP 36: Changed ratings_score_check constraint from 1-10 to 1-5
   # Modified: 30.11.2025, 11:55 - AP 40: Fixed criteria sorting in get_partner_matrix_details (sort_order instead of name)
+# Modified: 22.01.2026 - AP 47a: Added be_geo_id column to partners table
 */
 
 DROP TABLE IF EXISTS admin_users CASCADE;
@@ -61,6 +62,7 @@ CREATE TABLE departments (
 CREATE TABLE partners (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
+    be_geo_id INTEGER UNIQUE,
     active BOOLEAN DEFAULT TRUE
 );
 

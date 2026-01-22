@@ -416,6 +416,25 @@ Einzeleingabe dient für PAM-Einschätzungen und Korrekturen.
 - Erweitertes CSV mit allen IPA- und Quant-Spalten kombiniert
 - Ermöglicht Pivot-Analysen in Excel
 
+---
+
+## 10. Testdaten & Archetypen
+
+Für die Entwicklung und Validierung der Visualisierungen wurden spezifische Testszenarien definiert. Die Datenbank enthält 5 Archetypen-Partner mit charakteristischen Bewertungsprofilen:
+
+| Archetyp | Partner | Profil | Erwartete Darstellung |
+|----------|---------|--------|----------------------|
+| **"Die Diva"** | Damovo | Strategisch brillant (Kriterien 1-5 Top), operativ katastrophal (14-16 Flop) | Langer grüner UND langer roter Balken. Hohe Divergenz. |
+| **"Der Spezialist"** | Avodaq | Nur 2 Kriterien bewertet (Security/Akquise), diese aber Top. Rest N/A. | Kurzer/mittlerer grüner Balken, kein Rot. Niedrige Awareness. |
+| **"Der Solide"** | Bechtle | Alles Mittelmaß (3-4). Wichtigkeit normal. | Kaum Ausschlag um die Mitte. |
+| **"Der Sanierungsfall"** | Cancom | Wichtige Themen werden schlecht erfüllt. Nur 1 Bewertung. | Langer roter Balken. |
+| **"Der Konflikt"** | Deutsche Telekom | Manager bewertet Top (5), Team bewertet Flop (1). | Score in der Mitte, aber Blitz-Icon (⚡) wegen hoher Divergenz. |
+
+Diese Archetypen dienen als Referenz für:
+- Validierung der Heatmap-Balken (grün/rot)
+- Korrekte Berechnung der Divergenz-Indikatoren
+- Funktionsfähigkeit bei geringer Stichprobengröße (n=1)
+
 _- Ende des Dokuments -_
 
 CPQI-Projekt | Dr. Ralf Korell | Stand: 22.01.2026
