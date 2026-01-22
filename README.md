@@ -1,7 +1,7 @@
 # Cisco Partner Quality Index (CPQI)
 
 **Version:** 1.2
-**Datum:** 28.11.2025
+**Datum:** 22.01.2026
 
 > 📖 **Ausführliche Dokumentation:** [docs/cpqi_gesamtdoku.md](docs/cpqi_gesamtdoku.md) – Methodik, Kriterienkatalog, Scoring-Modell, Datenmodell
 
@@ -18,11 +18,20 @@ Das System basiert auf dem Modell der **Importance-Performance Analysis**. Die L
 * **Performance:** Der Teilnehmer bewertet ausgewählte Partner anhand derselben Kriterien (Skala 1-5, optional).
 * **Metadaten:** Zusätzlich werden **NPS** (Net Promoter Score), **Interaktionsfrequenz** und **Qualitative Kommentare** erhoben.
 
-**Berechnungsziel:**
+**Berechnungsziel (Scoring-Modell V2.3):**
 Der finale "Score" eines Partners ist ein gewichteter Index:
-$$Score = \sum (Performance_i \times Importance_i)$$
+$$Score = \sum (Performance_i - 3.0) \times ImportanceFaktor_i$$
 
-Zusätzlich werden Diskrepanzen in der Wahrnehmung zwischen Führungskräften (Manager) und operativen Mitarbeitern (Team) analysiert ("Conflict-Check").
+**Importance-Faktoren:**
+| Importance | Faktor |
+|------------|--------|
+| 5 | 12 |
+| 4 | 7 |
+| 3 | 4 |
+| 2 | 2 |
+| andere | 0 |
+
+Zusätzlich werden Diskrepanzen in der Wahrnehmung zwischen Führungskräften (Manager) und operativen Mitarbeitern (Team) analysiert ("Conflict-Check", Schwellenwert > 2.0).
 
 ---
 
@@ -52,12 +61,12 @@ Das System implementiert ein mehrschichtiges Sicherheitskonzept ("Defense in Dep
 **Pfad:** `/var/www/html/index.html` + `js/app.js` (Controller: `js/wizard-controller.js`)
 
 Ein 5-Schritte-Wizard zur Datenerfassung:
-1.  **Persönliche Angaben:** Name, Email, Abteilung (Hierarchie), Manager-Status.
+1.  **Persönliche Angaben:** Abteilung (Hierarchie), Manager-Status.
 2.  **Wichtigkeits-Bewertung:** Festlegung der persönlichen Prioritäten (Pflicht).
 3.  **Partner-Auswahl:** Selektion der zu bewertenden Firmen.
 4.  **Partner-Bewertung (Detail):**
-    * **Header:** Frequenz (1-4), NPS (-2 bis 10), Genereller Kommentar.
-    * **Kriterien:** Slider je Kriterium. Bei Extremwerten (≤3 oder ≥8) erscheint ein Icon (`📝`) für spezifische Kommentare.
+    * **Header:** Frequenz (1-4), NPS (0-10, optional), Genereller Kommentar.
+    * **Kriterien:** Slider je Kriterium. Bei Extremwerten (1 oder 5) erscheint ein Icon (`📝`) für spezifische Kommentare.
     * **Features:** Lokale Datenspeicherung (`localStorage`) schützt vor Datenverlust bei Refresh (konfigurierbar in `js/config.js` via `USE_LOCAL_STORAGE`).
 5.  **Abschluss:** Speicherung & Dankeseite.
 
@@ -73,7 +82,7 @@ Interaktives Dashboard für Auswertungen (Login erforderlich):
     * **Insights-Spalte** mit Status-Icons:
         * `📣` **NPS:** Net Promoter Score Indikator.
         * `💬` **Kommentare:** Anzahl und Drill-Down (Allgemein vs. Spezifisch).
-        * `⚠️` **Action:** Kritische Handlungsfelder (Imp ≥ 8 & Perf ≤ 5).
+        * `⚠️` **Action:** Kritische Handlungsfelder (Imp ≥ 4 & Perf ≤ 2).
         * `⚡` **Divergenz:** Signifikante Abweichung (> 2.0) zwischen Manager- und Team-Bewertung.
 * **Interaktion:** Klick auf Partner öffnet **IPA-Matrix** (Scatterplot). Klick auf Icons öffnet **Detail-Modal**.
 * **Export:** CSV-Export der gefilterten Daten.
@@ -90,7 +99,7 @@ Das Schema ist normalisiert (3NF) und nutzt fortschrittliche DB-Features.
 * **`criteria`**: Fragenkatalog.
 * **`departments`**: Hierarchie-Baum (Adjacency List).
 * **`participants`**: Bewerter (Name, Email, Manager-Status, `session_token`).
-* **`ratings`**: Die Einzelnoten (1-10 oder NULL) inkl. Kommentar.
+* **`ratings`**: Die Einzelnoten (1-5 oder NULL) inkl. Kommentar.
 * **`partner_feedback`**: Kopfdaten pro Partner-Interaktion (`nps_score`, `interaction_frequency`, `general_comment`).
 * **`app_texts`**: Konfigurierbare Texte für Tooltips/Modals.
 * **`admin_users`**: Benutzerverwaltung für das Dashboard (Username, Password-Hash).
