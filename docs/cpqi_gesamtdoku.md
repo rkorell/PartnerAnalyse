@@ -281,6 +281,31 @@ Neue Spalte für externe Identifikation:
 | --- | --- | --- |
 | be_geo_id | INTEGER UNIQUE | Eindeutige Partner-ID (BE_GEO_ID, max. 7-stellig) |
 
+**Aktuelle Partnerliste (Stand: 22.01.2026):**
+
+| Partner | BE_GEO_ID |
+|---------|-----------|
+| Advanced Unibyte | 534900 |
+| Avodaq | 60985 |
+| Axians | 17345 |
+| Bechtle | 51590 |
+| Cancom | 52777 |
+| Computacenter | 63917 |
+| Conscia | 50058 |
+| Controlware | 55017 |
+| Damovo | 66698 |
+| Deutsche Telekom | — |
+| Fundamental | 46304 |
+| Logicalis | 1865 |
+| NTS | 657066 |
+| NTT Data | 51524 |
+| Pandacom | 57342 |
+| Scaltel | 50437 |
+| SVA | 107667 |
+| SWS / ACP | 52658 |
+| Systema | 52903 |
+| Telent | 35807 |
+
 ## 9.3 JSONB-Wert-Konvention
 
 Das value-Feld verwendet einheitliche JSON-Strukturen:
