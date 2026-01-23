@@ -2,7 +2,7 @@ CPQI - Gesamtdokumentation
 
 Cisco Partner Quality Index Methodik, Kriterienkatalog & Datenmodell
 
-Stand: 22.01.2026 | Dr. Ralf Korell
+Stand: 23.01.2026 | Dr. Ralf Korell
 
 # 1\. Einleitung & Methodischer Rahmen
 
@@ -281,7 +281,7 @@ Neue Spalte für externe Identifikation:
 | --- | --- | --- |
 | be_geo_id | INTEGER UNIQUE | Eindeutige Partner-ID (BE_GEO_ID, max. 7-stellig) |
 
-**Aktuelle Partnerliste (Stand: 22.01.2026):**
+**Aktuelle Partnerliste (Stand: 23.01.2026):**
 
 | Partner | BE_GEO_ID |
 |---------|-----------|
@@ -294,7 +294,7 @@ Neue Spalte für externe Identifikation:
 | Conscia | 50058 |
 | Controlware | 55017 |
 | Damovo | 66698 |
-| Telekom | — |
+| Telekom | 51272 |
 | Fundamental | 46304 |
 | Logicalis | 1865 |
 | NTS | 657066 |
@@ -462,4 +462,4 @@ Diese Archetypen dienen als Referenz für:
 
 _- Ende des Dokuments -_
 
-CPQI-Projekt | Dr. Ralf Korell | Stand: 22.01.2026
+CPQI-Projekt | Dr. Ralf Korell | Stand: 23.01.2026
