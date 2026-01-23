@@ -14,6 +14,7 @@
   # Modified: 30.11.2025 - AP 36: Changed ratings_score_check constraint from 1-10 to 1-5
   # Modified: 30.11.2025, 11:55 - AP 40: Fixed criteria sorting in get_partner_matrix_details (sort_order instead of name)
 # Modified: 22.01.2026 - AP 47a: Added be_geo_id column to partners table
+# Modified: 23.01.2026 - FIX: Awareness-Berechnung dynamisch (SELECT COUNT FROM criteria statt hardcoded 20)
 */
 
 DROP TABLE IF EXISTS admin_users CASCADE;
@@ -320,8 +321,8 @@ BEGIN
                            COUNT(DISTINCT CASE WHEN pf.nps_score <= 6 THEN pf.participant_id END)) / 
                            NULLIF(COUNT(DISTINCT CASE WHEN pf.nps_score IS NOT NULL THEN pf.participant_id END), 0), 0) as nps,
             COUNT(DISTINCT CASE WHEN pf.general_comment IS NOT NULL AND trim(pf.general_comment) <> '' THEN pf.participant_id END) as cnt_gen_comments,
-            ROUND(100.0 * COUNT(CASE WHEN r.rating_type='performance' AND r.score IS NOT NULL THEN 1 END) / 
-                          NULLIF(COUNT(DISTINCT r.participant_id) * 20, 0), 0) as awareness
+            ROUND(100.0 * COUNT(CASE WHEN r.rating_type='performance' AND r.score IS NOT NULL THEN 1 END) /
+                          NULLIF(COUNT(DISTINCT r.participant_id) * (SELECT COUNT(*) FROM criteria), 0), 0) as awareness
         FROM ratings r
         JOIN relevant_participants rp ON r.participant_id = rp.id
         LEFT JOIN partner_feedback pf ON r.participant_id = pf.participant_id AND r.partner_id = pf.partner_id
