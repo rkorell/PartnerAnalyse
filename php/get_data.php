@@ -49,11 +49,12 @@ try {
 
     // Partners
     $partners = [];
-    $stmt = $pdo->query("SELECT id, name FROM partners WHERE active = TRUE ORDER BY name ASC");
+    $stmt = $pdo->query("SELECT id, name, sortgroup FROM partners WHERE active = TRUE ORDER BY name ASC");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $partners[] = [
             'id' => intval($row['id']),
-            'name' => $row['name']
+            'name' => $row['name'],
+            'sortgroup' => $row['sortgroup'] !== null ? intval($row['sortgroup']) : null
         ];
     }
 

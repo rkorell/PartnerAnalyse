@@ -64,6 +64,7 @@ CREATE TABLE partners (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     be_geo_id INTEGER UNIQUE,
+    sortgroup INTEGER,
     active BOOLEAN DEFAULT TRUE
 );
 

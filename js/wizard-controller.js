@@ -312,39 +312,30 @@ export class WizardController {
 
     setupPartnerSelection() {
         const container = document.getElementById('partner-selection-container');
-        container.innerHTML = ''; 
-        
-        this.partnerData.forEach((partner, index) => {
-            const isLoaded = this.selectedPartners.some(p => p.id == partner.id);
-            const isSelected = isLoaded || (this.isTestMode && Math.random() < 0.3); 
+        container.innerHTML = '';
 
-            const checkboxDiv = document.createElement('div');
-            checkboxDiv.className = 'partner-checkbox' + (isSelected ? ' selected' : '');
-            
-            checkboxDiv.innerHTML = `
-                <input type="checkbox" id="partner_${index}" value="${partner.id}" data-name="${escapeHtml(partner.name)}" ${isSelected ? 'checked' : ''}>
-                <label for="partner_${index}">${escapeHtml(partner.name)}</label>
+        // Sortier-Radio-Buttons einfügen (nur einmal)
+        let sortContainer = document.getElementById('partner-sort-options');
+        if (!sortContainer) {
+            sortContainer = document.createElement('div');
+            sortContainer.id = 'partner-sort-options';
+            sortContainer.className = 'partner-sort-options';
+            sortContainer.innerHTML = `
+                <label><input type="radio" name="partner-sort" value="alpha" checked> Alphabetisch</label>
+                <label><input type="radio" name="partner-sort" value="grouped"> Gruppiert</label>
             `;
-            
-            const checkbox = checkboxDiv.querySelector('input');
-            checkbox.addEventListener('change', () => {
-                this.updatePartnerSelection(); 
-                this._saveState();
+            container.parentNode.insertBefore(sortContainer, container);
 
-                if (checkbox.checked) {
-                    checkboxDiv.classList.add('selected');
-                } else {
-                    checkboxDiv.classList.remove('selected');
-                }
+            // Event-Listener für Sortierung
+            sortContainer.querySelectorAll('input[name="partner-sort"]').forEach(radio => {
+                radio.addEventListener('change', () => this.renderPartnerList());
             });
-            
-            container.appendChild(checkboxDiv);
-        });
+        }
 
-        this.updatePartnerSelection();
+        this.renderPartnerList();
 
         if (this.isTestMode) {
-             this.updatePartnerSelection(); 
+             this.updatePartnerSelection();
 
              if (this.selectedPartners.length === 0 && this.partnerData.length > 0) {
                  const firstBox = container.querySelector('input');
@@ -354,6 +345,69 @@ export class WizardController {
                  }
              }
         }
+    }
+
+    renderPartnerList() {
+        const container = document.getElementById('partner-selection-container');
+        container.innerHTML = '';
+
+        // Aktuelle Sortierung ermitteln
+        const sortMode = document.querySelector('input[name="partner-sort"]:checked')?.value || 'alpha';
+
+        // Partner sortieren
+        let sortedPartners = [...this.partnerData];
+        if (sortMode === 'grouped') {
+            sortedPartners.sort((a, b) => {
+                const groupA = a.sortgroup ?? 999;
+                const groupB = b.sortgroup ?? 999;
+                if (groupA !== groupB) return groupA - groupB;
+                return a.name.localeCompare(b.name);
+            });
+        } else {
+            sortedPartners.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        let lastGroup = null;
+        sortedPartners.forEach((partner, index) => {
+            // Bei gruppierter Ansicht: Trenner bei Gruppenwechsel
+            if (sortMode === 'grouped') {
+                const currentGroup = partner.sortgroup ?? 999;
+                if (lastGroup !== null && currentGroup !== lastGroup) {
+                    const separator = document.createElement('div');
+                    separator.className = 'partner-group-separator';
+                    container.appendChild(separator);
+                }
+                lastGroup = currentGroup;
+            }
+
+            const isLoaded = this.selectedPartners.some(p => p.id == partner.id);
+            const isSelected = isLoaded || (this.isTestMode && !this._testModeInitialized && Math.random() < 0.3);
+
+            const checkboxDiv = document.createElement('div');
+            checkboxDiv.className = 'partner-checkbox' + (isSelected ? ' selected' : '');
+
+            checkboxDiv.innerHTML = `
+                <input type="checkbox" id="partner_${partner.id}" value="${partner.id}" data-name="${escapeHtml(partner.name)}" ${isSelected ? 'checked' : ''}>
+                <label for="partner_${partner.id}">${escapeHtml(partner.name)}</label>
+            `;
+
+            const checkbox = checkboxDiv.querySelector('input');
+            checkbox.addEventListener('change', () => {
+                this.updatePartnerSelection();
+                this._saveState();
+
+                if (checkbox.checked) {
+                    checkboxDiv.classList.add('selected');
+                } else {
+                    checkboxDiv.classList.remove('selected');
+                }
+            });
+
+            container.appendChild(checkboxDiv);
+        });
+
+        this._testModeInitialized = true;
+        this.updatePartnerSelection();
     }
 
     updatePartnerSelection() {
