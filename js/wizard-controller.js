@@ -314,22 +314,32 @@ export class WizardController {
         const container = document.getElementById('partner-selection-container');
         container.innerHTML = '';
 
-        // Sortier-Radio-Buttons einfügen (nur einmal)
-        let sortContainer = document.getElementById('partner-sort-options');
-        if (!sortContainer) {
-            sortContainer = document.createElement('div');
-            sortContainer.id = 'partner-sort-options';
-            sortContainer.className = 'partner-sort-options';
-            sortContainer.innerHTML = `
-                <label><input type="radio" name="partner-sort" value="alpha" checked> Alphabetisch</label>
-                <label><input type="radio" name="partner-sort" value="grouped"> Gruppiert</label>
+        // Toolbar mit Radio-Buttons und Suchfeld (nur einmal)
+        let toolbar = document.getElementById('partner-toolbar');
+        if (!toolbar) {
+            toolbar = document.createElement('div');
+            toolbar.id = 'partner-toolbar';
+            toolbar.className = 'partner-toolbar';
+            toolbar.innerHTML = `
+                <div class="partner-search-container">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="partner-search" placeholder="Tippen zum Filtern">
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="partner-sort-options">
+                    <label><input type="radio" name="partner-sort" value="alpha" checked> Alphabetisch</label>
+                    <label><input type="radio" name="partner-sort" value="grouped"> Gruppiert</label>
+                </div>
             `;
-            container.parentNode.insertBefore(sortContainer, container);
+            container.parentNode.insertBefore(toolbar, container);
 
             // Event-Listener für Sortierung
-            sortContainer.querySelectorAll('input[name="partner-sort"]').forEach(radio => {
+            toolbar.querySelectorAll('input[name="partner-sort"]').forEach(radio => {
                 radio.addEventListener('change', () => this.renderPartnerList());
             });
+
+            // Event-Listener für Suche
+            toolbar.querySelector('#partner-search').addEventListener('input', () => this.renderPartnerList());
         }
 
         this.renderPartnerList();
@@ -351,8 +361,9 @@ export class WizardController {
         const container = document.getElementById('partner-selection-container');
         container.innerHTML = '';
 
-        // Aktuelle Sortierung ermitteln
+        // Aktuelle Sortierung und Suchbegriff ermitteln
         const sortMode = document.querySelector('input[name="partner-sort"]:checked')?.value || 'alpha';
+        const searchTerm = document.getElementById('partner-search')?.value?.toLowerCase() || '';
 
         // Partner sortieren
         let sortedPartners = [...this.partnerData];
@@ -365,6 +376,11 @@ export class WizardController {
             });
         } else {
             sortedPartners.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        // Nach Suchbegriff filtern (beginnt mit)
+        if (searchTerm) {
+            sortedPartners = sortedPartners.filter(p => p.name.toLowerCase().startsWith(searchTerm));
         }
 
         let lastGroup = null;
@@ -412,12 +428,23 @@ export class WizardController {
 
     updatePartnerSelection() {
         const checkboxes = document.querySelectorAll('#partner-selection-container input[type="checkbox"]');
-        this.selectedPartners = Array.from(checkboxes)
+
+        // Sichtbare Partner-IDs ermitteln
+        const visibleIds = Array.from(checkboxes).map(cb => cb.value);
+
+        // Nicht-sichtbare Partner behalten
+        const hiddenSelected = this.selectedPartners.filter(p => !visibleIds.includes(String(p.id)));
+
+        // Sichtbare gecheckte Partner ermitteln
+        const visibleSelected = Array.from(checkboxes)
             .filter(cb => cb.checked)
             .map(cb => ({
                 id: cb.value,
-                name: cb.dataset.name 
+                name: cb.dataset.name
             }));
+
+        // Zusammenführen
+        this.selectedPartners = [...hiddenSelected, ...visibleSelected];
         
         document.getElementById('selected-partners-count').textContent = this.selectedPartners.length;
         

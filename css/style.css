@@ -44,6 +44,10 @@ body {
     margin-bottom: 10px;
 }
 
+.cisco-blue {
+    color: #049fd9;
+}
+
 .subtitle {
     color: #7f8c8d;
     font-size: 1.2em;
@@ -140,7 +144,7 @@ body {
 .step-description {
     color: #7f8c8d;
     font-size: 1.1em;
-    margin-bottom: 30px;
+    margin-bottom: 15px;
 }
 
 /* Formulare */
@@ -318,13 +322,22 @@ input[type=range].slider-neutral {
 }
 
 /* Partner-Auswahl */
+.partner-toolbar {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    gap: 20px;
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 24px;
+    background: #bdc3c7;
+}
+
 .partner-sort-options {
     display: flex;
     gap: 20px;
-    margin-bottom: 15px;
-    padding: 10px 15px;
-    background: #f8f9fa;
-    border-radius: 6px;
 }
 
 .partner-sort-options label {
@@ -368,6 +381,39 @@ input[type=range].slider-neutral {
     height: 6px;
     background: white;
     border-radius: 50%;
+}
+
+.partner-search-container {
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.partner-search-container .search-icon {
+    position: absolute;
+    left: 12px;
+    font-size: 16px;
+    pointer-events: none;
+}
+
+.partner-search-container input {
+    width: 100%;
+    max-width: 300px;
+    padding: 10px 12px 10px 38px;
+    border: 2px solid #ecf0f1;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.partner-search-container input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+}
+
+.partner-search-container input::placeholder {
+    color: #95a5a6;
 }
 
 .partner-group-separator {
