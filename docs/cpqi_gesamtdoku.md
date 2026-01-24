@@ -2,7 +2,7 @@ CPQI - Gesamtdokumentation
 
 Cisco Partner Quality Index Methodik, Kriterienkatalog & Datenmodell
 
-Stand: 23.01.2026 | Dr. Ralf Korell
+Stand: 24.01.2026 | Dr. Ralf Korell
 
 # 1\. Einleitung & Methodischer Rahmen
 
@@ -281,10 +281,12 @@ Neue Spalte für externe Identifikation:
 | --- | --- | --- |
 | be_geo_id | INTEGER UNIQUE | Eindeutige Partner-ID (BE_GEO_ID, max. 7-stellig) |
 
-**Aktuelle Partnerliste (Stand: 23.01.2026):**
+**Aktuelle Partnerliste (Stand: 24.01.2026):**
 
 | Partner | BE_GEO_ID |
 |---------|-----------|
+| Accenture | 71517 |
+| ACP | 52658 |
 | Advanced Unibyte | 534900 |
 | Avodaq | 60985 |
 | Axians | 17345 |
@@ -294,17 +296,22 @@ Neue Spalte für externe Identifikation:
 | Conscia | 50058 |
 | Controlware | 55017 |
 | Damovo | 66698 |
-| Telekom | 51272 |
 | Fundamental | 46304 |
+| Infosys | 695680 |
 | Logicalis | 1865 |
 | NTS | 657066 |
 | NTT Data | 51524 |
 | Pandacom | 57342 |
 | Scaltel | 50437 |
+| SPIE | — |
 | SVA | 107667 |
-| SWS / ACP | 52658 |
 | Systema | 52903 |
+| Tata Communications | 497984 |
+| Tata Consulting | 634901 |
+| Tech Mahindra | 625805 |
+| Telekom | 51272 |
 | Telent | 35807 |
+| Wipro | 606459 |
 
 ## 9.3 JSONB-Wert-Konvention
 
@@ -462,4 +469,4 @@ Diese Archetypen dienen als Referenz für:
 
 _- Ende des Dokuments -_
 
-CPQI-Projekt | Dr. Ralf Korell | Stand: 23.01.2026
+CPQI-Projekt | Dr. Ralf Korell | Stand: 24.01.2026

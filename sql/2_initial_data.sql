@@ -114,10 +114,13 @@ INSERT INTO criteria (id, category, sort_order, name, description) VALUES
 SELECT setval('criteria_id_seq', (SELECT MAX(id) FROM criteria));
 
 -- ============================================================================
--- PARTNER (20 Stück)
+-- PARTNER (27 Stück)
 -- ============================================================================
 
 INSERT INTO partners (name, be_geo_id) VALUES
+('Accenture', 71517),
+('ACP', 52658),
+('Advanced Unibyte', 534900),
 ('Avodaq', 60985),
 ('Axians', 17345),
 ('Bechtle', 51590),
@@ -126,15 +129,19 @@ INSERT INTO partners (name, be_geo_id) VALUES
 ('Conscia', 50058),
 ('Controlware', 55017),
 ('Damovo', 66698),
-('Telekom', 51272),
 ('Fundamental', 46304),
+('Infosys', 695680),
 ('Logicalis', 1865),
 ('NTS', 657066),
 ('NTT Data', 51524),
 ('Pandacom', 57342),
 ('Scaltel', 50437),
+('SPIE', NULL),
 ('SVA', 107667),
-('SWS / ACP', 52658),
 ('Systema', 52903),
+('Tata Communications', 497984),
+('Tata Consulting', 634901),
+('Tech Mahindra', 625805),
+('Telekom', 51272),
 ('Telent', 35807),
-('Advanced Unibyte', 534900);
+('Wipro', 606459);
