@@ -2,7 +2,7 @@ CPQI - Gesamtdokumentation
 
 Cisco Partner Quality Index Methodik, Kriterienkatalog & Datenmodell
 
-Stand: 24.01.2026 | Dr. Ralf Korell
+Stand: 28.01.2026 | Dr. Ralf Korell
 
 # 1\. Einleitung & Methodischer Rahmen
 
@@ -281,7 +281,7 @@ Neue Spalte für externe Identifikation:
 | --- | --- | --- |
 | be_geo_id | INTEGER UNIQUE | Eindeutige Partner-ID (BE_GEO_ID, max. 7-stellig) |
 
-**Aktuelle Partnerliste (Stand: 24.01.2026):**
+**Aktuelle Partnerliste (Stand: 28.01.2026):**
 
 | Partner | BE_GEO_ID |
 |---------|-----------|
@@ -303,7 +303,7 @@ Neue Spalte für externe Identifikation:
 | NTT Data | 51524 |
 | Pandacom | 57342 |
 | Scaltel | 50437 |
-| SPIE | — |
+| SPIE | 57447 |
 | SVA | 107667 |
 | Systema | 52903 |
 | Tata Communications | 497984 |
@@ -469,4 +469,4 @@ Diese Archetypen dienen als Referenz für:
 
 _- Ende des Dokuments -_
 
-CPQI-Projekt | Dr. Ralf Korell | Stand: 24.01.2026
+CPQI-Projekt | Dr. Ralf Korell | Stand: 28.01.2026

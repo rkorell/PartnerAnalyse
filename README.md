@@ -1,7 +1,7 @@
 # Cisco Partner Quality Index (CPQI)
 
 **Version:** 1.2
-**Datum:** 24.01.2026
+**Datum:** 28.01.2026
 
 > 📖 **Ausführliche Dokumentation:** [docs/cpqi_gesamtdoku.md](docs/cpqi_gesamtdoku.md) – Methodik, Kriterienkatalog, Scoring-Modell, Datenmodell
 

@@ -136,7 +136,7 @@ INSERT INTO partners (name, be_geo_id) VALUES
 ('NTT Data', 51524),
 ('Pandacom', 57342),
 ('Scaltel', 50437),
-('SPIE', NULL),
+('SPIE', 57447),
 ('SVA', 107667),
 ('Systema', 52903),
 ('Tata Communications', 497984),
