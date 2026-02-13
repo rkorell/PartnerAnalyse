@@ -1,7 +1,7 @@
 # Cisco Partner Quality Index (CPQI)
 
 **Version:** 1.2
-**Datum:** 28.01.2026
+**Datum:** 2026-02-13
 
 > 📖 **Ausführliche Dokumentation:** [docs/cpqi_gesamtdoku.md](docs/cpqi_gesamtdoku.md) – Methodik, Kriterienkatalog, Scoring-Modell, Datenmodell
 
@@ -70,7 +70,9 @@ Ein 5-Schritte-Wizard zur Datenerfassung:
     * **Features:** Lokale Datenspeicherung (`localStorage`) schützt vor Datenverlust bei Refresh (konfigurierbar in `js/config.js` via `USE_LOCAL_STORAGE`).
 5.  **Abschluss:** Speicherung & Dankeseite.
 
-*Feature:* **Test-Modus** (aktivierbar in DB), der Formulare automatisch mit Zufallsdaten befüllt.
+*Features:*
+* **Test-Modus** (aktivierbar in DB), der Formulare automatisch mit Zufallsdaten befüllt.
+* **Survey-Lifecycle:** Der Wizard prüft beim Laden `start_date` und `end_date` (EOB 18:00) der aktiven Survey. Außerhalb des Erhebungszeitraums wird ein Overlay mit freundlicher Meldung und Countdown angezeigt. Prüfung entfällt bei `test_mode` oder NULL-Datum.
 
 ### 3.2. Analyse (Dashboard)
 **Pfad:** `/var/www/html/score_analyse.html` + `js/score_analyse.js`
@@ -94,7 +96,7 @@ Interaktives Dashboard für Auswertungen (Login erforderlich):
 Das Schema ist normalisiert (3NF) und nutzt fortschrittliche DB-Features.
 
 **Tabellen:**
-* **`surveys`**: Kampagnen-Steuerung (inkl. `test_mode` Flag).
+* **`surveys`**: Kampagnen-Steuerung (inkl. `test_mode` Flag, `start_date`/`end_date` für Erhebungszeitraum).
 * **`partners`**: Stammdaten der Firmen.
 * **`criteria`**: Fragenkatalog.
 * **`departments`**: Hierarchie-Baum (Adjacency List).
