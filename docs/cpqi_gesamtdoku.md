@@ -2,7 +2,7 @@ CPQI - Gesamtdokumentation
 
 Cisco Partner Quality Index Methodik, Kriterienkatalog & Datenmodell
 
-Stand: 28.01.2026 | Dr. Ralf Korell
+Stand: 2026-02-13 | Dr. Ralf Korell
 
 # 1\. Einleitung & Methodischer Rahmen
 
@@ -213,7 +213,27 @@ Basierend auf der Aufwand/Nutzen-Analyse ergeben sich folgende Empfehlungen:
 - Definition 'Neukunde': Zeitraum? Reaktivierung?
 - Erhebungsrhythmus: Einmalig oder kontinuierlich?
 
-## 8.2 Zukünftige Erweiterungen
+## 8.2 Survey-Lifecycle (AP 48)
+
+Surveys haben einen definierten Erhebungszeitraum (`start_date`, `end_date`). Der Wizard prüft beim Laden die Gültigkeit:
+
+| Prüfung | Bedingung | Verhalten |
+|---------|-----------|-----------|
+| Zu früh | `now < start_date 00:00` | Overlay mit Countdown (Tage, Stunden, Minuten) |
+| Aktiv | `start_date ≤ now ≤ end_date 18:00` | Wizard normal nutzbar |
+| Abgelaufen | `now > end_date 18:00` | Overlay mit Endedatum |
+| Keine Survey | Kein Survey mit `is_active = TRUE` | Overlay mit Hinweis |
+
+**Ausnahmen (kein Datumscheck):**
+- `test_mode = TRUE` → Datumsprüfung wird übersprungen
+- `start_date` / `end_date` = NULL → jeweilige Grenze wird nicht geprüft
+
+**Hinweise:**
+- Prüfung nur beim Einstieg (Frontend), nicht beim Speichern – wer rechtzeitig anfängt, darf abschließen
+- `is_active` wird nicht automatisch gesetzt/gelöscht (manuelle Steuerung)
+- Der Wizard sucht gezielt die Survey mit `is_active = TRUE` (nicht einfach die neueste)
+
+## 8.3 Zukünftige Erweiterungen
 
 - Anomalie-Schwellenwerte: Definition und DB-Integration (aktuell manuell)
 
@@ -281,7 +301,7 @@ Neue Spalte für externe Identifikation:
 | --- | --- | --- |
 | be_geo_id | INTEGER UNIQUE | Eindeutige Partner-ID (BE_GEO_ID, max. 7-stellig) |
 
-**Aktuelle Partnerliste (Stand: 28.01.2026):**
+**Aktuelle Partnerliste (Stand: 2026-02-13):**
 
 | Partner | BE_GEO_ID |
 |---------|-----------|
@@ -312,6 +332,85 @@ Neue Spalte für externe Identifikation:
 | Telekom | 51272 |
 | Telent | 35807 |
 | Wipro | 606459 |
+
+### 9.2.4 Tabellen: Backup-Verwaltung
+
+Tabellen zur Protokollierung von System-Backups und Datenbank-Exports:
+
+**backup_status** – Protokolliert alle Backup-Läufe:
+
+| **Spalte** | **Typ** | **Beschreibung** |
+| --- | --- | --- |
+| id | SERIAL PK | Primärschlüssel |
+| system_name | VARCHAR(50) | WebServer, MagicMirrorPi5, CloudWatcher, TuerOeffner |
+| backup_type | VARCHAR(20) | 'auto' (Cron) oder 'manual' (Webseite) |
+| started_at | TIMESTAMP | Startzeitpunkt |
+| finished_at | TIMESTAMP | Endzeitpunkt (NULL = läuft noch) |
+| success | BOOLEAN | TRUE = erfolgreich |
+| return_code | INTEGER | raspiBackup Returncode |
+| backup_size_mb | NUMERIC(10,2) | Größe des Backups in MB |
+| backup_path | TEXT | Pfad zum Backup-Verzeichnis |
+| message | TEXT | Fehlermeldung falls vorhanden |
+
+**db_export_log** – Protokolliert Datenbank-Exports:
+
+| **Spalte** | **Typ** | **Beschreibung** |
+| --- | --- | --- |
+| id | SERIAL PK | Primärschlüssel |
+| database_name | VARCHAR(50) | weather, partner_analyse |
+| exported_at | TIMESTAMP | Exportzeitpunkt |
+| file_path | TEXT | Pfad zur Export-Datei |
+| file_size_kb | INTEGER | Dateigröße in KB |
+| triggered_by | VARCHAR(50) | 'pre-backup', 'manual', 'erhebung' |
+
+### 9.2.5 Backup & Restore der Datenbank
+
+**Backup-Konzept:**
+
+Die partner_analyse-Datenbank wird automatisch vor jedem System-Backup via pg_dump gesichert:
+
+| Aspekt | Wert |
+|--------|------|
+| Backup-Tool | pg_dump (PostgreSQL) |
+| Format | SQL, gzip-komprimiert |
+| Speicherort (Auto) | `/opt/raspi-backup/db_backups/` |
+| Speicherort (Export) | `/opt/raspi-backup/db_exports/` |
+| Rotation | 7 Tage (Auto-Backups) |
+| Auslöser | Pre-Backup-Script vor raspiBackup |
+
+**Namenskonvention:**
+
+| Typ | Format | Beispiel |
+|-----|--------|----------|
+| Automatisch | `partner_analyse_YYYYMMDD_HHMM.sql.gz` | `partner_analyse_20260201_0300.sql.gz` |
+| Manuell | `EXPORT_partner_analyse_YYYYMMDD_HHMM.sql.gz` | `EXPORT_partner_analyse_20260201_1630.sql.gz` |
+
+**Restore nach System-Restore:**
+
+Das PostgreSQL-Datenverzeichnis ist vom System-Backup ausgeschlossen (Konsistenzgründe). Nach einem System-Restore muss die Datenbank aus dem Dump wiederhergestellt werden:
+
+```bash
+# Interaktives Restore-Script:
+sudo /opt/raspi-backup/scripts/restore-databases.sh
+
+# Oder manuell:
+sudo -u postgres psql -c "CREATE USER admin_partner WITH PASSWORD 'partnerAnalyse';"
+sudo -u postgres psql -c "ALTER USER admin_partner WITH SUPERUSER;"
+sudo -u postgres createdb -O admin_partner partner_analyse
+gunzip -c /opt/raspi-backup/db_backups/partner_analyse_YYYYMMDD_HHMM.sql.gz | sudo -u postgres psql partner_analyse
+```
+
+**Credentials:**
+
+| User | Passwort | Rechte |
+|------|----------|--------|
+| admin_partner | partnerAnalyse | Superuser, Owner |
+
+**Webinterface:**
+
+Unter `http://172.23.56.196/backup/` können manuelle Exports erstellt und vorhandene Dumps eingesehen werden.
+
+Vollständige Backup-Dokumentation: `/opt/raspi-backup/docs/BACKUP-KONZEPT.md`
 
 ## 9.3 JSONB-Wert-Konvention
 
@@ -469,4 +568,4 @@ Diese Archetypen dienen als Referenz für:
 
 _- Ende des Dokuments -_
 
-CPQI-Projekt | Dr. Ralf Korell | Stand: 28.01.2026
+CPQI-Projekt | Dr. Ralf Korell | Stand: 2026-02-13
