@@ -233,7 +233,31 @@ Surveys haben einen definierten Erhebungszeitraum (`start_date`, `end_date`). De
 - `is_active` wird nicht automatisch gesetzt/gelöscht (manuelle Steuerung)
 - Der Wizard sucht gezielt die Survey mit `is_active = TRUE` (nicht einfach die neueste)
 
-## 8.3 Zukünftige Erweiterungen
+## 8.3 Survey-Verwaltung (AP 49)
+
+Unter `/survey_admin.html` steht eine Login-geschützte Admin-Oberfläche zur Verfügung:
+
+| Funktion | Beschreibung |
+|----------|-------------|
+| Übersicht | Tabellarische Darstellung aller Surveys mit Inline-Editing |
+| Name | Freitext, editierbar |
+| Start-/Enddatum | Date-Picker, optional (NULL = keine Einschränkung) |
+| Aktiv-Status | Radio-Buttons – genau eine Survey ist aktiv (atomarer Wechsel) |
+| Test-Modus | Checkbox pro Survey |
+| Teilnehmerzahl | Anzeige der Anzahl Antworten (n) pro Survey |
+| Neue Survey | Wird mit is_active=FALSE und test_mode=FALSE angelegt |
+| Löschen | Checkbox-Auswahl + Bestätigungsdialog mit Teilnehmerzahl-Warnung |
+
+**Referentielle Integrität (ON DELETE CASCADE):**
+
+Beim Löschen einer Survey werden automatisch kaskadiert:
+- `participants` (survey_id → surveys.id)
+- `ratings` (participant_id → participants.id)
+- `partner_feedback` (participant_id → participants.id)
+
+**Passwortschutz:** Gleicher Login wie die Analyse-Seite (via `protect.php`).
+
+## 8.4 Zukünftige Erweiterungen
 
 - Anomalie-Schwellenwerte: Definition und DB-Integration (aktuell manuell)
 
@@ -568,4 +592,4 @@ Diese Archetypen dienen als Referenz für:
 
 _- Ende des Dokuments -_
 
-CPQI-Projekt | Dr. Ralf Korell | Stand: 2026-02-13
+CPQI-Projekt | Dr. Ralf Korell | Stand: 2026-02-13 (AP 49)

@@ -15,6 +15,7 @@
   # Modified: 30.11.2025, 11:55 - AP 40: Fixed criteria sorting in get_partner_matrix_details (sort_order instead of name)
 # Modified: 22.01.2026 - AP 47a: Added be_geo_id column to partners table
 # Modified: 23.01.2026 - FIX: Awareness-Berechnung dynamisch (SELECT COUNT FROM criteria statt hardcoded 20)
+# Modified: 2026-02-13 - AP 48: ON DELETE CASCADE für participants→surveys, ratings→participants, partner_feedback→participants
 */
 
 DROP TABLE IF EXISTS admin_users CASCADE;
@@ -80,7 +81,7 @@ CREATE TABLE criteria (
 -- 6. Teilnehmer
 CREATE TABLE participants (
     id SERIAL PRIMARY KEY,
-    survey_id INTEGER REFERENCES surveys(id),
+    survey_id INTEGER REFERENCES surveys(id) ON DELETE CASCADE,
     department_id INTEGER REFERENCES departments(id),
     session_token VARCHAR(100),
     is_manager BOOLEAN DEFAULT FALSE,
@@ -92,7 +93,7 @@ CREATE TABLE participants (
 -- 7. Bewertungen
 CREATE TABLE ratings (
     id BIGSERIAL PRIMARY KEY,
-    participant_id INTEGER REFERENCES participants(id),
+    participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
     criterion_id INTEGER REFERENCES criteria(id),
     partner_id INTEGER REFERENCES partners(id),
     rating_type VARCHAR(20),
@@ -106,7 +107,7 @@ CREATE TABLE ratings (
 -- 8. Partner Feedback (Kopfdaten: Frequenz, NPS, Globaler Kommentar)
 CREATE TABLE partner_feedback (
     id BIGSERIAL PRIMARY KEY,
-    participant_id INTEGER REFERENCES participants(id),
+    participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
     partner_id INTEGER REFERENCES partners(id),
     interaction_frequency INTEGER,
     nps_score INTEGER,

@@ -89,6 +89,17 @@ Interaktives Dashboard für Auswertungen (Login erforderlich):
 * **Interaktion:** Klick auf Partner öffnet **IPA-Matrix** (Scatterplot). Klick auf Icons öffnet **Detail-Modal**.
 * **Export:** CSV-Export der gefilterten Daten.
 
+### 3.3. Survey-Verwaltung (Admin)
+**Pfad:** `/var/www/html/survey_admin.html` + `php/survey_admin.php`
+
+Login-geschützte Verwaltungsseite für Surveys (gleiches Passwort wie Analyse):
+* **Tabellarische Übersicht** aller Surveys mit Inline-Editing.
+* **Editierbar:** Name, Start-/Enddatum (Date-Picker), Test-Modus (Checkbox).
+* **Aktiv-Steuerung:** Radio-Buttons – genau eine Survey ist aktiv (atomarer Wechsel).
+* **Neue Survey:** Anlage per Button (wird inaktiv und ohne Test-Modus erstellt).
+* **Löschen:** Checkbox-Auswahl + Bestätigungsdialog mit Teilnehmerzahl-Warnung. CASCADE löscht alle zugehörigen Daten (participants, ratings, partner_feedback).
+* **Teilnehmerzahl (n):** Zeigt pro Survey die Anzahl der Antworten an.
+
 ---
 
 ## 4. Datenmodell (PostgreSQL)
@@ -105,6 +116,13 @@ Das Schema ist normalisiert (3NF) und nutzt fortschrittliche DB-Features.
 * **`partner_feedback`**: Kopfdaten pro Partner-Interaktion (`nps_score`, `interaction_frequency`, `general_comment`).
 * **`app_texts`**: Konfigurierbare Texte für Tooltips/Modals.
 * **`admin_users`**: Benutzerverwaltung für das Dashboard (Username, Password-Hash).
+
+**Referentielle Integrität:**
+* `participants → surveys`: ON DELETE CASCADE
+* `ratings → participants`: ON DELETE CASCADE
+* `partner_feedback → participants`: ON DELETE CASCADE
+
+Löschen einer Survey entfernt automatisch alle zugehörigen Teilnehmer, Bewertungen und Feedback.
 
 **Views & Funktionen (Architektur-Layer):**
 * **Function `get_department_subtree(INT[])`**: Rekursive PL/pgSQL Funktion, um Abteilungsbäume effizient aufzulösen.
