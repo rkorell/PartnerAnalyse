@@ -14,6 +14,7 @@
   # Modified: 28.11.2025, 17:00 - AP 27: Added LocalStorage persistence (Light version)
   # Modified: 28.11.2025, 20:00 - AP 29.3: Integrated CSRF token handling
   # Modified: 30.11.2025, 10:04 - AP 38: Added openInfoModal() method for app_texts integration
+  # Modified: 2026-02-13 - AP 48: Survey date validation (start_date/end_date) with overlay block
 */
 
 import { CONFIG } from './config.js';
@@ -164,6 +165,9 @@ export class WizardController {
         try {
             this.insertLogo();
             await this.loadConfigData();
+
+            if (this.surveyBlocked) return;
+
             this._loadState();
             this.setupUI();
             
@@ -539,18 +543,58 @@ export class WizardController {
                 this.csrfToken = data.csrf_token;
             }
 
-            if (Array.isArray(data.surveys) && data.surveys.length > 0) {
-                this.surveyId = data.surveys[0].id;
-                this.isTestMode = !!data.surveys[0].test_mode; 
+            // AP 48: Aktive Survey suchen (nicht einfach surveys[0])
+            const survey = Array.isArray(data.surveys)
+                ? data.surveys.find(s => s.is_active)
+                : null;
+
+            if (survey) {
+                this.surveyId = survey.id;
+                this.isTestMode = !!survey.test_mode;
 
                 const subtitle = document.getElementById('survey-subtitle');
-                if(subtitle && data.surveys[0].name) {
-                    subtitle.textContent = data.surveys[0].name + (this.isTestMode ? " [TEST-MODE]" : "");
+                if(subtitle && survey.name) {
+                    subtitle.textContent = survey.name + (this.isTestMode ? " [TEST-MODE]" : "");
+                }
+
+                // AP 48: Datumsprüfung (skip bei test_mode oder NULL-Datum)
+                if (!this.isTestMode) {
+                    const now = new Date();
+                    const dateOpts = { day: '2-digit', month: 'long', year: 'numeric' };
+
+                    if (survey.start_date) {
+                        const startDate = new Date(survey.start_date + 'T00:00:00');
+                        if (now < startDate) {
+                            const formatted = startDate.toLocaleDateString('de-DE', dateOpts);
+                            const remaining = this._formatTimeDiff(startDate - now);
+                            this.blockWizard(
+                                'Etwas zu früh ...',
+                                `Schön, dass Du dabei sein willst!<br><br>Die Erhebung „${survey.name}" startet erst <strong>in ${remaining}</strong> (${formatted}).<br><br>Wir freuen uns, wenn Du dann wiederkommst – Dein Feedback ist uns wichtig!`
+                            );
+                            return;
+                        }
+                    }
+
+                    if (survey.end_date) {
+                        const endDate = new Date(survey.end_date + 'T18:00:00');
+                        if (now > endDate) {
+                            const formatted = new Date(survey.end_date + 'T00:00:00')
+                                .toLocaleDateString('de-DE', dateOpts);
+                            this.blockWizard(
+                                'Leider zu spät ...',
+                                `Die Erhebung „${survey.name}" endete am <strong>${formatted}</strong>.<br><br>Schade, dass wir Dein Feedback diesmal verpasst haben. Beim nächsten Mal bist Du hoffentlich dabei!`
+                            );
+                            return;
+                        }
+                    }
                 }
             } else {
                 this.surveyId = null;
-                const subtitle = document.getElementById('survey-subtitle');
-                if (subtitle) subtitle.textContent = "Kein aktives Survey gefunden";
+                this.blockWizard(
+                    'Gerade nichts los ...',
+                    'Aktuell ist keine Erhebung aktiv.<br><br>Sobald eine neue Runde startet, wirst Du informiert.'
+                );
+                return;
             }
 
             this.hierarchyData = data.departments; 
@@ -590,6 +634,38 @@ export class WizardController {
 
         this._updateButtonState(prevBtn, this.currentPartnerIndex > 0);
         this._updateButtonState(nextBtn, this.currentPartnerIndex < totalPartners - 1);
+    }
+
+    // AP 48: Zeitdifferenz menschenlesbar formatieren ("4 Tagen, 8 Stunden und 10 Minuten")
+    _formatTimeDiff(diffMs) {
+        const totalMin = Math.floor(diffMs / 60000);
+        const days = Math.floor(totalMin / 1440);
+        const hours = Math.floor((totalMin % 1440) / 60);
+        const minutes = totalMin % 60;
+
+        const parts = [];
+        if (days > 0) parts.push(`${days} ${days === 1 ? 'Tag' : 'Tagen'}`);
+        if (hours > 0) parts.push(`${hours} ${hours === 1 ? 'Stunde' : 'Stunden'}`);
+        if (minutes > 0 || parts.length === 0) parts.push(`${minutes} ${minutes === 1 ? 'Minute' : 'Minuten'}`);
+
+        if (parts.length === 1) return parts[0];
+        return parts.slice(0, -1).join(', ') + ' und ' + parts[parts.length - 1];
+    }
+
+    // AP 48: Wizard sperren mit halbtransparentem Overlay (Inhalt sichtbar im Hintergrund)
+    blockWizard(title, message) {
+        this.surveyBlocked = true;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.style.cssText = 'background: rgba(0,0,0,0.85); z-index: 5000;';
+        overlay.innerHTML = `
+            <div class="modal-content-large" style="max-width: 460px; text-align: left; align-items: stretch;">
+                <h2 class="modal-headline">${title}</h2>
+                <p style="font-size: 1.1em; color: #666; margin: 20px 0 0 0; line-height: 1.6;">${message}</p>
+            </div>
+        `;
+        document.body.appendChild(overlay);
     }
 
     showStep(stepNumber) {

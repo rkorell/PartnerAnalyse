@@ -16,6 +16,7 @@
   # Modified: 28.11.2025, 19:30 - FIX AP 29.2: Removed protection (must be public for survey participants)
   # Modified: 28.11.2025, 20:00 - AP 29.3: Added CSRF token generation
   # Modified: 28.11.2025, 20:15 - AP 29.3: Added auth_status for proactive frontend login
+  # Modified: 2026-02-13 - AP 48: Added is_active, start_date, end_date to survey response
 */
 
 header('Content-Type: application/json');
@@ -38,12 +39,15 @@ try {
     
     // Surveys als Array
     $surveys = [];
-    $stmt = $pdo->query("SELECT id, name, test_mode FROM surveys ORDER BY start_date DESC, id DESC");
+    $stmt = $pdo->query("SELECT id, name, test_mode, is_active, start_date, end_date FROM surveys ORDER BY start_date DESC, id DESC");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $surveys[] = [
             'id' => intval($row['id']),
             'name' => $row['name'],
-            'test_mode' => $row['test_mode'] === true || $row['test_mode'] === 't' || $row['test_mode'] === 1
+            'test_mode' => $row['test_mode'] === true || $row['test_mode'] === 't' || $row['test_mode'] === 1,
+            'is_active' => $row['is_active'] === true || $row['is_active'] === 't' || $row['is_active'] === 1,
+            'start_date' => $row['start_date'],
+            'end_date' => $row['end_date']
         ];
     }
 
