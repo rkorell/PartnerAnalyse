@@ -11,6 +11,7 @@
   # Modified: 28.11.2025, 18:45 - AP 29.2: Enable access protection
   # Modified: 29.11.2025, 11:15 - AP I.2: Switched to view_ratings_v2 (Non-destructive testing of V2.1 Model)
   # Modified: 29.11.2025, 23:45 - AP 36: Full Refactoring - Use DB functions for Matrix & Structure Stats to ensure consistency
+  # Modified: 2026-02-14 - AP 50: exclude_ids Parameter für Fraud-Ausschluss
 */
 
 header('Content-Type: application/json');
@@ -32,6 +33,7 @@ $partner_id = isset($input['partner_id']) ? intval($input['partner_id']) : 0;
 $survey_ids = $input['survey_ids'] ?? [];
 $department_ids = $input['department_ids'] ?? [];
 $manager_filter = $input['manager_filter'] ?? "alle";
+$exclude_ids = isset($input['exclude_ids']) && is_array($input['exclude_ids']) ? array_map('intval', $input['exclude_ids']) : [];
 
 if ($partner_id <= 0 || empty($survey_ids) || empty($department_ids)) {
     http_response_code(400);
@@ -42,15 +44,14 @@ if ($partner_id <= 0 || empty($survey_ids) || empty($department_ids)) {
 // Arrays für Postgres vorbereiten
 $dept_array = '{' . implode(',', array_map('intval', $department_ids)) . '}';
 $survey_array = '{' . implode(',', array_map('intval', $survey_ids)) . '}';
+$exclude_array = '{' . implode(',', $exclude_ids) . '}';
 
 try {
-    // 1. Matrix Details laden (inkl. ungewichteter Splits für Tooltips)
-    // Nutzt die neue DB-Funktion, die Frequenz-Gewichtung korrekt anwendet.
-    $stmtMatrix = $pdo->prepare("SELECT * FROM get_partner_matrix_details(?, ?::int[], ?::int[], ?)");
-    $stmtMatrix->execute([$partner_id, $survey_array, $dept_array, $manager_filter]);
+    // 1. Matrix Details laden (inkl. Frequenz-Gewichtung, mit optionalem Ausschluss)
+    $stmtMatrix = $pdo->prepare("SELECT * FROM get_partner_matrix_details(?, ?::int[], ?::int[], ?, ?::int[])");
+    $stmtMatrix->execute([$partner_id, $survey_array, $dept_array, $manager_filter, $exclude_array]);
     $matrix_details = $stmtMatrix->fetchAll(PDO::FETCH_ASSOC);
 
-    // JSON-Strings in der DB-Antwort decodieren (Kommentare)
     foreach ($matrix_details as &$row) {
         if (isset($row['comments'])) {
             $row['comments'] = json_decode($row['comments'], true);
@@ -58,23 +59,20 @@ try {
     }
     unset($row);
 
-    // 2. Struktur-Daten laden (Wer hat bewertet?)
-    $stmtStruct = $pdo->prepare("SELECT * FROM get_partner_structure_stats(?, ?::int[], ?::int[], ?)");
-    $stmtStruct->execute([$partner_id, $survey_array, $dept_array, $manager_filter]);
+    // 2. Struktur-Daten laden (mit optionalem Ausschluss)
+    $stmtStruct = $pdo->prepare("SELECT * FROM get_partner_structure_stats(?, ?::int[], ?::int[], ?, ?::int[])");
+    $stmtStruct->execute([$partner_id, $survey_array, $dept_array, $manager_filter, $exclude_array]);
     $structure_stats = $stmtStruct->fetchAll(PDO::FETCH_ASSOC);
 
-    // 3. General Comments laden
-    // Einfache Abfrage, da diese nicht Teil der komplexen Matrix-Berechnung sind.
-    // Wir filtern hier ebenfalls auf Survey, um konsistent zu bleiben.
-    // (Department-Filterung ist hier implizit über participants-Tabelle und Survey-Logik ausreichend für den Kontext "Partner-Feedback", 
-    // aber sauberer wäre auch hier der Dept-Filter. Wir belassen es bei Survey-Filterung wie im vorherigen Stand für Comments.)
-    $sqlGen = "SELECT general_comment FROM partner_feedback pf 
-               JOIN participants p ON pf.participant_id = p.id 
-               WHERE pf.partner_id = ? AND p.survey_id = ANY(?::int[]) 
+    // 3. General Comments laden (mit Ausschluss-Filter)
+    $sqlGen = "SELECT general_comment FROM partner_feedback pf
+               JOIN participants p ON pf.participant_id = p.id
+               WHERE pf.partner_id = ? AND p.survey_id = ANY(?::int[])
+               AND p.id != ALL(?::int[])
                AND pf.general_comment IS NOT NULL AND trim(pf.general_comment) <> ''";
-    
+
     $stmtGen = $pdo->prepare($sqlGen);
-    $stmtGen->execute([$partner_id, $survey_array]);
+    $stmtGen->execute([$partner_id, $survey_array, $exclude_array]);
     $gen_comments = $stmtGen->fetchAll(PDO::FETCH_COLUMN);
 
     echo json_encode([

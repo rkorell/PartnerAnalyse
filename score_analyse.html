@@ -18,9 +18,16 @@
 <body>
     <div class="container">
         <header class="header">
-            <img src="img/cisco.png" alt="Cisco Logo" style="height: 56px; margin-bottom: 12px; display: block; margin-left: auto; margin-right: auto;">
-            <h1><span class="cisco-blue">CPQI</span> - Score Analyse</h1>
-            <p class="subtitle" id="analyse-subtitle">Darstellung und Untersuchung des Partner Quality Indexes</p>
+            <div class="header-logo-left">
+                <img src="img/cisco.png" alt="Cisco Logo">
+            </div>
+            <div class="header-center">
+                <h1><span class="cisco-blue">CPQI</span> - Score Analyse</h1>
+                <p class="subtitle" id="analyse-subtitle">Darstellung und Untersuchung des Partner Quality Indexes</p>
+            </div>
+            <div class="header-logo-right">
+                <img src="img/dsgvo.png" alt="Datenschutz" title="Datenschutz-Information" onclick="window.openInfoModal('dsgvo-info')">
+            </div>
         </header>
 
         <div class="wizard-container" style="min-height: 0; position: relative;">
@@ -64,6 +71,7 @@
                     <h3>Fehler</h3><p id="error-text">Es ist ein Fehler aufgetreten.</p><button type="button" id="close-error" class="btn btn-secondary">Schließen</button>
                 </div>
             </div>
+            <div id="fraud-section" style="margin-top:20px;"></div>
             <div id="result-section" style="margin-top:30px;"></div>
             
             <div class="author-signature">Dr. Ralf Korell, <script>document.write(new Date().getFullYear())</script></div>
@@ -106,5 +114,6 @@
     </div>
 
     <script type="module" src="js/score_analyse.js"></script>
+
 </body>
 </html>

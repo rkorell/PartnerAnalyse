@@ -23,6 +23,7 @@
   # Modified: 29.11.2025, 11:15 - AP I.2: Switched to view_ratings_v2 (V2.1 Model with Factors)
   # Modified: 29.11.2025, 12:00 - AP 31: Added Awareness-Quote calculation
   # Modified: 29.11.2025, 16:00 - AP I.3: Full Refactoring - Use DB Function calculate_partner_bilanz
+  # Modified: 2026-02-14 - AP 50: exclude_ids Parameter für Fraud-Ausschluss
 */
 
 header('Content-Type: application/json');
@@ -50,6 +51,7 @@ $survey_ids     = $input['survey_ids'] ?? [];
 $manager_filter = $input['manager_filter'] ?? "alle";
 $department_ids = $input['department_ids'] ?? [];
 $min_answers    = isset($input['min_answers']) ? intval($input['min_answers']) : 1;
+$exclude_ids    = isset($input['exclude_ids']) && is_array($input['exclude_ids']) ? array_map('intval', $input['exclude_ids']) : [];
 
 if (empty($survey_ids) || empty($department_ids)) {
     http_response_code(400);
@@ -60,20 +62,21 @@ if (empty($survey_ids) || empty($department_ids)) {
 // Array-String für PostgreSQL Funktion vorbereiten "{1,2,3}"
 $dept_array_string = '{' . implode(',', array_map('intval', $department_ids)) . '}';
 $survey_array_string = '{' . implode(',', array_map('intval', $survey_ids)) . '}';
+$exclude_array_string = '{' . implode(',', $exclude_ids) . '}';
 
 try {
     require_once DB_CONFIG_PATH;
 
-    // AP I.3: Aufruf der gekapselten DB-Funktion
-    // Parameter: survey_ids[], dept_ids[], manager_filter, min_answers
-    $sql = "SELECT * FROM calculate_partner_bilanz(?::int[], ?::int[], ?, ?)";
+    // AP I.3/AP 50: Aufruf der gekapselten DB-Funktion mit optionalem Teilnehmer-Ausschluss
+    $sql = "SELECT * FROM calculate_partner_bilanz(?::int[], ?::int[], ?, ?, ?::int[])";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
         $survey_array_string,
         $dept_array_string,
         $manager_filter,
-        $min_answers
+        $min_answers,
+        $exclude_array_string
     ]);
     
     $result = $stmt->fetchAll(PDO::FETCH_ASSOC);

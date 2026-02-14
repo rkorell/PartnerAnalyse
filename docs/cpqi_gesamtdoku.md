@@ -2,7 +2,7 @@ CPQI - Gesamtdokumentation
 
 Cisco Partner Quality Index Methodik, Kriterienkatalog & Datenmodell
 
-Stand: 2026-02-13 | Dr. Ralf Korell
+Stand: 2026-02-14 | Dr. Ralf Korell
 
 # 1\. Einleitung & Methodischer Rahmen
 
@@ -257,7 +257,89 @@ Beim Löschen einer Survey werden automatisch kaskadiert:
 
 **Passwortschutz:** Gleicher Login wie die Analyse-Seite (via `protect.php`).
 
-## 8.4 Zukünftige Erweiterungen
+## 8.4 Datenschutz, Sicherheit & Fraud-Detection (AP 50)
+
+> **Ausführliches Sicherheitskonzept:** [docs/CPQI_Security_Konzept.md](CPQI_Security_Konzept.md) – Rechtsrahmen (DSGVO, EuGH-Rechtsprechung), technische Maßnahmen, Fraud-Detection-Methodik mit vollständigem Quellenverzeichnis.
+
+Das CPQI implementiert ein mehrschichtiges Sicherheitskonzept nach dem Prinzip **Defense in Depth**. Die wichtigsten Maßnahmen im Überblick:
+
+### 8.4.1 Datenschutz & IP-Anonymisierung
+
+IP-Adressen werden **niemals im Klartext gespeichert**. Zwei unabhängige Anonymisierungsschichten:
+
+| Schicht | Verfahren | Zweck |
+|---------|-----------|-------|
+| **Anwendung** | SHA-256 Hash mit Salt (`participants.ip_hash`) | Duplikat-Erkennung ohne Rückverfolgbarkeit |
+| **Infrastruktur** | Apache Piped Logging (letztes Oktett → 0) | Log-Anonymisierung, 7 Tage Retention |
+
+Salt und DB-Credentials liegen außerhalb des Webroots (`/etc/partneranalyse/`).
+
+**Rechtliche Einordnung:** SHA-256 mit Salt ist nach BSI TR-02102-1 ein empfohlenes Verfahren. Die Nicht-Rückführbarkeit stützt sich auf EuGH C-582/14 (Breyer) und EuG T-557/20 (relativer Personenbezug). Details und Quellen im [Security-Konzept](CPQI_Security_Konzept.md), Kapitel 1-2.
+
+### 8.4.2 Anwendungssicherheit
+
+| Maßnahme | Umsetzung |
+|----------|-----------|
+| HTTPS | TLS-Verschlüsselung (Let's Encrypt) |
+| CSRF-Schutz | Synchronizer Token Pattern (`protect.php`) |
+| Session-Security | HttpOnly, SameSite=Lax |
+| Server-Härtung | .htaccess blockiert `.git`, `*.sql`, Konfigurationsdateien |
+| Security-Headers | X-Frame-Options, X-Content-Type-Options |
+
+**Design-Entscheidung:** CSRF-Token wird nach Submit bewusst **nicht** erneuert (Mehrfach-Abstimmung wird toleriert, nicht verhindert). Begründung im [Security-Konzept](CPQI_Security_Konzept.md), Kapitel 2.5.
+
+### 8.4.3 Survey-Fraud-Detection
+
+Das Analyse-Dashboard erkennt drei Kategorien von Qualitätsindikationen:
+
+| Indikator | Severity | Methode |
+|-----------|----------|---------|
+| IP-Duplikate | 3 (hoch) | Hash-Vergleich innerhalb Survey |
+| Straightlining (Häufung identischer Bewertungen) | 2 (mittel) | Standardabweichung = 0 |
+| Extreme Scores | 1 (niedrig) | Durchgängig Score 1 oder 5 |
+
+IP-Duplikate werden als **Cluster** dargestellt. Der Analyst entscheidet über Ausschluss – keine automatische Filterung. Methodische Grundlagen (Krosnick 1991, Leiner 2019, REAL-Framework) im [Security-Konzept](CPQI_Security_Konzept.md), Kapitel 3.
+
+## 8.5 UI-Änderungen (AP 50)
+
+### 8.5.1 Header-Layout
+
+Beide Seiten (Wizard und Analyse) verwenden einen einheitlichen **Sticky Header** mit 3-Spalten-Layout:
+
+| Position | Inhalt | Funktion |
+|----------|--------|----------|
+| Links | Cisco Logo | Branding |
+| Mitte | Titel + Untertitel | Seitenidentifikation |
+| Rechts | DSGVO-Icon | Klick öffnet Datenschutz-Info (Modal) |
+
+Der Header ist fixiert (`position: sticky`) und hat abgerundete untere Ecken.
+
+### 8.5.2 Abteilungs-Hierarchie im Wizard
+
+Die Organisationsstruktur wird als Baumstruktur mit bis zu 4 Ebenen abgebildet:
+
+| Ebene | Darstellung | Beispiel |
+|-------|-------------|---------|
+| 0 (Root) | Fester Text-Label (nicht editierbar) | "Cisco Deutschland" |
+| 1 | Dropdown "Ich arbeite in / für die Organisation" | Public Sector |
+| 2 | Dropdown "Bereich" | Vertrieb Nord |
+| 3 | Dropdown "Team" | Team Alpha |
+
+Die Root-Ebene wird dynamisch aus der Datenbank geladen und als gültige Vorauswahl behandelt. Wählt der Teilnehmer keine Unterorganisation, wird die Root-ID als `departmentId` gespeichert. Die feinste ausgewählte Ebene wird als `finalDeptId` übermittelt (Kaskade: Team → Bereich → Organisation → Root).
+
+### 8.5.3 Info-Modals (app_texts)
+
+Kontextsensitive Hilfetexte werden als HTML in der Tabelle `app_texts` gespeichert und über modale Overlays angezeigt. Auslöser sind "i"-Beacons (orangefarbene Kreise) oder das DSGVO-Icon:
+
+| Kategorie | Auslöser | Seite | Inhalt |
+|-----------|----------|-------|--------|
+| `entry-mask` | i-Beacon (Wizard-Container) | Wizard | Methodik & Zielsetzung |
+| `nps-explanation` | i-Beacon (NPS-Slider) | Wizard | NPS-Erklärung |
+| `dsgvo-info` | DSGVO-Icon (Header) | Beide | Datenschutz-Zusammenfassung + PDF-Link |
+| `analytic-mask` | i-Beacon (Ergebnis-Header) | Analyse | Bilanz-Erklärung, Archetypen, PDF-Link |
+| `fraud-detection` | i-Beacon (Fraud-Panel) | Analyse | Severity-Erklärung, Workflow |
+
+## 8.6 Zukünftige Erweiterungen
 
 - Anomalie-Schwellenwerte: Definition und DB-Integration (aktuell manuell)
 
@@ -575,15 +657,15 @@ Einzeleingabe dient für PAM-Einschätzungen und Korrekturen.
 
 ## 10. Testdaten & Archetypen
 
-Für die Entwicklung und Validierung der Visualisierungen wurden spezifische Testszenarien definiert. Die Datenbank enthält 5 Archetypen-Partner mit charakteristischen Bewertungsprofilen:
+Für die Entwicklung und Validierung der Visualisierungen wurden spezifische Testszenarien definiert. Die Datenbank enthält 5 Archetypen-Partner mit charakteristischen Bewertungsprofilen (sortiert nach Relevanz):
 
 | Archetyp | Partner | Profil | Erwartete Darstellung |
 |----------|---------|--------|----------------------|
-| **"Die Diva"** | Damovo | Strategisch brillant (Kriterien 1-5 Top), operativ katastrophal (14-16 Flop) | Langer grüner UND langer roter Balken. Hohe Divergenz. |
-| **"Der Spezialist"** | Avodaq | Nur 2 Kriterien bewertet (Security/Akquise), diese aber Top. Rest N/A. | Kurzer/mittlerer grüner Balken, kein Rot. Niedrige Awareness. |
-| **"Der Solide"** | Bechtle | Alles Mittelmaß (3-4). Wichtigkeit normal. | Kaum Ausschlag um die Mitte. |
-| **"Der Sanierungsfall"** | Cancom | Wichtige Themen werden schlecht erfüllt. Nur 1 Bewertung. | Langer roter Balken. |
-| **"Der Konflikt"** | Telekom | Manager bewertet Top (5), Team bewertet Flop (1). | Score in der Mitte, aber Blitz-Icon (⚡) wegen hoher Divergenz. |
+| **"Der Solide"** | Bechtle | Wunschpartner: Breit stark in wichtigen Kriterien, kaum Schwächen. Hoher Score, hohes Potenzial, hohe Loyalität. | Lang Grün, kurz/kein Rot. |
+| **"Der Spezialist"** | Avodaq | Wenige Kriterien mit hoher Importance, in denen er herausragend abschneidet. Keine Schwächen. Technologiefokussiert. | Kurz/mittel Grün, kein Rot. |
+| **"Der Stratege ohne Execution"** | Damovo | Strategisch brillant (Kriterien 1-5 Top), operativ mit erheblichen Schwächen (14-16 Flop). Zwei Gesichter. | Lang Grün UND lang Rot. |
+| **"Der Sanierungsfall"** | Cancom | Wichtige Themen werden systematisch schlecht erfüllt. Mehr Belastung als Wertbeitrag. | Lang Rot, kurz/kein Grün. |
+| **"Der Konflikt"** | Telekom | Diskrepanz zwischen Management- und Team-Bewertung. Manager bewertet Top, Team bewertet Flop (oder umgekehrt). | Score variiert je nach Filter. Divergenz-Icon (⚡). |
 
 Diese Archetypen dienen als Referenz für:
 - Validierung der Heatmap-Balken (grün/rot)
@@ -592,4 +674,4 @@ Diese Archetypen dienen als Referenz für:
 
 _- Ende des Dokuments -_
 
-CPQI-Projekt | Dr. Ralf Korell | Stand: 2026-02-13 (AP 49)
+CPQI-Projekt | Dr. Ralf Korell | Stand: 2026-02-14 (AP 50: Security, Fraud-Detection, UI, Archetypen)

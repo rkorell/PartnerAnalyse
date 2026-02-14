@@ -24,6 +24,11 @@
   # Modified: 29.11.2025, 23:45 - AP 36: Integration of Structure Table and new DB-based data loading
   # Modified: 30.11.2025, 10:39 - AP 39: Matrix redesign - coordinate mapping with padding buffer to prevent clipping
   # Modified: 02.12.2025, 17:30 - AP 43: Replaced all Magic Numbers with CONFIG references
+  # Modified: 2026-02-14 - AP 50: Fraud-Detection Panel (parallel fetch + UI)
+  # Modified: 2026-02-14 - AP 50: Fix: Fraud-Panel bleibt nach Ausschluss bedienbar (Option C)
+  # Modified: 2026-02-14 - Teilnehmerzahlen im Abteilungsbaum (per Survey, via MagicMirrorModuleStats)
+  # Modified: 2026-02-14 - AP 50: Fraud-Panel IP-Clustering + Sortierung (Severity DESC, Score 5 vor 1)
+  # Modified: 2026-02-14 - AP 50: Info-Sticker (i) im Fraud-Panel-Header mit Hilfetext aus app_texts
 */
 
 import { CONFIG } from './config.js';
@@ -60,9 +65,12 @@ document.addEventListener("DOMContentLoaded", function() {
     const infoModal = document.getElementById('global-info-modal');
     const closeInfoBtn = document.getElementById('close-info-modal');
 
-    let analysisData = []; 
+    const fraudSection = document.getElementById('fraud-section');
+
+    let analysisData = [];
     let currentPartnerDetails = null;
-    let currentFilterState = null; 
+    let currentFilterState = null;
+    let _deptCounts = null;
 
     // Initial Load
     initializeFilters();
@@ -82,6 +90,7 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     if(exportBtn) exportBtn.addEventListener('click', exportToCSV);
+    surveySelect.addEventListener('change', onSurveySelectionChange);
 
     if (loginForm) {
         loginForm.addEventListener('submit', function(e) {
@@ -220,6 +229,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     });
                     if (!anyActive && surveySelect.options.length) surveySelect.options[0].selected = true;
                 }
+                onSurveySelectionChange();
             });
     }
 
@@ -259,7 +269,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                 e.stopPropagation();
                             });
                         } else {
-                            chevron.classList.add('invisible');
+                            chevron.classList.add('chevron-leaf');
                             chevron.textContent = "▶";
                         }
                         const checkbox = document.createElement('input');
@@ -283,6 +293,15 @@ document.addEventListener("DOMContentLoaded", function() {
                         headerDiv.appendChild(chevron);
                         headerDiv.appendChild(checkbox);
                         headerDiv.appendChild(label);
+                        const countSpan = document.createElement('span');
+                        countSpan.className = 'dept-count';
+                        countSpan.dataset.deptId = node.id;
+                        if (_deptCounts && _deptCounts.hasOwnProperty(node.id)) {
+                            const c = _deptCounts[node.id];
+                            countSpan.textContent = ` (${c})`;
+                            if (c === 0) countSpan.classList.add('zero');
+                        }
+                        label.appendChild(countSpan);
                         nodeDiv.appendChild(headerDiv);
                         if (node.children.length > 0 && node._expanded) {
                             const childrenDiv = document.createElement('div');
@@ -325,13 +344,59 @@ document.addEventListener("DOMContentLoaded", function() {
                         });
                     }
                     renderTree();
+                    onSurveySelectionChange();
                 }
             });
     }
 
+    // --- DEPARTMENT COUNTS (Teilnehmerzahlen im Abteilungsbaum) ---
+
+    function onSurveySelectionChange() {
+        const selected = Array.from(surveySelect.selectedOptions);
+        if (selected.length === 1) {
+            updateDepartmentCounts(parseInt(selected[0].value));
+        } else {
+            clearDepartmentCounts();
+        }
+    }
+
+    function updateDepartmentCounts(surveyId) {
+        fetch(`php/MagicMirrorModuleStats.php?survey_id=${surveyId}`)
+            .then(resp => resp.json())
+            .then(data => {
+                _deptCounts = {};
+                function flatten(node) {
+                    _deptCounts[node.id] = node.count;
+                    if (node.children) node.children.forEach(flatten);
+                }
+                const roots = Array.isArray(data.root) ? data.root : [data.root];
+                roots.forEach(flatten);
+
+                departmentTreeContainer.querySelectorAll('.dept-count').forEach(span => {
+                    const id = parseInt(span.dataset.deptId);
+                    if (_deptCounts.hasOwnProperty(id)) {
+                        const c = _deptCounts[id];
+                        span.textContent = ` (${c})`;
+                        span.className = c === 0 ? 'dept-count zero' : 'dept-count';
+                    } else {
+                        span.textContent = ' (0)';
+                        span.className = 'dept-count zero';
+                    }
+                });
+            })
+            .catch(() => { clearDepartmentCounts(); });
+    }
+
+    function clearDepartmentCounts() {
+        _deptCounts = null;
+        departmentTreeContainer.querySelectorAll('.dept-count').forEach(span => {
+            span.textContent = '';
+        });
+    }
+
     // --- CORE LOGIC (ANALYSE & VISUALISIERUNG V2.2) ---
 
-    function analyseScores() {
+    function analyseScores(keepExclusions = false) {
         const surveyIds = Array.from(surveySelect.selectedOptions).map(opt => parseInt(opt.value));
         const departmentCheckboxes = departmentTreeContainer.querySelectorAll('input[type="checkbox"]:checked');
         const departmentIds = Array.from(departmentCheckboxes).map(cb => parseInt(cb.value));
@@ -352,6 +417,10 @@ document.addEventListener("DOMContentLoaded", function() {
         };
 
         resultSection.innerHTML = "";
+        if (!keepExclusions) {
+            excludedParticipantIds = [];
+            fraudSection.innerHTML = "";
+        }
         setExportButtonState(false);
         toggleGlobalLoader(true);
 
@@ -360,7 +429,8 @@ document.addEventListener("DOMContentLoaded", function() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 ...currentFilterState,
-                min_answers: minAnswers
+                min_answers: minAnswers,
+                exclude_ids: excludedParticipantIds
             })
         })
         .then(resp => {
@@ -379,13 +449,13 @@ document.addEventListener("DOMContentLoaded", function() {
                     score: row.score,
                     totalAnswers: row.total_answers,
                     globalParticipantCount: row.global_participant_count,
-                    
+
                     scorePositive: parseFloat(row.score_positive || 0),
                     scoreNegative: Math.abs(parseFloat(row.score_negative || 0)),
                     countPositive: parseInt(row.count_positive || 0),
                     countNegative: parseInt(row.count_negative || 0),
-                    
-                    awarenessPct: parseInt(row.awareness_pct || 0), 
+
+                    awarenessPct: parseInt(row.awareness_pct || 0),
 
                     npsScore: row.nps_score,
                     commentCount: row.comment_count,
@@ -397,13 +467,20 @@ document.addEventListener("DOMContentLoaded", function() {
 
                 renderResultTable(analysisData);
                 setExportButtonState(true);
+
+                // Fraud-Detection erst nach erfolgreicher Analyse laden
+                if (!keepExclusions) {
+                    fetchFraudData(currentFilterState);
+                }
             } else if (data && data.message) {
                 resultSection.innerHTML = `<div class="selection-info">${data.message}</div>`;
                 analysisData = [];
+                fraudSection.innerHTML = "";
                 setExportButtonState(false);
             } else if (data && data.error) {
                 showError(data.error);
                 analysisData = [];
+                fraudSection.innerHTML = "";
                 setExportButtonState(false);
             } else {
                 showError("Unbekanntes Antwortformat.");
@@ -502,7 +579,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     ...currentFilterState,
-                    partner_id: partner.partnerId
+                    partner_id: partner.partnerId,
+                    exclude_ids: excludedParticipantIds
                 })
             });
             
@@ -648,6 +726,285 @@ document.addEventListener("DOMContentLoaded", function() {
         });
         
         matrixContainer.innerHTML = Tpl.getMatrixSVG_Standard(dotsHTML, size, padding, plotSize);
+    }
+
+    // --- FRAUD DETECTION (AP 50) ---
+
+    let fraudData = [];
+    let excludedParticipantIds = [];
+
+    function fetchFraudData(filterState) {
+        fetch('php/get_fraud_data.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(filterState)
+        })
+        .then(resp => {
+            if (resp.status === 401) return [];
+            return resp.json();
+        })
+        .then(data => {
+            if (Array.isArray(data) && data.length > 0) {
+                fraudData = data;
+                renderFraudPanel(data);
+            } else {
+                fraudData = [];
+                renderFraudClean();
+            }
+        })
+        .catch(() => {
+            fraudData = [];
+            fraudSection.innerHTML = '';
+        });
+    }
+
+    function renderFraudClean() {
+        fraudSection.innerHTML = `<div class="fraud-panel fraud-clean">
+            <div class="fraud-header fraud-header-clean">
+                Survey-Fraud-Detection: Keine Auffälligkeiten
+            </div>
+        </div>`;
+    }
+
+    function renderFraudPanel(rows) {
+        // 1. IP-Gruppen bilden (Clustering)
+        const ipGroups = {};
+        const standalone = [];
+
+        rows.forEach(r => {
+            if (r.is_ip_duplicate && r.ip_hash) {
+                if (!ipGroups[r.ip_hash]) ipGroups[r.ip_hash] = [];
+                ipGroups[r.ip_hash].push(r);
+            } else {
+                standalone.push(r);
+            }
+        });
+
+        // 2. Display-Items aufbauen
+        const displayItems = [];
+
+        Object.values(ipGroups).forEach(group => {
+            const maxSev = Math.max(...group.map(r => r.severity));
+            const straightliners = group.filter(r => r.is_straightliner);
+            const slScores = [...new Set(straightliners.map(r => r.mode_score))];
+            const pids = group.map(r => r.participant_id);
+            const depts = [...new Set(group.map(r => r.department_name))];
+
+            displayItems.push({
+                type: 'cluster',
+                severity: maxSev,
+                sortScore: slScores.length > 0 ? Math.max(...slScores) : null,
+                participantIds: pids,
+                count: group.length,
+                slCount: straightliners.length,
+                slScores,
+                departments: depts
+            });
+        });
+
+        standalone.forEach(r => {
+            displayItems.push({
+                type: 'single',
+                severity: r.is_straightliner && r.mode_score === 3 ? 0 : r.severity,
+                sortScore: r.is_straightliner ? r.mode_score : null,
+                participantIds: [r.participant_id],
+                entry: r
+            });
+        });
+
+        // 3. Sortierung: Severity DESC, dann Score 5 vor 1 vor Rest
+        displayItems.sort((a, b) => {
+            if (a.severity !== b.severity) return b.severity - a.severity;
+            const scoreOrd = (s) => s === 5 ? 0 : s === 1 ? 1 : s === null ? 3 : 2;
+            return scoreOrd(a.sortScore) - scoreOrd(b.sortScore);
+        });
+
+        // 4. Render
+        const totalParticipants = rows.length;
+        const incidentCount = displayItems.length;
+        const excludeInfo = excludedParticipantIds.length > 0
+            ? ` (${excludedParticipantIds.length} Bewertungen ausgeschlossen)` : '';
+
+        let bodyHTML = '';
+        displayItems.forEach(item => {
+            const pidsStr = item.participantIds.join(',');
+            const isExcluded = item.participantIds.every(pid => excludedParticipantIds.includes(pid));
+
+            if (item.type === 'cluster') {
+                let sevClass, sevLabel;
+                if (item.severity === 3) { sevClass = 'sev-3'; sevLabel = 'IP + Muster'; }
+                else { sevClass = 'sev-2'; sevLabel = 'IP-Duplikat'; }
+
+                let tags = `<span class="fraud-tag ip">${item.count}× gleiche IP</span>`;
+                if (item.slCount > 0) {
+                    const scoreStr = item.slScores.join('/');
+                    tags += `<span class="fraud-tag pattern">${item.slCount}× Häufung identischer Bewertungen: Score ${scoreStr}</span>`;
+                }
+
+                const deptStr = item.departments.join(', ');
+
+                bodyHTML += `<div class="fraud-row fraud-row-cluster${isExcluded ? ' fraud-row-excluded' : ''}" data-participant-ids="${pidsStr}">
+                    <input type="checkbox" class="fraud-cb" value="${pidsStr}">
+                    <span class="fraud-badge ${sevClass}">${sevLabel}</span>
+                    <span>${tags}</span>
+                    <span class="fraud-info">${escapeHtml(deptStr)}</span>
+                </div>`;
+            } else {
+                const r = item.entry;
+                const isHarmless = r.is_straightliner && r.mode_score === 3;
+                let sevClass, sevLabel;
+                if (isHarmless) {
+                    sevClass = 'sev-harmless';
+                    sevLabel = 'Hinweis';
+                } else {
+                    sevClass = `sev-${r.severity}`;
+                    sevLabel = r.severity >= 2 ? 'Auffällig' : 'Auffällig';
+                }
+
+                let tags = '';
+                if (r.is_straightliner) {
+                    const tagClass = r.mode_score === 3 ? 'harmless' : 'pattern';
+                    tags += `<span class="fraud-tag ${tagClass}">Häufung identischer Bewertungen: ${r.straightline_pct}% Score ${r.mode_score}</span>`;
+                }
+
+                const role = r.is_manager ? 'Manager' : 'Team';
+                bodyHTML += `<div class="fraud-row${isExcluded ? ' fraud-row-excluded' : ''}" data-participant-ids="${r.participant_id}">
+                    <input type="checkbox" class="fraud-cb" value="${r.participant_id}">
+                    <span class="fraud-badge ${sevClass}">${escapeHtml(sevLabel)}</span>
+                    <span>${tags}</span>
+                    <span class="fraud-info">#${r.participant_id} · ${escapeHtml(r.department_name)} · ${role}</span>
+                </div>`;
+            }
+        });
+
+        fraudSection.innerHTML = `<div class="fraud-panel">
+            <div class="fraud-header" id="fraud-toggle" style="position: relative;">
+                <span class="chevron">▶</span>
+                Survey-Fraud-Detection: ${incidentCount} Indikation${incidentCount === 1 ? '' : 'en'}, ${totalParticipants} Bewertungen${excludeInfo}
+                <span class="help-beacon-header" onclick="event.stopPropagation(); window.openInfoModal('fraud-detection')" title="Was ist Fraud-Detection?">i</span>
+            </div>
+            <div class="fraud-body" id="fraud-body">
+                <div class="fraud-actions">
+                    <button type="button" id="fraud-select-all">Alle auswählen</button>
+                    <button type="button" id="fraud-select-none">Auswahl aufheben</button>
+                    <button type="button" id="fraud-exclude" class="btn-exclude" disabled>Markierte ausschließen</button>
+                    <button type="button" id="fraud-reset" class="btn-reset" style="display:${excludedParticipantIds.length > 0 ? 'inline-block' : 'none'}">Alle Ausschlüsse zurücksetzen</button>
+                </div>
+                ${bodyHTML}
+            </div>
+        </div>`;
+
+        bindFraudEvents();
+    }
+
+    function bindFraudEvents() {
+        const toggle = document.getElementById('fraud-toggle');
+        const body = document.getElementById('fraud-body');
+        if (toggle && body) {
+            toggle.addEventListener('click', function() {
+                this.classList.toggle('open');
+                body.classList.toggle('open');
+            });
+        }
+
+        const selectAll = document.getElementById('fraud-select-all');
+        const selectNone = document.getElementById('fraud-select-none');
+        const excludeBtn = document.getElementById('fraud-exclude');
+
+        if (selectAll) selectAll.addEventListener('click', () => {
+            fraudSection.querySelectorAll('.fraud-row:not(.fraud-row-excluded) .fraud-cb').forEach(cb => { cb.checked = true; });
+            updateFraudExcludeBtn();
+        });
+
+        if (selectNone) selectNone.addEventListener('click', () => {
+            fraudSection.querySelectorAll('.fraud-row:not(.fraud-row-excluded) .fraud-cb').forEach(cb => { cb.checked = false; });
+            updateFraudExcludeBtn();
+        });
+
+        fraudSection.addEventListener('change', (e) => {
+            if (e.target.classList.contains('fraud-cb')) updateFraudExcludeBtn();
+        });
+
+        if (excludeBtn) excludeBtn.addEventListener('click', excludeSelectedFraud);
+
+        const resetBtn = document.getElementById('fraud-reset');
+        if (resetBtn) resetBtn.addEventListener('click', resetFraudExclusions);
+    }
+
+    function updateFraudExcludeBtn() {
+        let totalPids = 0;
+        fraudSection.querySelectorAll('.fraud-row:not(.fraud-row-excluded) .fraud-cb:checked').forEach(cb => {
+            totalPids += cb.value.split(',').length;
+        });
+        const btn = document.getElementById('fraud-exclude');
+        if (btn) {
+            btn.disabled = totalPids === 0;
+            btn.textContent = totalPids > 0 ? `${totalPids} Bewertungen ausschließen` : 'Markierte ausschließen';
+        }
+    }
+
+    function excludeSelectedFraud() {
+        const newExcludes = [];
+        fraudSection.querySelectorAll('.fraud-cb:checked').forEach(cb => {
+            if (cb.closest('.fraud-row').classList.contains('fraud-row-excluded')) return;
+            cb.value.split(',').forEach(id => newExcludes.push(parseInt(id)));
+        });
+        if (newExcludes.length === 0) return;
+
+        excludedParticipantIds = [...new Set([...excludedParticipantIds, ...newExcludes])];
+
+        // Zeilen visuell als ausgeschlossen markieren
+        fraudSection.querySelectorAll('.fraud-row:not(.fraud-row-excluded)').forEach(row => {
+            const pids = row.dataset.participantIds.split(',').map(Number);
+            if (pids.every(pid => excludedParticipantIds.includes(pid))) {
+                row.classList.add('fraud-row-excluded');
+                const cb = row.querySelector('.fraud-cb');
+                if (cb) cb.checked = false;
+            }
+        });
+
+        updateFraudHeader();
+        updateFraudExcludeBtn();
+        showFraudResetBtn(true);
+
+        // Panel einklappen
+        const toggle = document.getElementById('fraud-toggle');
+        const body = document.getElementById('fraud-body');
+        if (toggle) toggle.classList.remove('open');
+        if (body) body.classList.remove('open');
+
+        // Neuberechnung der Scores OHNE die ausgeschlossenen Teilnehmer
+        analyseScores(true);
+    }
+
+    function resetFraudExclusions() {
+        excludedParticipantIds = [];
+        fraudSection.querySelectorAll('.fraud-row-excluded').forEach(row => {
+            row.classList.remove('fraud-row-excluded');
+        });
+        updateFraudHeader();
+        updateFraudExcludeBtn();
+        showFraudResetBtn(false);
+
+        // Komplette Neuberechnung ohne Ausschlüsse
+        analyseScores(true);
+    }
+
+    function updateFraudHeader() {
+        const toggle = document.getElementById('fraud-toggle');
+        if (!toggle) return;
+        const totalParticipants = fraudData.length;
+        const incidentCount = fraudSection.querySelectorAll('.fraud-row').length;
+        const excluded = excludedParticipantIds.length;
+        const chevron = toggle.querySelector('.chevron');
+        const chevronHTML = chevron ? chevron.outerHTML : '<span class="chevron">▶</span>';
+        const excludeInfo = excluded > 0 ? ` (${excluded} Bewertungen ausgeschlossen)` : '';
+        toggle.innerHTML = `${chevronHTML} Survey-Fraud-Detection: ${incidentCount} Indikation${incidentCount === 1 ? '' : 'en'}, ${totalParticipants} Bewertungen${excludeInfo}`;
+    }
+
+    function showFraudResetBtn(visible) {
+        const btn = document.getElementById('fraud-reset');
+        if (btn) btn.style.display = visible ? 'inline-block' : 'none';
     }
 
     function exportToCSV() {

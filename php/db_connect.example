@@ -18,3 +18,8 @@ $options = [
 ];
 // WICHTIG: Keine interne Fehlerbehandlung. Die Ausnahme wird an das aufrufende Skript weitergeleitet.
 $pdo = new PDO($dsn);
+
+// Salt für IP-Hashing (Fraud-Detection, DSGVO-konform)
+// MUSS außerhalb des Webroots liegen, damit er nicht über HTTP auslesbar ist.
+// Ohne diesen Salt könnten IP-Hashes per Rainbow Table rückgerechnet werden.
+define('IP_HASH_SALT', 'your_secret_salt_word');

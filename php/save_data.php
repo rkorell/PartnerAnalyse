@@ -15,6 +15,7 @@
    # Modified: 28.11.2025, 19:30 - FIX AP 29.2: Removed protection (must be public for survey participants)
    # Modified: 28.11.2025, 20:00 - AP 29.3: Added CSRF token validation
    # Modified: 30.11.2025 - AP X: Changed validation ranges from 1-10 to 1-5 for importance/performance
+   # Modified: 2026-02-14 - AP 50: IP-Adresse des Teilnehmers erfassen (Anomalie-Erkennung)
 */
 header('Content-Type: application/json');
 
@@ -147,15 +148,18 @@ try {
 
     $pdo->beginTransaction();
 
-    // 1. Teilnehmer anlegen (Verwendet trim-ed Name/Email und validierte IDs)
-    $stmt = $pdo->prepare("INSERT INTO participants (survey_id, department_id, is_manager, name, email) VALUES (?, ?, ?, ?, ?) RETURNING id");
-    
+    // 1. Teilnehmer anlegen
+    $ipRaw = $_SERVER['REMOTE_ADDR'] ?? null;
+    $ipHash = $ipRaw ? hash('sha256', IP_HASH_SALT . $ipRaw) : null;
+    $stmt = $pdo->prepare("INSERT INTO participants (survey_id, department_id, is_manager, name, email, ip_hash) VALUES (?, ?, ?, ?, ?, ?) RETURNING id");
+
     $stmt->execute([
         $surveyId,
-        $departmentId, 
+        $departmentId,
         $isManager,
         $name,
-        $email
+        $email,
+        $ipHash
     ]);
     
     $participantId = $stmt->fetchColumn();

@@ -10,8 +10,14 @@
 <body>
     <div class="container">
         <header class="header">
-            <h1><span class="cisco-blue">CPQI</span> - Cisco Partner Quality Index</h1>
-            <p class="subtitle" id="survey-subtitle">Public Sector Partner Bewertung</p>
+            <div class="header-logo-left" id="header-logo-left"></div>
+            <div class="header-center">
+                <h1><span class="cisco-blue">CPQI</span> - Cisco Partner Quality Index</h1>
+                <p class="subtitle" id="survey-subtitle">Public Sector Partner Bewertung</p>
+            </div>
+            <div class="header-logo-right">
+                <img src="img/dsgvo.png" alt="Datenschutz" title="Datenschutz-Information" onclick="window.openInfoModal('dsgvo-info')">
+            </div>
         </header>
 
         <div class="progress-container">
@@ -61,10 +67,15 @@
                         </div>
                     </div>
                     
-                    <div class="form-row">
+                    <div class="form-row" style="align-items: flex-end;">
+                        <div class="form-group" style="flex: 0 0 auto;">
+                            <label>&nbsp;</label>
+                            <span id="root-dept-label" class="root-dept-label">Cisco Deutschland</span>
+                            <input type="hidden" id="root-dept-id" value="">
+                        </div>
                         <div class="form-group">
-                            <label for="department">Ich arbeite in / für die Abteilung *:</label>
-                            <select id="department" name="department" required>
+                            <label for="department">Ich arbeite in / für die Organisation:</label>
+                            <select id="department" name="department">
                                 <option value="">Bitte wählen...</option>
                             </select>
                         </div>
@@ -155,5 +166,6 @@
     </div>
 
     <script type="module" src="js/app.js"></script>
+
 </body>
 </html>

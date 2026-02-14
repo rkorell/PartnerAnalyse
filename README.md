@@ -1,7 +1,7 @@
 # Cisco Partner Quality Index (CPQI)
 
 **Version:** 1.2
-**Datum:** 2026-02-13
+**Datum:** 2026-02-14
 
 > 📖 **Ausführliche Dokumentation:** [docs/cpqi_gesamtdoku.md](docs/cpqi_gesamtdoku.md) – Methodik, Kriterienkatalog, Scoring-Modell, Datenmodell
 
@@ -45,13 +45,23 @@ Das System folgt einer schlanken **Client-Server-Architektur (LAPP-Stack)** auf 
 * **Backend:** PHP 8.x (API-Layer) mit PDO.
 * **Frontend:** Vanilla JavaScript (ES6+), CSS3 (Cisco CI/CD Konformität).
 
-### 2.2. Sicherheitsarchitektur (Neu in v1.2)
+### 2.2. UI-Layout (AP 50)
+
+Beide Seiten (Wizard und Analyse) verwenden einen **Sticky Header** mit 3-Spalten-Layout: Cisco-Logo (links), Titel (Mitte), DSGVO-Icon (rechts). Das DSGVO-Icon öffnet ein Info-Modal mit Datenschutz-Zusammenfassung und PDF-Download-Link.
+
+### 2.3. Sicherheitsarchitektur (Neu in v1.2)
+
+> **Ausführliches Security-Konzept:** [docs/CPQI_Security_Konzept.md](docs/CPQI_Security_Konzept.md) – DSGVO-Rechtsrahmen, technische Maßnahmen, Fraud-Detection-Methodik mit Quellenverzeichnis.
+
 Das System implementiert ein mehrschichtiges Sicherheitskonzept ("Defense in Depth"):
 * **Server-Härtung:** `.htaccess` blockiert Zugriff auf Systemdateien (`.git`, `*.sql`, `README.md`) und setzt Security-Headers (`X-Frame-Options`, `X-Content-Type-Options`).
 * **Zugriffsschutz:** Die Analyse-API ist passwortgeschützt. Ein globaler Schalter `USE_LOGIN` in `php/common.php` steuert dies.
 * **Authentifizierung:** Session-basierter Login gegen eine gehashte Datenbank-Tabelle (`admin_users`).
 * **CSRF-Schutz:** Öffentliche Formulare (`save_data.php`) sind durch dynamische Session-Tokens gegen externe Angriffe (Flooding) geschützt.
 * **Datenbank:** Credentials liegen außerhalb des Webroots (`/etc/partneranalyse/db_connect.php`).
+* **IP-Anonymisierung (AP 50):** Teilnehmer-IPs werden als SHA-256-Hash mit Salt gespeichert (Duplikat-Erkennung ohne Rückverfolgbarkeit). Der Salt liegt ebenfalls außerhalb des Webroots.
+* **Apache-Logs:** IP-Adressen werden via Piped Logging anonymisiert (letztes Oktett → 0). Log-Retention: 7 Tage.
+* **Fraud-Detection (AP 50):** Mehrstufige Qualitätssicherung im Analyse-Dashboard – IP-Duplikate (Severity 3), Straightlining (Severity 2), Extreme Scores (Severity 1). Methodische Grundlagen: Krosnick 1991, Leiner 2019, REAL-Framework (Lawlor 2021).
 
 ---
 
@@ -61,7 +71,7 @@ Das System implementiert ein mehrschichtiges Sicherheitskonzept ("Defense in Dep
 **Pfad:** `/var/www/html/index.html` + `js/app.js` (Controller: `js/wizard-controller.js`)
 
 Ein 5-Schritte-Wizard zur Datenerfassung:
-1.  **Persönliche Angaben:** Abteilung (Hierarchie), Manager-Status.
+1.  **Persönliche Angaben:** Organisationszugehörigkeit (Hierarchie, siehe unten), Manager-Status. Die Erhebung ist anonym (Name/Email seit AP 44 ausgeblendet).
 2.  **Wichtigkeits-Bewertung:** Festlegung der persönlichen Prioritäten (Pflicht).
 3.  **Partner-Auswahl:** Selektion der zu bewertenden Firmen.
 4.  **Partner-Bewertung (Detail):**
@@ -69,6 +79,8 @@ Ein 5-Schritte-Wizard zur Datenerfassung:
     * **Kriterien:** Slider je Kriterium. Bei Extremwerten (1 oder 5) erscheint ein Icon (`📝`) für spezifische Kommentare.
     * **Features:** Lokale Datenspeicherung (`localStorage`) schützt vor Datenverlust bei Refresh (konfigurierbar in `js/config.js` via `USE_LOCAL_STORAGE`).
 5.  **Abschluss:** Speicherung & Dankeseite.
+
+**Abteilungs-Hierarchie (AP 50):** Die Organisationsstruktur umfasst bis zu 4 Ebenen. Die Root-Ebene (z.B. "Cisco Deutschland") wird als festes Text-Label angezeigt und gilt als gültige Vorauswahl. Drei kaskadierende Dropdowns (Organisation → Bereich → Team) erlauben eine optionale Verfeinerung. Gespeichert wird die feinste gewählte Ebene.
 
 *Features:*
 * **Test-Modus** (aktivierbar in DB), der Formulare automatisch mit Zufallsdaten befüllt.
@@ -87,6 +99,7 @@ Interaktives Dashboard für Auswertungen (Login erforderlich):
         * `⚠️` **Action:** Kritische Handlungsfelder (Imp ≥ 4 & Perf ≤ 2).
         * `⚡` **Divergenz:** Signifikante Abweichung (> 2.0) zwischen Manager- und Team-Bewertung.
 * **Interaktion:** Klick auf Partner öffnet **IPA-Matrix** (Scatterplot). Klick auf Icons öffnet **Detail-Modal**.
+* **Info-Modals:** Kontextsensitive Hilfetexte (aus `app_texts`-Tabelle) erreichbar über "i"-Beacons: Bilanz-Erklärung mit Archetypen (`analytic-mask`), Fraud-Detection-Workflow (`fraud-detection`), Datenschutz-Info (`dsgvo-info`).
 * **Export:** CSV-Export der gefilterten Daten.
 
 ### 3.3. Survey-Verwaltung (Admin)
@@ -111,10 +124,10 @@ Das Schema ist normalisiert (3NF) und nutzt fortschrittliche DB-Features.
 * **`partners`**: Stammdaten der Firmen.
 * **`criteria`**: Fragenkatalog.
 * **`departments`**: Hierarchie-Baum (Adjacency List).
-* **`participants`**: Bewerter (Name, Email, Manager-Status, `session_token`).
+* **`participants`**: Bewerter (Manager-Status, IP-Adresse; Name/Email-Felder existieren, werden aber seit AP 44 nicht mehr erfasst).
 * **`ratings`**: Die Einzelnoten (1-5 oder NULL) inkl. Kommentar.
 * **`partner_feedback`**: Kopfdaten pro Partner-Interaktion (`nps_score`, `interaction_frequency`, `general_comment`).
-* **`app_texts`**: Konfigurierbare Texte für Tooltips/Modals.
+* **`app_texts`**: Konfigurierbare Hilfetexte (HTML) für Info-Modals. Kategorien: `entry-mask`, `nps-explanation`, `dsgvo-info`, `analytic-mask`, `fraud-detection`.
 * **`admin_users`**: Benutzerverwaltung für das Dashboard (Username, Password-Hash).
 
 **Referentielle Integrität:**
@@ -156,11 +169,11 @@ psql -h localhost -U dein_user -d deine_db -f sql/2_initial_data.sql
 Für den Zugang zur Analyse muss initial ein Passwort gesetzt werden. Führen Sie dazu diesen Befehl auf der Konsole aus. Er fragt das Passwort ab, hasht es sicher und trägt es in die Datenbank ein:
 
 ```bash
-php -r '$p=readline("Neues Admin-Passwort: "); $h=password_hash($p, PASSWORD_DEFAULT); system("psql -h localhost -U admin_partner -d partner_analyse -c \"INSERT INTO admin_users (username, password_hash) VALUES ('\''admin'\'', '\''$h'\'') ON CONFLICT (username) DO UPDATE SET password_hash = '\''$h'\'';\""); echo "\nFertig.\n";'
+php -r '$p=readline("Neues Admin-Passwort: "); $h=password_hash($p, PASSWORD_DEFAULT); system("psql -h localhost -U <db_user> -d <db_name> -c \"INSERT INTO admin_users (username, password_hash) VALUES ('\''admin'\'', '\''$h'\'') ON CONFLICT (username) DO UPDATE SET password_hash = '\''$h'\'';\""); echo "\nFertig.\n";'
 ```
 
 ### 5.4. Konfiguration
-1.  **Datenbank:** Zugangsdaten in `/etc/partneranalyse/db_connect.php` anlegen.
+1.  **Datenbank:** Zugangsdaten in einer Konfigurationsdatei außerhalb des Webroots anlegen (Pfad in `DB_CONFIG_PATH` konfigurierbar).
 2.  **App-Einstellungen:** Zentrale Steuerung in `php/common.php`:
     * `DB_CONFIG_PATH`: Pfad zur DB-Config.
     * `USE_LOGIN`: Login-Zwang aktivieren (`true`) oder deaktivieren (`false`).
@@ -169,7 +182,7 @@ php -r '$p=readline("Neues Admin-Passwort: "); $h=password_hash($p, PASSWORD_DEF
 ```php
 // Beispiel Inhalt php/common.php
 <?php
-define('DB_CONFIG_PATH', '/etc/partneranalyse/db_connect.php');
+define('DB_CONFIG_PATH', '/pfad/zur/db_connect.php');
 define('USE_LOGIN', true);
 ?>
 ```

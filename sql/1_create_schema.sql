@@ -16,7 +16,13 @@
 # Modified: 22.01.2026 - AP 47a: Added be_geo_id column to partners table
 # Modified: 23.01.2026 - FIX: Awareness-Berechnung dynamisch (SELECT COUNT FROM criteria statt hardcoded 20)
 # Modified: 2026-02-13 - AP 48: ON DELETE CASCADE für participants→surveys, ratings→participants, partner_feedback→participants
+# Modified: 2026-02-14 - AP 50: ip_hash VARCHAR(64) in participants, idx_participants_ip_hash
+# Modified: 2026-02-14 - AP 50: pgcrypto Extension, view_survey_fraud
+# Modified: 2026-02-14 - AP 50: p_exclude_ids Parameter in allen 3 Funktionen, view_survey_fraud mit mode_score
 */
+
+-- pgcrypto für DB-seitiges Hashing (z.B. Migration bestehender IPs)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 DROP TABLE IF EXISTS admin_users CASCADE;
 DROP TABLE IF EXISTS app_texts CASCADE;
@@ -32,6 +38,7 @@ DROP FUNCTION IF EXISTS calculate_partner_bilanz CASCADE;
 DROP FUNCTION IF EXISTS get_partner_matrix_details CASCADE;
 DROP FUNCTION IF EXISTS get_partner_structure_stats CASCADE;
 DROP VIEW IF EXISTS view_ratings_extended CASCADE;
+DROP VIEW IF EXISTS view_survey_fraud CASCADE;
 
 -- 1. App Texte (Tooltips & Statische Texte)
 CREATE TABLE app_texts (
@@ -87,6 +94,7 @@ CREATE TABLE participants (
     is_manager BOOLEAN DEFAULT FALSE,
     name VARCHAR(100),
     email VARCHAR(200),
+    ip_hash VARCHAR(64),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -137,6 +145,7 @@ CREATE INDEX idx_survey_active ON surveys(is_active);
 CREATE INDEX idx_participants_department ON participants(department_id);
 CREATE INDEX idx_participants_manager ON participants(is_manager);
 CREATE INDEX idx_participants_survey ON participants(survey_id);
+CREATE INDEX idx_participants_ip_hash ON participants(ip_hash);
 
 -- Ratings
 CREATE INDEX idx_ratings_criterion ON ratings(criterion_id);
@@ -200,8 +209,9 @@ JOIN criteria c ON r.criterion_id = c.id;
 CREATE OR REPLACE FUNCTION calculate_partner_bilanz(
     p_survey_ids INT[],
     p_dept_ids INT[],
-    p_manager_filter TEXT, 
-    p_min_answers INT
+    p_manager_filter TEXT,
+    p_min_answers INT,
+    p_exclude_ids INT[] DEFAULT '{}'
 )
 RETURNS TABLE (
     partner_id INT,
@@ -226,10 +236,11 @@ BEGIN
     WITH
     -- 1. Relevante Teilnehmer filtern
     relevant_participants AS (
-        SELECT p.id, p.is_manager 
+        SELECT p.id, p.is_manager
         FROM participants p
         WHERE p.survey_id = ANY(p_survey_ids)
           AND p.department_id IN (SELECT id FROM get_department_subtree(p_dept_ids))
+          AND p.id != ALL(p_exclude_ids)
           AND (
               p_manager_filter = 'alle'
               OR (p_manager_filter = 'nur_manager' AND p.is_manager = TRUE)
@@ -373,23 +384,25 @@ CREATE OR REPLACE FUNCTION get_partner_matrix_details(
     p_partner_id INT,
     p_survey_ids INT[],
     p_dept_ids INT[],
-    p_manager_filter TEXT
+    p_manager_filter TEXT,
+    p_exclude_ids INT[] DEFAULT '{}'
 )
 RETURNS TABLE (
     name VARCHAR,
-    imp NUMERIC,      -- Durchschnitt Wichtigkeit (Ungewichtet, da strategisch)
-    perf NUMERIC,     -- Durchschnitt Performance (GEWICHTET nach Frequenz!)
-    perf_mgr NUMERIC, -- Reiner Schnitt Manager (für Tooltip/Konflikt)
-    perf_team NUMERIC,-- Reiner Schnitt Team (für Tooltip/Konflikt)
-    comments JSON     -- Liste der Kommentare
+    imp NUMERIC,
+    perf NUMERIC,
+    perf_mgr NUMERIC,
+    perf_team NUMERIC,
+    comments JSON
 ) AS $$
 BEGIN
     RETURN QUERY
     WITH relevant_participants AS (
-        SELECT p.id, p.is_manager 
+        SELECT p.id, p.is_manager
         FROM participants p
         WHERE p.survey_id = ANY(p_survey_ids)
           AND p.department_id IN (SELECT id FROM get_department_subtree(p_dept_ids))
+          AND p.id != ALL(p_exclude_ids)
           AND (
               p_manager_filter = 'alle'
               OR (p_manager_filter = 'nur_manager' AND p.is_manager = TRUE)
@@ -445,18 +458,19 @@ CREATE OR REPLACE FUNCTION get_partner_structure_stats(
     p_partner_id INT,
     p_survey_ids INT[],
     p_dept_ids INT[],
-    p_manager_filter TEXT
+    p_manager_filter TEXT,
+    p_exclude_ids INT[] DEFAULT '{}'
 )
 RETURNS TABLE (
     role TEXT,
     headcount INT,
-    avg_score NUMERIC, -- Reine Note (ungewichtet)
-    avg_freq NUMERIC   -- Durchschnittliche Frequenz
+    avg_score NUMERIC,
+    avg_freq NUMERIC
 ) AS $$
 BEGIN
     RETURN QUERY
     WITH base_data AS (
-        SELECT 
+        SELECT
             rp.is_manager,
             r.score,
             COALESCE(pf.interaction_frequency, 1) as freq,
@@ -468,6 +482,7 @@ BEGIN
           AND r.rating_type = 'performance'
           AND rp.survey_id = ANY(p_survey_ids)
           AND rp.department_id IN (SELECT id FROM get_department_subtree(p_dept_ids))
+          AND rp.id != ALL(p_exclude_ids)
           AND (
               p_manager_filter = 'alle'
               OR (p_manager_filter = 'nur_manager' AND rp.is_manager = TRUE)
@@ -504,3 +519,78 @@ BEGIN
     FROM base_data;
 END;
 $$ LANGUAGE plpgsql;
+
+
+/* View: view_survey_fraud (AP 50)
+   Zweck: Fraud-Indikatoren pro Teilnehmer für Anomalie-Erkennung.
+   Erkennt: IP-Duplikate, Häufung identischer Bewertungen (≥80% gleicher Score).
+   mode_score: Der am häufigsten vergebene Score-Wert (Score 3 = harmlos, da neutraler Effekt im Scoring-Modell).
+   Schweregrad: 3 = IP + Muster (Score≠3), 2 = nur IP, 1 = Häufung (inkl. Score 3), 0 = unauffällig.
+*/
+CREATE OR REPLACE VIEW view_survey_fraud AS
+WITH
+ip_stats AS (
+    SELECT
+        p.id AS participant_id,
+        COUNT(*) OVER (PARTITION BY p.survey_id, p.ip_hash) AS ip_submit_count
+    FROM participants p
+    WHERE p.ip_hash IS NOT NULL
+),
+rating_score_counts AS (
+    SELECT
+        r.participant_id,
+        r.score,
+        COUNT(*) AS cnt
+    FROM ratings r
+    WHERE r.rating_type = 'performance' AND r.score IS NOT NULL
+    GROUP BY r.participant_id, r.score
+),
+rating_mode AS (
+    SELECT DISTINCT ON (participant_id)
+        participant_id,
+        score AS mode_score,
+        cnt AS mode_count
+    FROM rating_score_counts
+    ORDER BY participant_id, cnt DESC, score DESC
+),
+rating_patterns AS (
+    SELECT
+        rsc.participant_id,
+        SUM(rsc.cnt) AS total_perf_ratings,
+        rm.mode_score,
+        ROUND(100.0 * rm.mode_count / NULLIF(SUM(rsc.cnt), 0), 0) AS straightline_pct,
+        ROUND(SUM(rsc.score * rsc.cnt)::numeric / NULLIF(SUM(rsc.cnt), 0), 2) AS avg_score
+    FROM rating_score_counts rsc
+    JOIN rating_mode rm ON rsc.participant_id = rm.participant_id
+    GROUP BY rsc.participant_id, rm.mode_score, rm.mode_count
+)
+SELECT
+    p.id AS participant_id,
+    p.survey_id,
+    s.name AS survey_name,
+    p.department_id,
+    d.name AS department_name,
+    p.is_manager,
+    p.ip_hash,
+    p.created_at,
+    COALESCE(ips.ip_submit_count, 0) AS ip_submit_count,
+    COALESCE(ips.ip_submit_count > 1, FALSE) AS is_ip_duplicate,
+    COALESCE(rp.total_perf_ratings, 0) AS total_perf_ratings,
+    COALESCE(rp.mode_score, 0) AS mode_score,
+    COALESCE(rp.straightline_pct, 0) AS straightline_pct,
+    COALESCE(rp.straightline_pct >= 80, FALSE) AS is_straightliner,
+    COALESCE(rp.avg_score, 0) AS avg_score,
+    CASE
+        WHEN COALESCE(ips.ip_submit_count > 1, FALSE)
+             AND COALESCE(rp.straightline_pct >= 80, FALSE)
+             AND COALESCE(rp.mode_score, 3) != 3
+            THEN 3
+        WHEN COALESCE(ips.ip_submit_count > 1, FALSE) THEN 2
+        WHEN COALESCE(rp.straightline_pct >= 80, FALSE) THEN 1
+        ELSE 0
+    END AS severity
+FROM participants p
+JOIN surveys s ON p.survey_id = s.id
+JOIN departments d ON p.department_id = d.id
+LEFT JOIN ip_stats ips ON p.id = ips.participant_id
+LEFT JOIN rating_patterns rp ON p.id = rp.participant_id;

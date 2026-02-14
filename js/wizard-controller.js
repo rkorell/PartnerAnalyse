@@ -15,6 +15,7 @@
   # Modified: 28.11.2025, 20:00 - AP 29.3: Integrated CSRF token handling
   # Modified: 30.11.2025, 10:04 - AP 38: Added openInfoModal() method for app_texts integration
   # Modified: 2026-02-13 - AP 48: Survey date validation (start_date/end_date) with overlay block
+  # Modified: 2026-02-14 - AP 50: Header 3-Spalten-Layout (insertLogo angepasst für header-logo-left Container)
 */
 
 import { CONFIG } from './config.js';
@@ -223,11 +224,21 @@ export class WizardController {
     // --- HIERARCHIE & PARTNER SELECTION ---
     setupHierarchyDropdowns() {
         const departmentSelect = document.getElementById('department');
-        const departments = this.hierarchyData.filter(d => d.parent_id === null);
-        
+        const rootDeptIdField = document.getElementById('root-dept-id');
+        const rootDeptLabel = document.getElementById('root-dept-label');
+
+        // Root (level_depth 0) als festen Text anzeigen, Dropdowns ab Ebene 1
+        const root = this.hierarchyData.find(d => d.parent_id === null);
+        if (root) {
+            rootDeptIdField.value = root.id;
+            rootDeptLabel.textContent = root.name;
+        }
+
+        const departments = this.hierarchyData.filter(d => root && d.parent_id == root.id);
+
         departments.forEach(dept => {
             const option = document.createElement('option');
-            option.value = dept.id; 
+            option.value = dept.id;
             option.textContent = dept.name;
             departmentSelect.appendChild(option);
         });
@@ -516,16 +527,13 @@ export class WizardController {
     }
     
     insertLogo() {
-        const header = document.querySelector('.header h1');
-        if(header && !document.getElementById('cisco-logo')) {
+        const container = document.getElementById('header-logo-left');
+        if(container && !document.getElementById('cisco-logo')) {
             const img = document.createElement('img');
             img.src = 'img/cisco.png';
             img.id = 'cisco-logo';
             img.alt = 'Cisco Logo';
-            img.style.height = '60px'; 
-            img.style.marginRight = '20px';
-            img.style.verticalAlign = 'middle';
-            header.parentNode.insertBefore(img, header);
+            container.appendChild(img);
         }
     }
 

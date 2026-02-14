@@ -6,6 +6,7 @@
   # Created: 27.11.2025, 15:40 - Extracted Flow and Validation Logic from wizard-controller.js (AP 10)
   # Modified: 27.11.2025, 15:50 - Minor update to use explicit callbacks (AP 10 Deep Refactoring)
   # Modified: 28.11.2025, 13:00 - AP 21: CamelCase consolidation for personal data keys
+  # Modified: 2026-02-14 - AP 50: Root-Department als Fallback (Ebene 0 als Text, Dropdowns ab Ebene 1)
 */
 
 import { CONFIG } from './config.js';
@@ -91,21 +92,25 @@ export class WizardFlow {
             case 1:
                 const departmentEl = document.getElementById('department');
                 const departmentId = departmentEl.value;
-                const departmentName = departmentEl.options[departmentEl.selectedIndex].text;
+                const rootDeptId = document.getElementById('root-dept-id').value;
 
-                if (!departmentId) {
+                const effectiveDeptId = departmentId || rootDeptId;
+                const departmentName = departmentId
+                    ? departmentEl.options[departmentEl.selectedIndex].text
+                    : document.getElementById('root-dept-label').textContent;
+
+                if (!effectiveDeptId) {
                     this.callbacks.showError('Bitte wähle eine Abteilung aus.');
                     return false;
                 }
-                
-                // HIER GEÄNDERT (AP 21): CamelCase Keys
+
                 this.callbacks.setPersonalData({
                     name: document.getElementById('name').value,
                     email: document.getElementById('email').value,
                     isManager: document.getElementById('is_manager').checked,
-                    departmentId: departmentId,
+                    departmentId: effectiveDeptId,
                     departmentName: departmentName,
-                    finalDeptId: document.getElementById('team').value || document.getElementById('area').value || departmentId
+                    finalDeptId: document.getElementById('team').value || document.getElementById('area').value || effectiveDeptId
                 });
                 return true;
                 
