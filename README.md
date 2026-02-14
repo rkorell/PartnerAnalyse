@@ -100,6 +100,7 @@ Interaktives Dashboard für Auswertungen (Login erforderlich):
         * `⚡` **Divergenz:** Signifikante Abweichung (> 2.0) zwischen Manager- und Team-Bewertung.
 * **Interaktion:** Klick auf Partner öffnet **IPA-Matrix** (Scatterplot). Klick auf Icons öffnet **Detail-Modal**.
 * **Info-Modals:** Kontextsensitive Hilfetexte (aus `app_texts`-Tabelle) erreichbar über "i"-Beacons: Bilanz-Erklärung mit Archetypen (`analytic-mask`), Fraud-Detection-Workflow (`fraud-detection`), Datenschutz-Info (`dsgvo-info`).
+* **Fraud-Detection:** Panel mit Qualitätsindikatoren pro Teilnehmer (Backend: `php/get_fraud_data.php`, DB-View: `view_survey_fraud`).
 * **Export:** CSV-Export der gefilterten Daten.
 
 ### 3.3. Survey-Verwaltung (Admin)
@@ -140,6 +141,7 @@ Löschen einer Survey entfernt automatisch alle zugehörigen Teilnehmer, Bewertu
 **Views & Funktionen (Architektur-Layer):**
 * **Function `get_department_subtree(INT[])`**: Rekursive PL/pgSQL Funktion, um Abteilungsbäume effizient aufzulösen.
 * **View `view_ratings_extended`**: Flache, denormalisierte Sicht auf Bewertungen für einfachere SQL-Abfragen im Backend.
+* **View `view_survey_fraud`**: Fraud-Indikatoren pro Teilnehmer (IP-Duplikate, Straightlining, Extreme Scores) für das Analyse-Dashboard.
 
 ---
 
