@@ -1,7 +1,7 @@
 # Cisco Partner Quality Index (CPQI)
 
 **Version:** 1.2
-**Datum:** 2026-02-14
+**Datum:** 2026-02-16
 
 > 📖 **Ausführliche Dokumentation:** [docs/cpqi_gesamtdoku.md](docs/cpqi_gesamtdoku.md) – Methodik, Kriterienkatalog, Scoring-Modell, Datenmodell
 
@@ -47,7 +47,9 @@ Das System folgt einer schlanken **Client-Server-Architektur (LAPP-Stack)** auf 
 
 ### 2.2. UI-Layout (AP 50)
 
-Beide Seiten (Wizard und Analyse) verwenden einen **Sticky Header** mit 3-Spalten-Layout: Cisco-Logo (links), Titel (Mitte), DSGVO-Icon (rechts). Das DSGVO-Icon öffnet ein Info-Modal mit Datenschutz-Zusammenfassung und PDF-Download-Link.
+Beide Seiten (Wizard und Analyse) verwenden einen **Sticky Header** mit 3-Spalten-Layout: CPQI-Logo (links), Titel (Mitte), DSGVO-Icon (rechts). Das DSGVO-Icon öffnet ein Info-Modal mit Datenschutz-Zusammenfassung und PDF-Download-Link.
+
+**Willkommensseite (AP 51):** Der Begrüßungstext betont die Anonymität als methodisches Prinzip. Drei Info-Tiles (Flexbox-Kacheln) neben der Überschrift verlinken auf Datenschutz-Modal, Security-Konzept (PDF) und CPQI-Gesamtdarstellung (PDF).
 
 ### 2.3. Sicherheitsarchitektur (Neu in v1.2)
 
@@ -102,6 +104,16 @@ Interaktives Dashboard für Auswertungen (Login erforderlich):
 * **Info-Modals:** Kontextsensitive Hilfetexte (aus `app_texts`-Tabelle) erreichbar über "i"-Beacons: Bilanz-Erklärung mit Archetypen (`analytic-mask`), Fraud-Detection-Workflow (`fraud-detection`), Datenschutz-Info (`dsgvo-info`).
 * **Fraud-Detection:** Panel mit Qualitätsindikatoren pro Teilnehmer (Backend: `php/get_fraud_data.php`, DB-View: `view_survey_fraud`).
 * **Export:** CSV-Export der gefilterten Daten.
+
+### 3.4. Live-Counter
+**Pfad:** `/var/www/html/cpqi_counter.html`
+
+Öffentliche Seite (kein Login) zur Echtzeit-Übersicht der Teilnehmerzahlen:
+* **Layout:** Cisco-Dunkelblau-Gradient (60% Mitte, 20% schwarz links/rechts), CPQI-Logo, Gesamtzahl als Badge.
+* **Abteilungsbaum:** Vollständig aufgeklappt, non-interaktiv, mit aggregierten Teilnehmerzahlen pro Organisationseinheit.
+* **Farbkodierung:** Rot (0), Orange (1-4), Gelb (5-14), Grün (15+).
+* **Datenquelle:** `php/MagicMirrorModuleStats.php` (aktive Survey, keine Parameter nötig).
+* **Auto-Refresh:** Alle 60 Sekunden.
 
 ### 3.3. Survey-Verwaltung (Admin)
 **Pfad:** `/var/www/html/survey_admin.html` + `php/survey_admin.php`
