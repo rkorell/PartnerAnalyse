@@ -2,6 +2,7 @@
 /* # Modified: 24.11.2025, 23:30 - Added .slider-neutral for N/A state */
 /* # Modified: 27.11.2025, 18:00 - AP 14: Added utility classes to replace inline JS styles */
 /* # Modified: 02.12.2025, 15:45 - AP 41: New .help-beacon classes replacing .info-trigger for visibility upgrade */
+/* # Modified: 2026-02-16 20:15 - Info-Tiles für Willkommensseite (Datenschutz, Security, CPQI) */
 
 /* Reset und Grundlagen */
 * {
@@ -49,7 +50,7 @@ body {
 }
 
 .header-logo-left img {
-    height: 40px;
+    height: 120px;
 }
 
 .header-center {
@@ -65,7 +66,7 @@ body {
 }
 
 .header-logo-right img {
-    height: 32px;
+    height: 64px;
     cursor: pointer;
     opacity: 0.85;
     transition: opacity 0.2s;
@@ -183,6 +184,69 @@ body {
     color: #7f8c8d;
     font-size: 1.1em;
     margin-bottom: 15px;
+}
+
+/* Welcome-Header (Überschrift + Info-Tiles nebeneinander) */
+.welcome-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 3px solid #3498db;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.welcome-header h2 {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+
+.welcome-text {
+    max-width: 750px;
+    margin-bottom: 15px;
+}
+
+/* Info-Tiles (Willkommensseite) */
+.info-tiles {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-right: 50px;
+}
+
+.info-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px 25px;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #333;
+    transition: all 0.2s;
+    background: rgba(255, 255, 255, 0.7);
+    min-width: 140px;
+    cursor: pointer;
+}
+
+.info-tile:hover {
+    border-color: #049fd9;
+    box-shadow: 0 2px 12px rgba(4, 159, 217, 0.15);
+    transform: translateY(-2px);
+}
+
+.info-tile-icon {
+    font-size: 2em;
+    margin-bottom: 8px;
+}
+
+.info-tile-label {
+    font-size: 0.95em;
+    font-weight: 500;
+    color: #2c3e50;
 }
 
 /* Formulare */

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="de">
+<!-- CPQI Live Counter - Teilnehmerübersicht (non-interactive) -->
+<!-- # Modified: 2026-02-16 21:00 - Erstellt: Live-Counter mit Abteilungsbaum -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="60">
+    <title>CPQI - Live Counter</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            background: #000;
+            color: #e8f0f8;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 0;
+        }
+        .counter-container {
+            display: flex;
+            gap: 40px;
+            align-items: flex-start;
+            width: 60%;
+            min-height: 100vh;
+            background: linear-gradient(160deg, #00234b 0%, #003a6b 50%, #004f8a 100%);
+            padding: 30px 40px;
+        }
+        .logo-section {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo-section img {
+            width: 288px;
+            /* Originalfarben auf dunklem Hintergrund */
+        }
+        .total-badge {
+            background: rgba(4, 159, 217, 0.25);
+            border: 1px solid rgba(4, 159, 217, 0.5);
+            border-radius: 12px;
+            padding: 10px 20px;
+            text-align: center;
+        }
+        .total-number {
+            font-size: 2.5em;
+            font-weight: 700;
+            color: #04a5e0;
+            line-height: 1;
+        }
+        .total-label {
+            font-size: 0.85em;
+            color: #8ab4d4;
+            margin-top: 4px;
+        }
+        .survey-name {
+            font-size: 0.8em;
+            color: #6a9ec0;
+            text-align: center;
+            max-width: 160px;
+            margin-top: 5px;
+        }
+        .tree-section {
+            flex: 1 1 auto;
+            margin-top: 25px;
+        }
+        .tree-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #04a5e0;
+            margin-bottom: 12px;
+            border-bottom: 1px solid rgba(4, 159, 217, 0.3);
+            padding-bottom: 8px;
+        }
+        .tree-node {
+            padding-left: 20px;
+        }
+        .tree-node.root {
+            padding-left: 0;
+        }
+        .tree-row {
+            display: flex;
+            align-items: center;
+            padding: 3px 0;
+            gap: 8px;
+        }
+        .tree-chevron {
+            color: #3a7db5;
+            font-size: 0.7em;
+            width: 14px;
+            text-align: center;
+        }
+        .tree-name {
+            font-size: 1.1em;
+            color: #d0e4f2;
+        }
+        .tree-count {
+            font-size: 1.15em;
+            font-weight: 600;
+            color: #04a5e0;
+            margin-left: 4px;
+        }
+        .tree-count.count-zero { color: #c45050; }
+        .tree-count.count-low { color: #d4883a; }
+        .tree-count.count-mid { color: #c4b044; }
+        .tree-count.count-good { color: #5aaa6a; }
+        .tree-bar {
+            height: 4px;
+            background: rgba(4, 159, 217, 0.6);
+            border-radius: 2px;
+            margin-left: 8px;
+            transition: width 0.5s ease;
+        }
+        .timestamp {
+            font-size: 0.7em;
+            color: #5a8aaa;
+            text-align: right;
+            margin-top: 20px;
+        }
+        .error-msg {
+            color: #cc6666;
+            font-size: 0.9em;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="counter-container">
+        <div class="logo-section">
+            <img src="img/cisco.png" alt="CPQI">
+            <div class="total-badge">
+                <div class="total-number" id="total-count">–</div>
+                <div class="total-label">Teilnehmer</div>
+            </div>
+            <div class="survey-name" id="survey-name"></div>
+        </div>
+        <div class="tree-section">
+            <div class="tree-title">Teilnehmer nach Organisation</div>
+            <div id="tree-container"></div>
+            <div class="timestamp" id="timestamp"></div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const container = document.getElementById('tree-container');
+            const totalEl = document.getElementById('total-count');
+            const surveyNameEl = document.getElementById('survey-name');
+            const timestampEl = document.getElementById('timestamp');
+
+            function renderNode(node, maxCount, isRoot) {
+                const div = document.createElement('div');
+                div.className = 'tree-node' + (isRoot ? ' root' : '');
+
+                const row = document.createElement('div');
+                row.className = 'tree-row';
+
+                const chevron = document.createElement('span');
+                chevron.className = 'tree-chevron';
+                chevron.textContent = node.children && node.children.length > 0 ? '▼' : '•';
+
+                const name = document.createElement('span');
+                name.className = 'tree-name';
+                name.textContent = node.name;
+
+                const count = document.createElement('span');
+                var colorClass = node.count === 0 ? 'count-zero' : node.count < 5 ? 'count-low' : node.count < 15 ? 'count-mid' : 'count-good';
+                count.className = 'tree-count ' + colorClass;
+                count.textContent = '(' + node.count + ')';
+
+                row.appendChild(chevron);
+                row.appendChild(name);
+                row.appendChild(count);
+
+                if (node.count > 0 && maxCount > 0) {
+                    const bar = document.createElement('span');
+                    bar.className = 'tree-bar';
+                    bar.style.width = Math.max(4, (node.count / maxCount) * 120) + 'px';
+                    bar.style.display = 'inline-block';
+                    row.appendChild(bar);
+                }
+
+                div.appendChild(row);
+
+                if (node.children && node.children.length > 0) {
+                    node.children.forEach(function(child) {
+                        div.appendChild(renderNode(child, maxCount, false));
+                    });
+                }
+
+                return div;
+            }
+
+            fetch('php/MagicMirrorModuleStats.php')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        container.innerHTML = '<div class="error-msg">' + data.error + '</div>';
+                        return;
+                    }
+
+                    const root = data.root;
+                    totalEl.textContent = root.count;
+
+                    // Survey-Name laden
+                    fetch('php/get_data.php')
+                        .then(function(r) { return r.json(); })
+                        .then(function(d) {
+                            if (d.surveys) {
+                                const active = d.surveys.find(function(s) { return s.id == data.survey_id; });
+                                if (active) surveyNameEl.textContent = active.name;
+                            }
+                        })
+                        .catch(function() {});
+
+                    // Max-Count für Balken bestimmen (auf Ebene 1)
+                    var maxCount = 0;
+                    if (root.children) {
+                        root.children.forEach(function(c) {
+                            if (c.count > maxCount) maxCount = c.count;
+                        });
+                    }
+
+                    container.innerHTML = '';
+                    container.appendChild(renderNode(root, maxCount, true));
+
+                    timestampEl.textContent = 'Aktualisiert: ' + new Date().toLocaleTimeString('de-DE');
+                })
+                .catch(function(err) {
+                    container.innerHTML = '<div class="error-msg">Verbindungsfehler</div>';
+                });
+        })();
+    </script>
+</body>
+</html>

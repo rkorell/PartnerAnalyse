@@ -37,14 +37,31 @@
             <div class="help-beacon" onclick="window.openInfoModal('entry-mask')" title="Methodik & Zielsetzung">i</div>
             
             <div class="wizard-step active" id="wizard-step-1">
-                <h2>Herzlich Willkommen. <BR>
-                Schön, dass Du mitmachst! </h2> 
-                 <BR>
-                
-                Die Erhebung der Daten ist vollständig anonym.<BR>
-                Die Angabe bzgl. Deiner Arbeitsgruppe dient allein statistischen Zwecken - dadurch haben wir die Möglichkeit, nach Unterschieden in den einzelnenen Bereichen zu suchen.
+                <div class="welcome-header">
+                    <h2>Herzlich Willkommen. <BR>
+                    Schön, dass Du mitmachst! </h2>
+                    <div class="info-tiles">
+                        <a class="info-tile" href="#" onclick="window.openInfoModal('dsgvo-info'); return false;" title="Übersicht anzeigen">
+                            <span class="info-tile-icon">🔒</span>
+                            <span class="info-tile-label">Datenschutz</span>
+                        </a>
+                        <a class="info-tile" href="docs/CPQI_Security_Konzept.pdf" target="_blank" title="PDF öffnen">
+                            <span class="info-tile-icon">📋</span>
+                            <span class="info-tile-label">Security-Konzept</span>
+                        </a>
+                        <a class="info-tile" href="docs/CPQI.pdf" target="_blank" title="PDF öffnen">
+                            <span class="info-tile-icon">📖</span>
+                            <span class="info-tile-label">Über den CPQI</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="welcome-text">
+                Diese Erhebung ist vollständig anonym – und das ist kein Zufall, sondern Methode.
+                Anonymität schafft den geschützten Raum, in dem Du Deine Beobachtungen ehrlich teilen kannst.
                 <BR>
-                <BR>
+                Die Angabe bzgl. Deiner Arbeitsgruppe dient allein statistischen Zwecken - dadurch haben wir die Möglichkeit, nach Unterschieden in den einzelnen Bereichen zu suchen.
+                </div>
                 <h2>Angaben zu Deiner Organisation</h2>
                 <div class="form-section">
                     <div class="form-row">
