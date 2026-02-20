@@ -2,6 +2,7 @@
 <html lang="de">
 <!-- CPQI Live Counter - Teilnehmerübersicht (non-interactive) -->
 <!-- # Modified: 2026-02-16 21:00 - Erstellt: Live-Counter mit Abteilungsbaum -->
+<!-- # Modified: 2026-02-17 08:30 - Stoppuhr (Elapsed Timer) hinzugefügt -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -63,6 +64,30 @@
             text-align: center;
             max-width: 160px;
             margin-top: 5px;
+        }
+        .stopwatch-badge {
+            background: rgba(4, 159, 217, 0.15);
+            border: 1px solid rgba(4, 159, 217, 0.3);
+            border-radius: 12px;
+            padding: 8px 16px;
+            text-align: center;
+            margin-top: 5px;
+        }
+        .stopwatch-time {
+            font-size: 1.4em;
+            font-weight: 600;
+            color: #04a5e0;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 1px;
+        }
+        .stopwatch-time.not-started {
+            font-size: 0.9em;
+            color: #5a6a78;
+        }
+        .stopwatch-label {
+            font-size: 0.75em;
+            color: #8ab4d4;
+            margin-top: 2px;
         }
         .tree-section {
             flex: 1 1 auto;
@@ -137,6 +162,10 @@
                 <div class="total-label">Teilnehmer</div>
             </div>
             <div class="survey-name" id="survey-name"></div>
+            <div class="stopwatch-badge">
+                <div class="stopwatch-time not-started" id="stopwatch">Nicht gestartet</div>
+                <div class="stopwatch-label">Laufzeit</div>
+            </div>
         </div>
         <div class="tree-section">
             <div class="tree-title">Teilnehmer nach Organisation</div>
@@ -146,6 +175,40 @@
     </div>
 
     <script>
+        // ===== STOPPUHR =====
+        // Startzeitpunkt setzen um die Erhebung zu starten (ISO-Format):
+        // Beispiel: var SURVEY_START = '2026-02-17T09:00:00';
+        var SURVEY_START = null;
+
+        (function() {
+            var swEl = document.getElementById('stopwatch');
+            function updateStopwatch() {
+                if (!SURVEY_START) {
+                    swEl.textContent = 'Nicht gestartet';
+                    swEl.className = 'stopwatch-time not-started';
+                    return;
+                }
+                var start = new Date(SURVEY_START).getTime();
+                var now = Date.now();
+                if (now < start) {
+                    swEl.textContent = 'Nicht gestartet';
+                    swEl.className = 'stopwatch-time not-started';
+                    return;
+                }
+                var diff = Math.floor((now - start) / 1000);
+                var days = Math.floor(diff / 86400);
+                var hrs = Math.floor((diff % 86400) / 3600);
+                var mins = Math.floor((diff % 3600) / 60);
+                var secs = diff % 60;
+                var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+                swEl.textContent = days + ':' + pad(hrs) + ':' + pad(mins) + ':' + pad(secs);
+                swEl.className = 'stopwatch-time';
+            }
+            updateStopwatch();
+            setInterval(updateStopwatch, 1000);
+        })();
+        // ===== ENDE STOPPUHR =====
+
         (function() {
             const container = document.getElementById('tree-container');
             const totalEl = document.getElementById('total-count');
