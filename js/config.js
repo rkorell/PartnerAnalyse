@@ -73,7 +73,7 @@ export const CONFIG = {
             '#E67E22',  // Orange
             '#1ABC9C',  // Teal
             '#8E44AD',  // Purple
-            '#F39C12',  // Amber
+            '#5C6BC0',  // Indigo
         ],
 
         // Score Heatmap (RGB Arrays für Interpolation)
