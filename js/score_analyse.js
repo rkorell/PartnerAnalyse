@@ -29,6 +29,7 @@
   # Modified: 2026-02-14 - Teilnehmerzahlen im Abteilungsbaum (per Survey, via MagicMirrorModuleStats)
   # Modified: 2026-02-14 - AP 50: Fraud-Panel IP-Clustering + Sortierung (Severity DESC, Score 5 vor 1)
   # Modified: 2026-02-14 - AP 50: Info-Sticker (i) im Fraud-Panel-Header mit Hilfetext aus app_texts
+  # Modified: 2026-03-02 - AP 56: Area Distribution (camelCase Mapping, vBar in row, hBar in modal)
 */
 
 import { CONFIG } from './config.js';
@@ -244,6 +245,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         ...dep,
                         id: Number(dep.id),
                         parent_id: (dep.parent_id === null || dep.parent_id === undefined || dep.parent_id === "") ? null : Number(dep.parent_id),
+                        display_order: dep.display_order !== null && dep.display_order !== undefined ? Number(dep.display_order) : null,
                         children: []
                     }));
                     const deptMap = {};
@@ -306,7 +308,13 @@ document.addEventListener("DOMContentLoaded", function() {
                         if (node.children.length > 0 && node._expanded) {
                             const childrenDiv = document.createElement('div');
                             childrenDiv.className = 'tree-children'; 
-                            node.children.sort((a, b) => a.name.localeCompare(b.name)).forEach(child => {
+                            node.children.sort((a, b) => {
+                                // Knoten mit display_order zuerst, nach display_order sortiert
+                                const aOrd = a.display_order !== null ? a.display_order : Infinity;
+                                const bOrd = b.display_order !== null ? b.display_order : Infinity;
+                                if (aOrd !== bOrd) return aOrd - bOrd;
+                                return a.name.localeCompare(b.name);
+                            }).forEach(child => {
                                 childrenDiv.appendChild(renderNode(child));
                             });
                             nodeDiv.appendChild(childrenDiv);
@@ -462,7 +470,14 @@ document.addEventListener("DOMContentLoaded", function() {
                     maxDivergence: row.max_divergence,
                     hasActionItem: row.has_action_item,
                     numAssessorsMgr: row.num_assessors_mgr,
-                    numAssessorsTeam: row.num_assessors_team
+                    numAssessorsTeam: row.num_assessors_team,
+                    areaDistribution: (row.area_distribution || []).map(a => ({
+                        segmentId: a.segment_id,
+                        segmentName: a.segment_name,
+                        displayOrder: a.display_order,
+                        count: parseInt(a.participant_count)
+                    })),
+                    areaColors: CONFIG.COLORS.AREA_COLORS
                 }));
 
                 renderResultTable(analysisData);
@@ -683,11 +698,17 @@ document.addEventListener("DOMContentLoaded", function() {
         partner = await ensurePartnerDetails(partner);
         if (!partner || !partner.matrixDetails) return;
 
-        currentPartnerDetails = partner; 
+        currentPartnerDetails = partner;
         matrixTitle.textContent = "IPA Matrix: " + partner.partnerName;
 
+        // AP 56: Area Distribution im Modal
+        const areaContainer = document.getElementById('area-distribution-container');
+        if (areaContainer) {
+            areaContainer.innerHTML = Tpl.getAreaHBarHTML(partner.areaDistribution, partner.areaColors);
+        }
+
         if(matrixControls) matrixControls.style.display = 'none';
-        
+
         updateMatrixView('standard');
         matrixModal.style.display = 'flex';
     }

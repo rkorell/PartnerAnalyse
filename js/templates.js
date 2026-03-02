@@ -15,6 +15,7 @@
   # Modified: 30.11.2025, 10:39 - AP 39: Matrix redesign - German labels, pastel colors, adjusted line weights, removed center display
   # Modified: 30.11.2025, 11:45 - AP 40: Moved info icon from filter section to result table header
   # Modified: 02.12.2025, 15:45 - AP 41: Changed info-trigger to help-beacon-header class
+  # Modified: 2026-03-02 - AP 56: Area Distribution (vBar in row, hBar+legend in modal)
 */
 
 import { escapeHtml } from './utils.js';
@@ -118,10 +119,10 @@ export function getScoreTableStartHTML(title) {
 
 export function getScoreRowHTML_DBC(row, slots, scaling) {
     const {
-        posWidth, negWidth, 
-        posCount, negCount, 
-        posScore, negScore, 
-        awarenessColor 
+        posWidth, negWidth,
+        posCount, negCount,
+        posScore, negScore,
+        awarenessColor
     } = scaling;
 
     const awPct = row.awarenessPct || 0;
@@ -130,20 +131,22 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
     const txtPos = posWidth > 0 ? `${posScore} (${posCount})` : '';
     const txtNeg = negWidth > 0 ? `${negScore} (${negCount})` : '';
 
+    const areaVBarHTML = row.areaDistribution ? getAreaVBarHTML(row.areaDistribution, row.areaColors) : '';
+
     return `
     <div class="criteria-row partner-row-clickable score-table-row" data-partner-id="${row.partnerId}">
         <div class="criteria-content col-partner col-partner-link">${escapeHtml(row.partnerName)} ↗</div>
-        
+
         <div class="criteria-content col-score-graph">
             <div class="dbc-container">
                 <div class="dbc-zero-line"></div>
-                
+
                 <div class="dbc-bar-left-wrapper">
                     <div class="dbc-bar-left" style="width: ${negWidth}%;" title="Strategisches Defizit: ${negScore} (${negCount} Themen)">
                        ${txtNeg}
                     </div>
                 </div>
-                
+
                 <div class="dbc-bar-right-wrapper">
                     <div class="dbc-bar-right" style="width: ${posWidth}%;" title="Strategischer Wert: +${posScore} (${posCount} Themen)">
                         ${txtPos}
@@ -151,15 +154,18 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
                 </div>
             </div>
         </div>
-        
-        <div class="criteria-content col-count" style="display:flex; align-items:center; justify-content:center; gap:10px;">
-            <div style="font-weight:bold; font-size:1.1em;">${row.totalAnswers}</div>
-            <div class="awareness-container" title="Datenqualität: ${awPct}% der Fragen wurden bewertet">
-                <div class="awareness-pie" style="${pieStyle}"></div>
-                <span class="awareness-text">${awPct}%</span>
+
+        <div class="criteria-content col-count" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
+            ${areaVBarHTML}
+            <div class="count-awareness-stack">
+                <div style="font-weight:bold; font-size:1.1em;">${row.totalAnswers}</div>
+                <div class="awareness-container" title="Datenqualität: ${awPct}% der Fragen wurden bewertet">
+                    <div class="awareness-pie" style="${pieStyle}"></div>
+                    <span class="awareness-text">${awPct}%</span>
+                </div>
             </div>
         </div>
-        
+
         <div class="criteria-content col-insights">
             <div class="insight-slot-nps">${slots.slot1}</div>
             <div class="insight-slot-icon">${slots.slot2}</div>
@@ -167,6 +173,60 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
             <div class="insight-slot-mini">${slots.slot4}</div>
         </div>
     </div>`;
+}
+
+export function getAreaVBarHTML(areaDistribution, colors) {
+    if (!areaDistribution || areaDistribution.length === 0) return '';
+    const total = areaDistribution.reduce((sum, a) => sum + a.count, 0);
+    if (total === 0) return '';
+
+    // Farbe per Original-Index (nicht gefiltertem Index), damit Farbe = Segment-Zuordnung stabil bleibt
+    const visible = areaDistribution
+        .map((a, origIdx) => ({ ...a, color: colors[origIdx % colors.length] }))
+        .filter(a => a.count > 0);
+
+    const segments = visible
+        .map(a => `<div class="area-vbar-segment" style="flex:${a.count}; background:${a.color};"></div>`)
+        .join('');
+
+    const tooltipLines = visible
+        .map(a => `${a.segmentName}: ${a.count} (${(a.count / total * 100).toFixed(0)}%)`)
+        .join('\n');
+
+    return `<div class="area-vbar" title="${escapeHtml(tooltipLines)}">${segments}</div>`;
+}
+
+export function getAreaHBarHTML(areaDistribution, colors) {
+    if (!areaDistribution || areaDistribution.length === 0) return '';
+    const total = areaDistribution.reduce((sum, a) => sum + a.count, 0);
+    if (total === 0) return '';
+
+    // Farbe per Original-Index zuordnen, dann filtern
+    const enriched = areaDistribution
+        .map((a, origIdx) => ({ ...a, color: colors[origIdx % colors.length] }));
+
+    const barSegments = enriched
+        .filter(a => a.count > 0)
+        .map(a => {
+            const pct = (a.count / total * 100).toFixed(1);
+            return `<div class="area-hbar-segment" style="flex:${a.count}; background:${a.color};" title="${escapeHtml(a.segmentName)}: ${a.count} (${pct}%)"></div>`;
+        })
+        .join('');
+
+    const legendItems = enriched
+        .filter(a => a.count > 0)
+        .map(a => {
+            const pct = (a.count / total * 100).toFixed(1);
+            return `<span class="area-legend-item"><span class="area-legend-swatch" style="background:${a.color};"></span>${escapeHtml(a.segmentName)}: ${a.count} (${pct}%)</span>`;
+        })
+        .join('');
+
+    return `
+        <div style="margin-bottom:16px;">
+            <div style="font-size:0.9em; color:#555; margin-bottom:6px; font-weight:600;">Bereichsverteilung (${total} Teilnehmer)</div>
+            <div class="area-hbar">${barSegments}</div>
+            <div class="area-legend">${legendItems}</div>
+        </div>`;
 }
 
 

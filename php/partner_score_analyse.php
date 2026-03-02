@@ -24,6 +24,7 @@
   # Modified: 29.11.2025, 12:00 - AP 31: Added Awareness-Quote calculation
   # Modified: 29.11.2025, 16:00 - AP I.3: Full Refactoring - Use DB Function calculate_partner_bilanz
   # Modified: 2026-02-14 - AP 50: exclude_ids Parameter für Fraud-Ausschluss
+  # Modified: 2026-03-02 - AP 56: Area Distribution pro Partner (get_area_distribution)
 */
 
 header('Content-Type: application/json');
@@ -85,6 +86,35 @@ try {
         echo json_encode(["message" => "Keine Daten bei dieser Auswahl"]);
         exit;
     }
+
+    // AP 56: Area Distribution pro Partner
+    $sqlArea = "SELECT * FROM get_area_distribution(?::int[], ?::int[], ?, ?::int[])";
+    $stmtArea = $pdo->prepare($sqlArea);
+    $stmtArea->execute([
+        $survey_array_string,
+        $dept_array_string,
+        $manager_filter,
+        $exclude_array_string
+    ]);
+    $areaData = $stmtArea->fetchAll(PDO::FETCH_ASSOC);
+
+    $areaByPartner = [];
+    foreach ($areaData as $aRow) {
+        $pid = $aRow['partner_id'];
+        if (!isset($areaByPartner[$pid])) $areaByPartner[$pid] = [];
+        $areaByPartner[$pid][] = [
+            'segment_id' => (int)$aRow['segment_id'],
+            'segment_name' => $aRow['segment_name'],
+            'display_order' => (int)$aRow['display_order'],
+            'participant_count' => (int)$aRow['participant_count']
+        ];
+    }
+
+    foreach ($result as &$r) {
+        $pid = $r['partner_id'];
+        $r['area_distribution'] = $areaByPartner[$pid] ?? [];
+    }
+    unset($r);
 
     echo json_encode($result);
 

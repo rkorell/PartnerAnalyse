@@ -10,6 +10,7 @@
   # Modified: 29.11.2025, 20:30 - AP 32: Configured Analysis thresholds (Min Answers Limit, Conflict)
   # Modified: 30.11.2025 - AP X: Adjusted thresholds for 1-5 scale, removed IMPORTANCE_TOOLTIP_THRESHOLD (fixed mapping now)
   # Modified: 02.12.2025, 17:30 - AP 43: Consolidated all Magic Numbers (NPS, Action-Item, Matrix, Slider-Tooltips)
+  # Modified: 2026-03-02 - AP 56: Added AREA_COLORS for area distribution stacked bars
 */
 
 export const CONFIG = {
@@ -65,6 +66,15 @@ export const CONFIG = {
         NPS_PASSIVE_LOW: '#f39c12',
         NPS_PASSIVE_HIGH: '#f1c40f',
         NPS_PROMOTER: '#2ecc71',
+
+        // Area Distribution Farben (kein Grün, kein Rot!)
+        AREA_COLORS: [
+            '#4682B4',  // Steel Blue
+            '#E67E22',  // Orange
+            '#1ABC9C',  // Teal
+            '#8E44AD',  // Purple
+            '#F39C12',  // Amber
+        ],
 
         // Score Heatmap (RGB Arrays für Interpolation)
         HEATMAP_LOW: [231, 76, 60],

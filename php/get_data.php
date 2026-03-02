@@ -17,6 +17,7 @@
   # Modified: 28.11.2025, 20:00 - AP 29.3: Added CSRF token generation
   # Modified: 28.11.2025, 20:15 - AP 29.3: Added auth_status for proactive frontend login
   # Modified: 2026-02-13 - AP 48: Added is_active, start_date, end_date to survey response
+  # Modified: 2026-03-02 - AP 56: Added display_order to department query
 */
 
 header('Content-Type: application/json');
@@ -71,13 +72,14 @@ try {
 
     // Departments
     $departments = [];
-    $stmt = $pdo->query("SELECT id, name, parent_id, level_depth FROM departments ORDER BY level_depth ASC, name ASC");
+    $stmt = $pdo->query("SELECT id, name, parent_id, level_depth, display_order FROM departments ORDER BY level_depth ASC, name ASC");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $departments[] = [
             'id' => intval($row['id']),
             'name' => $row['name'],
             'parent_id' => $row['parent_id'] === null ? null : intval($row['parent_id']),
-            'level_depth' => intval($row['level_depth'])
+            'level_depth' => intval($row['level_depth']),
+            'display_order' => $row['display_order'] !== null ? intval($row['display_order']) : null
         ];
     }
 

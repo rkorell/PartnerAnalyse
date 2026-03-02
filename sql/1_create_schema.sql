@@ -64,7 +64,8 @@ CREATE TABLE departments (
     name VARCHAR(100) NOT NULL,
     parent_id INTEGER REFERENCES departments(id),
     level_depth INTEGER,
-    description TEXT
+    description TEXT,
+    display_order INTEGER
 );
 
 -- 4. Partner
@@ -517,6 +518,92 @@ BEGIN
         ROUND(SUM(score * freq) / NULLIF(SUM(freq), 0), 1) as avg_score,
         ROUND(AVG(freq), 1) as avg_freq
     FROM base_data;
+END;
+$$ LANGUAGE plpgsql;
+
+
+/* Funktion: get_area_distribution (AP 56)
+   Zweck: Bereichsverteilung der Teilnehmer pro Partner.
+   Segmente = Departments mit display_order IS NOT NULL.
+   Zählt disjunkt: Jeder Teilnehmer wird nur dem spezifischsten Segment zugeordnet.
+   Beispiel: Teilnehmer in SLED-NW zählt für SLED, nicht für Public.
+*/
+CREATE OR REPLACE FUNCTION get_area_distribution(
+    p_survey_ids INT[],
+    p_dept_ids INT[],
+    p_manager_filter TEXT,
+    p_exclude_ids INT[] DEFAULT '{}'
+)
+RETURNS TABLE (
+    partner_id INT,
+    partner_name VARCHAR,
+    segment_id INT,
+    segment_name VARCHAR,
+    display_order INT,
+    participant_count BIGINT
+) AS $$
+BEGIN
+    -- JIT deaktivieren: Bei wenigen Departments + rekursiven Subtree-Aufrufen
+    -- ist die JIT-Kompilierzeit (~770ms) >> Ausführungszeit (~10ms)
+    SET LOCAL jit = off;
+    RETURN QUERY
+    WITH
+    relevant_participants AS (
+        SELECT p.id, p.department_id
+        FROM participants p
+        WHERE p.survey_id = ANY(p_survey_ids)
+          AND p.department_id IN (SELECT id FROM get_department_subtree(p_dept_ids))
+          AND p.id != ALL(p_exclude_ids)
+          AND (
+              p_manager_filter = 'alle'
+              OR (p_manager_filter = 'nur_manager' AND p.is_manager = TRUE)
+              OR (p_manager_filter = 'nur_nicht_manager' AND p.is_manager = FALSE)
+          )
+    ),
+    segments AS (
+        SELECT d.id, d.name, d.display_order
+        FROM departments d
+        WHERE d.display_order IS NOT NULL
+        ORDER BY d.display_order
+    ),
+    -- Exklusive Dept-IDs pro Segment (Subtree MINUS Kind-Segment-Subtrees)
+    segment_exclusive_depts AS (
+        SELECT s.id AS segment_id,
+               gds.id AS dept_id
+        FROM segments s
+        CROSS JOIN LATERAL (
+            SELECT sub.id FROM get_department_subtree(ARRAY[s.id]) sub
+        ) gds
+        WHERE NOT EXISTS (
+            SELECT 1 FROM segments child_seg
+            WHERE child_seg.id != s.id
+              AND child_seg.id IN (SELECT sub2.id FROM get_department_subtree(ARRAY[s.id]) sub2)
+              AND gds.id IN (SELECT sub3.id FROM get_department_subtree(ARRAY[child_seg.id]) sub3)
+        )
+    ),
+    partner_participants AS (
+        SELECT DISTINCT r.partner_id, r.participant_id, rp.department_id
+        FROM ratings r
+        JOIN relevant_participants rp ON r.participant_id = rp.id
+        WHERE r.rating_type = 'performance'
+          AND r.score IS NOT NULL
+    )
+    SELECT
+        pa.id::int,
+        pa.name::varchar,
+        s.id::int,
+        s.name::varchar,
+        s.display_order::int,
+        COUNT(pp.participant_id)::bigint
+    FROM partners pa
+    CROSS JOIN segments s
+    LEFT JOIN partner_participants pp
+        ON pp.partner_id = pa.id
+        AND pp.department_id IN (SELECT sed.dept_id FROM segment_exclusive_depts sed WHERE sed.segment_id = s.id)
+    WHERE pa.active = TRUE
+      AND EXISTS (SELECT 1 FROM partner_participants pp2 WHERE pp2.partner_id = pa.id)
+    GROUP BY pa.id, pa.name, s.id, s.name, s.display_order
+    ORDER BY pa.name, s.display_order;
 END;
 $$ LANGUAGE plpgsql;
 
