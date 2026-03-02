@@ -342,6 +342,12 @@ Kontextsensitive Hilfetexte werden als HTML in der Tabelle `app_texts` gespeiche
 ## 8.6 Zukünftige Erweiterungen
 
 - Anomalie-Schwellenwerte: Definition und DB-Integration (aktuell manuell)
+- Partner-Gruppierung im Ranking: Statt einer flachen Rangliste könnten Partner nach Kriterien gruppiert und innerhalb der Gruppe sortiert werden. Mögliche Gruppierungskriterien:
+  - **Stichprobengröße** (z.B. Gruppen 1–5, 6–10, 11+ Bewertungen)
+  - **Anzahl bewerteter Partner pro Bewerter** (1–10, zur Erkennung von Viel-Bewertern)
+  - **Score-Streubreite** innerhalb einer Gruppe (Spread 10–100 Punkte)
+
+  *Hinweis:* Der bestehende „Mindestanzahl Antworten"-Slider auf der Analyseseite adressiert bereits das akute Problem kleiner Stichproben, indem Partner mit zu wenigen Bewertungen ausgeblendet werden. Eine explizite Gruppierung wäre eine ergänzende Darstellungsoption für differenziertere Analysen.
 
 # 9\. Datenmodellierung & Datenerfassung
 

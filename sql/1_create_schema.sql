@@ -19,6 +19,8 @@
 # Modified: 2026-02-14 - AP 50: ip_hash VARCHAR(64) in participants, idx_participants_ip_hash
 # Modified: 2026-02-14 - AP 50: pgcrypto Extension, view_survey_fraud
 # Modified: 2026-02-14 - AP 50: p_exclude_ids Parameter in allen 3 Funktionen, view_survey_fraud mit mode_score
+# Modified: 2026-03-02 - AP 56: display_order in departments, get_area_distribution() Funktion
+# Modified: 2026-03-02 - AP 57: logo_file in partners, calculate_partner_bilanz() erweitert
 */
 
 -- pgcrypto für DB-seitiges Hashing (z.B. Migration bestehender IPs)
@@ -74,7 +76,8 @@ CREATE TABLE partners (
     name VARCHAR(100) NOT NULL UNIQUE,
     be_geo_id INTEGER UNIQUE,
     sortgroup INTEGER,
-    active BOOLEAN DEFAULT TRUE
+    active BOOLEAN DEFAULT TRUE,
+    logo_file VARCHAR(200)
 );
 
 -- 5. Kriterien
@@ -230,7 +233,8 @@ RETURNS TABLE (
     num_assessors_team INT,
     nps_score INT,
     comment_count INT,
-    global_participant_count INT
+    global_participant_count INT,
+    logo_file VARCHAR
 ) AS $$
 BEGIN
     RETURN QUERY
@@ -365,7 +369,8 @@ BEGIN
         COALESCE(pm.num_assessors_team, 0)::int,
         COALESCE(pm.nps, 0)::int,
         (COALESCE(pb.total_spec_comments, 0) + COALESCE(pm.cnt_gen_comments, 0))::int,
-        (SELECT cnt FROM global_total)::int
+        (SELECT cnt FROM global_total)::int,
+        p.logo_file
     FROM partners p
     JOIN partner_meta pm ON p.id = pm.partner_id
     LEFT JOIN partner_bilanz pb ON p.id = pb.partner_id

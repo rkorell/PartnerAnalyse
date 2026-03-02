@@ -30,6 +30,7 @@
   # Modified: 2026-02-14 - AP 50: Fraud-Panel IP-Clustering + Sortierung (Severity DESC, Score 5 vor 1)
   # Modified: 2026-02-14 - AP 50: Info-Sticker (i) im Fraud-Panel-Header mit Hilfetext aus app_texts
   # Modified: 2026-03-02 - AP 56: Area Distribution (camelCase Mapping, vBar in row, hBar in modal)
+  # Modified: 2026-03-02 - AP 57: Report-Button + openPartnerReport()
 */
 
 import { CONFIG } from './config.js';
@@ -47,7 +48,8 @@ document.addEventListener("DOMContentLoaded", function() {
     const errorMessage = document.getElementById('error-message');
     const errorText = document.getElementById('error-text');
     const closeErrorBtn = document.getElementById('close-error');
-    const exportBtn = document.getElementById('export-btn'); 
+    const exportBtn = document.getElementById('export-btn');
+    const reportBtn = document.getElementById('report-btn');
 
     const matrixModal = document.getElementById('matrix-modal');
     const closeMatrixBtn = document.getElementById('close-matrix');
@@ -91,6 +93,7 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     if(exportBtn) exportBtn.addEventListener('click', exportToCSV);
+    if(reportBtn) reportBtn.addEventListener('click', openPartnerReport);
     surveySelect.addEventListener('change', onSurveySelectionChange);
 
     if (loginForm) {
@@ -193,13 +196,18 @@ document.addEventListener("DOMContentLoaded", function() {
     function hideLoader() { if(loadingOverlay) { clearTimeout(loadingOverlay._timeout); loadingOverlay.style.display = 'none'; } }
     function showError(msg) { if(errorText && errorMessage) { errorText.textContent = msg; errorMessage.style.display = 'flex'; } }
 
-    function setExportButtonState(enabled) { 
+    function setExportButtonState(enabled) {
         if (!exportBtn) return;
         exportBtn.disabled = !enabled;
         if (enabled) {
             exportBtn.classList.replace('btn-secondary', 'btn-primary');
         } else {
             exportBtn.classList.replace('btn-primary', 'btn-secondary');
+        }
+        if (reportBtn) {
+            reportBtn.disabled = !enabled;
+            if (enabled) reportBtn.classList.replace('btn-secondary', 'btn-primary');
+            else reportBtn.classList.replace('btn-primary', 'btn-secondary');
         }
     }
 
@@ -1026,6 +1034,18 @@ document.addEventListener("DOMContentLoaded", function() {
     function showFraudResetBtn(visible) {
         const btn = document.getElementById('fraud-reset');
         if (btn) btn.style.display = visible ? 'inline-block' : 'none';
+    }
+
+    function openPartnerReport() {
+        if (!currentFilterState || !analysisData.length) return;
+        const filterPayload = {
+            survey_ids: currentFilterState.survey_ids,
+            department_ids: currentFilterState.department_ids,
+            manager_filter: currentFilterState.manager_filter,
+            min_answers: parseInt(minAnswersSlider.value),
+            exclude_ids: excludedParticipantIds
+        };
+        window.open('partner_report.html?filter=' + encodeURIComponent(btoa(JSON.stringify(filterPayload))), '_blank');
     }
 
     function exportToCSV() {
