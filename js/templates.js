@@ -135,7 +135,7 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
 
     return `
     <div class="criteria-row partner-row-clickable score-table-row" data-partner-id="${row.partnerId}">
-        <div class="criteria-content col-partner col-partner-link">${escapeHtml(row.partnerName)} ↗</div>
+        <div class="criteria-content col-partner col-partner-link"><span class="partner-rank">${scaling.rank}.</span> ${escapeHtml(row.partnerName)} ↗</div>
 
         <div class="criteria-content col-score-graph">
             <div class="dbc-container">

@@ -253,7 +253,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 const isSelected = !selectedPartnerIds || selectedPartnerIds.has(p.partnerId);
                 const checkedAttr = isSelected ? ' checked' : '';
                 const deselClass = isSelected ? '' : ' deselected';
-
                 if (sortMode === 'grouped' && p.sortGroup !== lastGroup) {
                     lastGroup = p.sortGroup;
                     const groupName = sortGroupNames[lastGroup] || `Gruppe ${lastGroup || '?'}`;
@@ -715,7 +714,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let html = Tpl.getScoreTableStartHTML(`Ergebnis: Partner Score Ranking (Basierend auf ${globalCount} Teilnehmern)`);
 
-        rows.forEach((row) => {
+        rows.forEach((row, idx) => {
             const posWidth = (row.scorePositive / maxBarValue) * 100;
             const negWidth = (row.scoreNegative / maxBarValue) * 100;
 
@@ -764,7 +763,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 posWidth, negWidth,
                 posCount: row.countPositive, negCount: row.countNegative,
                 posScore: Math.round(row.scorePositive), negScore: Math.round(row.scoreNegative),
-                awarenessColor: awColor
+                awarenessColor: awColor,
+                rank: idx + 1
             });
         });
         html += `</div>`;

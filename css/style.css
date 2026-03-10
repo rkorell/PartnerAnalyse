@@ -1822,7 +1822,14 @@ input[type=range].slider-neutral {
 .col-partner-link {
     color: #2c3e50;
     font-weight: 600;
+    font-size: 1.2em;
     transition: color 0.2s ease;
+}
+
+.partner-rank {
+    color: #999;
+    font-weight: 400;
+    margin-right: 6px;
 }
 
 .col-partner-link:hover {
