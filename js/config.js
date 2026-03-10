@@ -11,6 +11,7 @@
   # Modified: 30.11.2025 - AP X: Adjusted thresholds for 1-5 scale, removed IMPORTANCE_TOOLTIP_THRESHOLD (fixed mapping now)
   # Modified: 02.12.2025, 17:30 - AP 43: Consolidated all Magic Numbers (NPS, Action-Item, Matrix, Slider-Tooltips)
   # Modified: 2026-03-02 - AP 56: Added AREA_COLORS for area distribution stacked bars
+  # Modified: 2026-03-10 - AP 58: Added SORT_GROUP_NAMES for partner filter grouping
 */
 
 export const CONFIG = {
@@ -80,6 +81,13 @@ export const CONFIG = {
         HEATMAP_LOW: [231, 76, 60],
         HEATMAP_MID: [243, 156, 18],
         HEATMAP_HIGH: [46, 204, 113],
+    },
+
+    // --- Partner-Sortiergruppen (AP 58) ---
+    SORT_GROUP_NAMES: {
+        1: 'Systemhäuser',
+        2: 'Spezialisierte Partner',
+        3: 'Global System Integrators',
     },
 
     // --- UI Konstanten (AP 24) ---

@@ -234,7 +234,8 @@ RETURNS TABLE (
     nps_score INT,
     comment_count INT,
     global_participant_count INT,
-    logo_file VARCHAR
+    logo_file VARCHAR,
+    sortgroup INT
 ) AS $$
 BEGIN
     RETURN QUERY
@@ -370,7 +371,8 @@ BEGIN
         COALESCE(pm.nps, 0)::int,
         (COALESCE(pb.total_spec_comments, 0) + COALESCE(pm.cnt_gen_comments, 0))::int,
         (SELECT cnt FROM global_total)::int,
-        p.logo_file
+        p.logo_file,
+        p.sortgroup
     FROM partners p
     JOIN partner_meta pm ON p.id = pm.partner_id
     LEFT JOIN partner_bilanz pb ON p.id = pb.partner_id

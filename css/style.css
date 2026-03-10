@@ -2102,3 +2102,24 @@ input[type="range"]::-moz-range-thumb:hover {
     padding: 14px 18px;
     font-size: 1.05em;
 }
+
+/* --- Partner-Filter Panel (AP 58) --- */
+.partner-filter-panel { border: 2px solid #3498db; border-radius: 8px; overflow: hidden; }
+.partner-filter-header { background: #ebf5fb; padding: 14px 18px; cursor: pointer; display: flex; align-items: center; gap: 10px; user-select: none; font-weight: 600; font-size: 1.05em; color: #2980b9; }
+.partner-filter-header:hover { background: #d6eaf8; }
+.partner-filter-header .chevron { transition: transform 0.2s; display: inline-block; }
+.partner-filter-header.open .chevron { transform: rotate(90deg); }
+.partner-filter-body { display: none; padding: 15px; }
+.partner-filter-body.open { display: block; }
+.partner-filter-actions { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+.partner-filter-actions button { padding: 5px 14px; border: 1px solid #3498db; border-radius: 4px; background: #fff; color: #2980b9; cursor: pointer; font-size: 0.85em; font-weight: 600; }
+.partner-filter-actions button:hover { background: #ebf5fb; }
+.partner-filter-actions input[type="text"] { padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85em; width: 160px; }
+.partner-filter-actions .sort-radios { display: flex; gap: 10px; margin-left: auto; font-size: 0.85em; color: #555; }
+.partner-filter-actions .sort-radios label { cursor: pointer; display: flex; align-items: center; gap: 3px; }
+.partner-filter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.partner-filter-item { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid #ecf0f1; border-radius: 6px; cursor: pointer; font-size: 0.9em; transition: opacity 0.15s; }
+.partner-filter-item:hover { border-color: #3498db; background: #f8fbfe; }
+.partner-filter-item.deselected { opacity: 0.45; }
+.partner-filter-item input[type="checkbox"] { margin: 0; cursor: pointer; }
+.partner-filter-group-label { grid-column: 1 / -1; font-size: 0.8em; font-weight: 600; color: #7f8c8d; padding: 8px 0 2px 0; border-bottom: 1px solid #ecf0f1; margin-top: 4px; }

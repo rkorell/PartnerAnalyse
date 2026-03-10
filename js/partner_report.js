@@ -4,6 +4,7 @@
   (c) - Dr. Ralf Korell, 2025/26
 
   # Created: 2026-03-02 - AP 57: Partner-Bericht (Report Page)
+  # Modified: 2026-03-10 - AP 58: Partner-Filter (partner_ids aus URL-Parameter auswerten)
 */
 
 import { CONFIG } from './config.js';
@@ -81,6 +82,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             })),
             areaColors: CONFIG.COLORS.AREA_COLORS
         }));
+
+        // Partner-Filter anwenden (AP 58)
+        if (filterParams.partner_ids) {
+            const allowedIds = new Set(filterParams.partner_ids);
+            partners = partners.filter(p => allowedIds.has(p.partnerId));
+        }
 
         // 2b. Details für alle Partner parallel laden
         statusEl.textContent = `Lade Details für ${partners.length} Partner...`;

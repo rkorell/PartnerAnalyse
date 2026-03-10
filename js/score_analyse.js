@@ -31,6 +31,7 @@
   # Modified: 2026-02-14 - AP 50: Info-Sticker (i) im Fraud-Panel-Header mit Hilfetext aus app_texts
   # Modified: 2026-03-02 - AP 56: Area Distribution (camelCase Mapping, vBar in row, hBar in modal)
   # Modified: 2026-03-02 - AP 57: Report-Button + openPartnerReport()
+  # Modified: 2026-03-10 - AP 58: Partner-Filter Panel (Checkbox-Grid, Suche, Sortierung, getFilteredData)
 */
 
 import { CONFIG } from './config.js';
@@ -50,6 +51,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const closeErrorBtn = document.getElementById('close-error');
     const exportBtn = document.getElementById('export-btn');
     const reportBtn = document.getElementById('report-btn');
+    const partnerFilterSection = document.getElementById('partner-filter-section');
 
     const matrixModal = document.getElementById('matrix-modal');
     const closeMatrixBtn = document.getElementById('close-matrix');
@@ -74,6 +76,7 @@ document.addEventListener("DOMContentLoaded", function() {
     let currentPartnerDetails = null;
     let currentFilterState = null;
     let _deptCounts = null;
+    let selectedPartnerIds = null;  // null = alle, Set = Auswahl
 
     // Initial Load
     initializeFilters();
@@ -209,6 +212,179 @@ document.addEventListener("DOMContentLoaded", function() {
             if (enabled) reportBtn.classList.replace('btn-secondary', 'btn-primary');
             else reportBtn.classList.replace('btn-primary', 'btn-secondary');
         }
+    }
+
+    // --- Partner-Filter (AP 58) ---
+
+    function getFilteredData() {
+        if (!selectedPartnerIds) return analysisData;
+        return analysisData.filter(p => selectedPartnerIds.has(p.partnerId));
+    }
+
+    function renderPartnerFilterPanel(data) {
+        if (!partnerFilterSection) return;
+        if (!data || data.length === 0) { partnerFilterSection.innerHTML = ''; return; }
+
+        const total = data.length;
+        let currentSort = 'alpha'; // 'alpha' oder 'grouped'
+
+        // Sortgroup-Namen aus CONFIG oder Fallback
+        const sortGroupNames = CONFIG.SORT_GROUP_NAMES || { 1: 'Gruppe 1', 2: 'Gruppe 2', 3: 'Gruppe 3' };
+
+        function getSortedPartners(sortMode) {
+            const sorted = [...data];
+            if (sortMode === 'grouped') {
+                sorted.sort((a, b) => (a.sortGroup || 99) - (b.sortGroup || 99) || a.partnerName.localeCompare(b.partnerName, 'de'));
+            } else {
+                sorted.sort((a, b) => a.partnerName.localeCompare(b.partnerName, 'de'));
+            }
+            return sorted;
+        }
+
+        function buildGrid(sortMode, searchTerm) {
+            const sorted = getSortedPartners(sortMode);
+            const lowerSearch = (searchTerm || '').toLowerCase().trim();
+            let html = '';
+            let lastGroup = null;
+
+            for (const p of sorted) {
+                const matchesSearch = !lowerSearch || p.partnerName.toLowerCase().includes(lowerSearch);
+                const displayStyle = matchesSearch ? '' : ' style="display:none;"';
+                const isSelected = !selectedPartnerIds || selectedPartnerIds.has(p.partnerId);
+                const checkedAttr = isSelected ? ' checked' : '';
+                const deselClass = isSelected ? '' : ' deselected';
+
+                if (sortMode === 'grouped' && p.sortGroup !== lastGroup) {
+                    lastGroup = p.sortGroup;
+                    const groupName = sortGroupNames[lastGroup] || `Gruppe ${lastGroup || '?'}`;
+                    html += `<div class="partner-filter-group-label"${displayStyle}>${escapeHtml(groupName)}</div>`;
+                }
+
+                html += `<label class="partner-filter-item${deselClass}"${displayStyle} data-partner-id="${p.partnerId}">
+                    <input type="checkbox" value="${p.partnerId}"${checkedAttr}>
+                    ${escapeHtml(p.partnerName)}
+                </label>`;
+            }
+            return html;
+        }
+
+        function getHeaderText() {
+            if (!selectedPartnerIds) return `Partner-Auswahl: Alle ${total} Partner`;
+            const count = selectedPartnerIds.size;
+            if (count === total) return `Partner-Auswahl: Alle ${total} Partner`;
+            return `Partner-Auswahl: ${count} von ${total} Partner`;
+        }
+
+        function onSelectionChange() {
+            // Header-Text aktualisieren
+            const headerTextEl = partnerFilterSection.querySelector('.pf-header-text');
+            if (headerTextEl) headerTextEl.textContent = getHeaderText();
+
+            // Ergebnistabelle und Buttons aktualisieren
+            renderResultTable(getFilteredData());
+        }
+
+        // Panel HTML aufbauen
+        partnerFilterSection.innerHTML = `
+            <div class="partner-filter-panel">
+                <div class="partner-filter-header" id="pf-toggle">
+                    <span class="chevron">&#9654;</span>
+                    <span class="pf-header-text">${getHeaderText()}</span>
+                </div>
+                <div class="partner-filter-body" id="pf-body">
+                    <div class="partner-filter-actions">
+                        <button type="button" id="pf-select-all">Alle</button>
+                        <button type="button" id="pf-select-none">Keine</button>
+                        <input type="text" id="pf-search" placeholder="Suche...">
+                        <div class="sort-radios">
+                            <label><input type="radio" name="pf-sort" value="alpha" checked> Alphabetisch</label>
+                            <label><input type="radio" name="pf-sort" value="grouped"> Gruppiert</label>
+                        </div>
+                    </div>
+                    <div class="partner-filter-grid" id="pf-grid">
+                        ${buildGrid('alpha', '')}
+                    </div>
+                </div>
+            </div>`;
+
+        // Toggle Accordion
+        const header = partnerFilterSection.querySelector('#pf-toggle');
+        const body = partnerFilterSection.querySelector('#pf-body');
+        header.addEventListener('click', () => {
+            header.classList.toggle('open');
+            body.classList.toggle('open');
+        });
+
+        // Checkbox-Change (Event Delegation)
+        const grid = partnerFilterSection.querySelector('#pf-grid');
+        grid.addEventListener('change', (e) => {
+            if (e.target.type !== 'checkbox') return;
+            const id = parseInt(e.target.value);
+            const item = e.target.closest('.partner-filter-item');
+
+            if (e.target.checked) {
+                if (selectedPartnerIds) {
+                    selectedPartnerIds.add(id);
+                    // Wenn alle wieder drin → null setzen
+                    if (selectedPartnerIds.size === total) selectedPartnerIds = null;
+                }
+                if (item) item.classList.remove('deselected');
+            } else {
+                if (!selectedPartnerIds) {
+                    // Erstes Abwählen: Set mit allen außer diesem erstellen
+                    selectedPartnerIds = new Set(data.map(p => p.partnerId));
+                }
+                selectedPartnerIds.delete(id);
+                if (item) item.classList.add('deselected');
+            }
+            onSelectionChange();
+        });
+
+        // Alle-Button
+        partnerFilterSection.querySelector('#pf-select-all').addEventListener('click', () => {
+            selectedPartnerIds = null;
+            grid.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+            grid.querySelectorAll('.partner-filter-item').forEach(el => el.classList.remove('deselected'));
+            onSelectionChange();
+        });
+
+        // Keine-Button
+        partnerFilterSection.querySelector('#pf-select-none').addEventListener('click', () => {
+            selectedPartnerIds = new Set();
+            grid.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+            grid.querySelectorAll('.partner-filter-item').forEach(el => el.classList.add('deselected'));
+            onSelectionChange();
+        });
+
+        // Suchfeld
+        partnerFilterSection.querySelector('#pf-search').addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase().trim();
+            grid.querySelectorAll('.partner-filter-item').forEach(el => {
+                const name = el.textContent.toLowerCase();
+                el.style.display = (!term || name.includes(term)) ? '' : 'none';
+            });
+            // Auch Gruppen-Labels ein-/ausblenden
+            grid.querySelectorAll('.partner-filter-group-label').forEach(el => {
+                const next = el.nextElementSibling;
+                // Zeige Label wenn mindestens ein Item in der Gruppe sichtbar
+                let hasVisible = false;
+                let sib = el.nextElementSibling;
+                while (sib && !sib.classList.contains('partner-filter-group-label')) {
+                    if (sib.style.display !== 'none') hasVisible = true;
+                    sib = sib.nextElementSibling;
+                }
+                el.style.display = hasVisible ? '' : 'none';
+            });
+        });
+
+        // Sortierung
+        partnerFilterSection.querySelectorAll('input[name="pf-sort"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                currentSort = radio.value;
+                const searchTerm = partnerFilterSection.querySelector('#pf-search').value;
+                grid.innerHTML = buildGrid(currentSort, searchTerm);
+            });
+        });
     }
 
     // --- DATA LOADING LOGIC (Surveys & Departments) ---
@@ -485,10 +661,13 @@ document.addEventListener("DOMContentLoaded", function() {
                         displayOrder: a.display_order,
                         count: parseInt(a.participant_count)
                     })),
-                    areaColors: CONFIG.COLORS.AREA_COLORS
+                    areaColors: CONFIG.COLORS.AREA_COLORS,
+                    sortGroup: parseInt(row.sortgroup || 0)
                 }));
 
+                selectedPartnerIds = null;
                 renderResultTable(analysisData);
+                renderPartnerFilterPanel(analysisData);
                 setExportButtonState(true);
 
                 // Fraud-Detection erst nach erfolgreicher Analyse laden
@@ -499,15 +678,18 @@ document.addEventListener("DOMContentLoaded", function() {
                 resultSection.innerHTML = `<div class="selection-info">${data.message}</div>`;
                 analysisData = [];
                 fraudSection.innerHTML = "";
+                partnerFilterSection.innerHTML = "";
                 setExportButtonState(false);
             } else if (data && data.error) {
                 showError(data.error);
                 analysisData = [];
                 fraudSection.innerHTML = "";
+                partnerFilterSection.innerHTML = "";
                 setExportButtonState(false);
             } else {
                 showError("Unbekanntes Antwortformat.");
                 analysisData = [];
+                partnerFilterSection.innerHTML = "";
                 setExportButtonState(false);
             }
         })
@@ -1043,17 +1225,19 @@ document.addEventListener("DOMContentLoaded", function() {
             department_ids: currentFilterState.department_ids,
             manager_filter: currentFilterState.manager_filter,
             min_answers: parseInt(minAnswersSlider.value),
-            exclude_ids: excludedParticipantIds
+            exclude_ids: excludedParticipantIds,
+            partner_ids: selectedPartnerIds ? [...selectedPartnerIds] : null
         };
         window.open('partner_report.html?filter=' + encodeURIComponent(btoa(JSON.stringify(filterPayload))), '_blank');
     }
 
     function exportToCSV() {
-        if (!analysisData || analysisData.length === 0) return;
-        
+        const data = getFilteredData();
+        if (!data || data.length === 0) return;
+
         let csvContent = "Partner;Score;Positiv;Negativ;Awareness;Kriterium;Wichtigkeit;Performance\n";
 
-        analysisData.forEach(partner => {
+        data.forEach(partner => {
             if (partner.matrixDetails) {
                 partner.matrixDetails.forEach(detail => {
                     let row = [
