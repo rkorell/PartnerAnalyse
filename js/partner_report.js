@@ -5,6 +5,7 @@
 
   # Created: 2026-03-02 - AP 57: Partner-Bericht (Report Page)
   # Modified: 2026-03-10 - AP 58: Partner-Filter (partner_ids aus URL-Parameter auswerten)
+  # Modified: 2026-03-13 - AP 59: NPS-Verteilung (Torte), Awareness entfernt
 */
 
 import { CONFIG } from './config.js';
@@ -66,6 +67,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             countNegative: parseInt(row.count_negative || 0),
             awarenessPct: parseInt(row.awareness_pct || 0),
             npsScore: parseInt(row.nps_score || 0),
+            npsPromoterPct: parseInt(row.nps_promoter_pct || 0),
+            npsPassivePct: parseInt(row.nps_passive_pct || 0),
+            npsDetractorPct: parseInt(row.nps_detractor_pct || 0),
             commentCount: parseInt(row.comment_count || 0),
             maxDivergence: parseFloat(row.max_divergence || 0),
             hasActionItem: parseInt(row.has_action_item || 0),
@@ -162,6 +166,10 @@ function renderPartnerSection(partner, allPartners, maxBarValue) {
 
 function renderHeader(partner, logoSrc, totalCriteria) {
     const npsColor = partner.npsScore > 0 ? '#2ecc71' : partner.npsScore < 0 ? '#e74c3c' : '#999';
+    const detractorDisplay = 100 - partner.npsPromoterPct - partner.npsPassivePct;
+    const pD = partner.npsPromoterPct + detractorDisplay;
+    const pieStyle = `background: conic-gradient(from 180deg, #2ecc71 0% ${partner.npsPromoterPct}%, #e74c3c ${partner.npsPromoterPct}% ${pD}%, #f1c40f ${pD}% 100%);`;
+    const pieTitle = `Promoter: ${partner.npsPromoterPct}% · Detractor: ${detractorDisplay}% · Passive: ${partner.npsPassivePct}%`;
 
     return `
     <div class="report-header">
@@ -172,9 +180,10 @@ function renderHeader(partner, logoSrc, totalCriteria) {
             <h2>${escapeHtml(partner.partnerName)}</h2>
             <div class="report-kpi-row">
                 <span class="report-kpi">Bewertungen: <strong>${partner.totalAnswers}</strong></span>
-                <span class="report-kpi">Awareness: <strong>${partner.awarenessPct}%</strong></span>
                 <span class="report-kpi">Kriterien: <strong>${totalCriteria}</strong></span>
-                <span class="report-kpi">NPS: <strong style="color:${npsColor}">${partner.npsScore > 0 ? '+' : ''}${partner.npsScore}</strong></span>
+                <span class="report-kpi">NPS: <strong style="color:${npsColor}">${partner.npsScore > 0 ? '+' : ''}${partner.npsScore}</strong>
+                    <span class="nps-pie-report" style="${pieStyle}" title="${pieTitle}"></span>
+                </span>
             </div>
         </div>
         <div class="report-header-right">

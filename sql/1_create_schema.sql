@@ -21,6 +21,7 @@
 # Modified: 2026-02-14 - AP 50: p_exclude_ids Parameter in allen 3 Funktionen, view_survey_fraud mit mode_score
 # Modified: 2026-03-02 - AP 56: display_order in departments, get_area_distribution() Funktion
 # Modified: 2026-03-02 - AP 57: logo_file in partners, calculate_partner_bilanz() erweitert
+# Modified: 2026-03-13 - AP 59: NPS-Schwellen (Promoter ≥7, Detractor ≤4), NPS-Verteilung (3 neue Spalten)
 */
 
 -- pgcrypto für DB-seitiges Hashing (z.B. Migration bestehender IPs)
@@ -232,6 +233,9 @@ RETURNS TABLE (
     num_assessors_mgr INT,
     num_assessors_team INT,
     nps_score INT,
+    nps_promoter_pct INT,
+    nps_passive_pct INT,
+    nps_detractor_pct INT,
     comment_count INT,
     global_participant_count INT,
     logo_file VARCHAR,
@@ -336,9 +340,15 @@ BEGIN
             COUNT(DISTINCT r.participant_id) as num_assessors,
             COUNT(DISTINCT r.participant_id) FILTER (WHERE rp.is_manager) as num_assessors_mgr,
             COUNT(DISTINCT r.participant_id) FILTER (WHERE NOT rp.is_manager) as num_assessors_team,
-            ROUND(100.0 * (COUNT(DISTINCT CASE WHEN pf.nps_score >= 9 THEN pf.participant_id END) - 
-                           COUNT(DISTINCT CASE WHEN pf.nps_score <= 6 THEN pf.participant_id END)) / 
+            ROUND(100.0 * (COUNT(DISTINCT CASE WHEN pf.nps_score >= 7 THEN pf.participant_id END) -
+                           COUNT(DISTINCT CASE WHEN pf.nps_score <= 4 THEN pf.participant_id END)) /
                            NULLIF(COUNT(DISTINCT CASE WHEN pf.nps_score IS NOT NULL THEN pf.participant_id END), 0), 0) as nps,
+            ROUND(100.0 * COUNT(DISTINCT CASE WHEN pf.nps_score >= 7 THEN pf.participant_id END) /
+                           NULLIF(COUNT(DISTINCT CASE WHEN pf.nps_score IS NOT NULL THEN pf.participant_id END), 0), 0) as nps_promoter_pct,
+            ROUND(100.0 * COUNT(DISTINCT CASE WHEN pf.nps_score >= 5 AND pf.nps_score <= 6 THEN pf.participant_id END) /
+                           NULLIF(COUNT(DISTINCT CASE WHEN pf.nps_score IS NOT NULL THEN pf.participant_id END), 0), 0) as nps_passive_pct,
+            ROUND(100.0 * COUNT(DISTINCT CASE WHEN pf.nps_score <= 4 THEN pf.participant_id END) /
+                           NULLIF(COUNT(DISTINCT CASE WHEN pf.nps_score IS NOT NULL THEN pf.participant_id END), 0), 0) as nps_detractor_pct,
             COUNT(DISTINCT CASE WHEN pf.general_comment IS NOT NULL AND trim(pf.general_comment) <> '' THEN pf.participant_id END) as cnt_gen_comments,
             ROUND(100.0 * COUNT(CASE WHEN r.rating_type='performance' AND r.score IS NOT NULL THEN 1 END) /
                           NULLIF(COUNT(DISTINCT r.participant_id) * (SELECT COUNT(*) FROM criteria), 0), 0) as awareness
@@ -369,6 +379,9 @@ BEGIN
         COALESCE(pm.num_assessors_mgr, 0)::int,
         COALESCE(pm.num_assessors_team, 0)::int,
         COALESCE(pm.nps, 0)::int,
+        COALESCE(pm.nps_promoter_pct, 0)::int,
+        COALESCE(pm.nps_passive_pct, 0)::int,
+        COALESCE(pm.nps_detractor_pct, 0)::int,
         (COALESCE(pb.total_spec_comments, 0) + COALESCE(pm.cnt_gen_comments, 0))::int,
         (SELECT cnt FROM global_total)::int,
         p.logo_file,
