@@ -3,6 +3,7 @@
 /* # Modified: 27.11.2025, 18:00 - AP 14: Added utility classes to replace inline JS styles */
 /* # Modified: 02.12.2025, 15:45 - AP 41: New .help-beacon classes replacing .info-trigger for visibility upgrade */
 /* # Modified: 2026-02-16 20:15 - Info-Tiles für Willkommensseite (Datenschutz, Security, CPQI) */
+/* # Modified: 2026-03-13 - AP 59: NPS-Donut, Awareness-Torte entfernt, Kachel-Design für Insights + Header */
 
 /* Reset und Grundlagen */
 * {
@@ -1572,16 +1573,20 @@ input[type=range].slider-neutral {
 }
 
 /* AP 56: Area Distribution - Stacked Bars */
-.count-awareness-stack {
+.count-area-tile {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 8px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 4px 10px 6px;
 }
 
 .area-vbar {
     width: 14px;
-    min-height: 36px;
+    min-height: 52px;
     display: flex;
     flex-direction: column;
     border-radius: 3px;
@@ -1764,6 +1769,31 @@ input[type=range].slider-neutral {
 }
 
 /* --- D: Pills für Insight-Icons --- */
+/* NPS mit Donut darunter */
+.nps-with-pie {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 4px 10px 6px;
+}
+
+.nps-with-pie .nps-display {
+    border: none !important;
+    background: none !important;
+    padding: 0 !important;
+}
+
+.nps-pie {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: #ecf0f1;
+}
+
 .insight-slot-nps .nps-display {
     background: #f8f9fa;
     border-radius: 20px;
@@ -1778,15 +1808,32 @@ input[type=range].slider-neutral {
 .insight-slot-icon .insight-icon,
 .insight-slot-mini .insight-icon {
     background: #f8f9fa;
-    border-radius: 50%;
-    width: 32px;
-    height: 32px;
+    border-radius: 12px;
+    min-width: 32px;
+    min-height: 66px;
+    padding: 4px 8px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border: 1px solid #e9ecef;
     font-size: 1em;
     transition: background-color 0.2s ease;
+}
+
+/* Spalten-Header als Kacheln */
+.score-table-header .criteria-content {
+    display: flex;
+}
+
+.column-header-tile {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 4px 20px;
+    font-weight: 600;
+    text-align: center;
+    box-sizing: border-box;
+    width: 100%;
 }
 
 .insight-slot-icon .insight-icon:hover,

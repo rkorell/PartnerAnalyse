@@ -32,6 +32,7 @@
   # Modified: 2026-03-02 - AP 56: Area Distribution (camelCase Mapping, vBar in row, hBar in modal)
   # Modified: 2026-03-02 - AP 57: Report-Button + openPartnerReport()
   # Modified: 2026-03-10 - AP 58: Partner-Filter Panel (Checkbox-Grid, Suche, Sortierung, getFilteredData)
+  # Modified: 2026-03-13 - AP 59: NPS-Verteilung (Promoter/Passive/Detractor) Mapping, Awareness-Logik entfernt
 */
 
 import { CONFIG } from './config.js';
@@ -649,6 +650,9 @@ document.addEventListener("DOMContentLoaded", function() {
                     awarenessPct: parseInt(row.awareness_pct || 0),
 
                     npsScore: row.nps_score,
+                    npsPromoterPct: parseInt(row.nps_promoter_pct || 0),
+                    npsPassivePct: parseInt(row.nps_passive_pct || 0),
+                    npsDetractorPct: parseInt(row.nps_detractor_pct || 0),
                     commentCount: row.comment_count,
                     maxDivergence: row.max_divergence,
                     hasActionItem: row.has_action_item,
@@ -718,10 +722,6 @@ document.addEventListener("DOMContentLoaded", function() {
             const posWidth = (row.scorePositive / maxBarValue) * 100;
             const negWidth = (row.scoreNegative / maxBarValue) * 100;
 
-            let awColor = '#e74c3c';
-            if (row.awarenessPct >= 80) awColor = '#2ecc71';
-            else if (row.awarenessPct >= 50) awColor = '#f1c40f';
-
             let slot1 = ''; 
             let slot2 = ''; 
             let slot3 = ''; 
@@ -738,7 +738,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     npsColor = CONFIG.COLORS.NPS_PROMOTER;
                 }
                 
-                slot1 = Tpl.getInsightNpsHTML(nps, npsColor);
+                slot1 = Tpl.getInsightNpsHTML(nps, npsColor, row.npsPromoterPct, row.npsPassivePct, row.npsDetractorPct);
             }
 
             const commentCount = parseInt(row.commentCount || 0);
@@ -763,7 +763,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 posWidth, negWidth,
                 posCount: row.countPositive, negCount: row.countNegative,
                 posScore: Math.round(row.scorePositive), negScore: Math.round(row.scoreNegative),
-                awarenessColor: awColor,
                 rank: idx + 1
             });
         });

@@ -16,6 +16,7 @@
   # Modified: 30.11.2025, 11:45 - AP 40: Moved info icon from filter section to result table header
   # Modified: 02.12.2025, 15:45 - AP 41: Changed info-trigger to help-beacon-header class
   # Modified: 2026-03-02 - AP 56: Area Distribution (vBar in row, hBar+legend in modal)
+  # Modified: 2026-03-13 - AP 59: NPS-Donut (Promoter/Detractor/Passive), Awareness-Torte entfernt, Kachel-Design
 */
 
 import { escapeHtml } from './utils.js';
@@ -109,10 +110,10 @@ export function getScoreTableStartHTML(title) {
     </div>
     <div class="criteria-table">
         <div class="criteria-row score-table-header">
-            <div class="criteria-content col-partner">Partner</div>
-            <div class="criteria-content col-score-graph" style="text-align:center;">Partner-Bilanz (Defizit vs. Wert)</div>
-            <div class="criteria-content col-count">Antworten</div>
-            <div class="criteria-content col-insights text-center">Insights</div>
+            <div class="criteria-content col-partner"><span class="column-header-tile">Partner</span></div>
+            <div class="criteria-content col-score-graph" style="text-align:center;"><span class="column-header-tile">Partner-Bilanz (Defizit vs. Wert)</span></div>
+            <div class="criteria-content col-count"><span class="column-header-tile">Antworten</span></div>
+            <div class="criteria-content col-insights text-center"><span class="column-header-tile">Insights</span></div>
         </div>`;
 }
 
@@ -121,12 +122,8 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
     const {
         posWidth, negWidth,
         posCount, negCount,
-        posScore, negScore,
-        awarenessColor
+        posScore, negScore
     } = scaling;
-
-    const awPct = row.awarenessPct || 0;
-    const pieStyle = `background: conic-gradient(${awarenessColor} 0% ${awPct}%, #ecf0f1 ${awPct}% 100%);`;
 
     const txtPos = posWidth > 0 ? `${posScore} (${posCount})` : '';
     const txtNeg = negWidth > 0 ? `${negScore} (${negCount})` : '';
@@ -155,14 +152,10 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
             </div>
         </div>
 
-        <div class="criteria-content col-count" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
-            ${areaVBarHTML}
-            <div class="count-awareness-stack">
+        <div class="criteria-content col-count" style="display:flex; align-items:flex-end; justify-content:center;">
+            <div class="count-area-tile">
+                ${areaVBarHTML}
                 <div style="font-weight:bold; font-size:1.1em;">${row.totalAnswers}</div>
-                <div class="awareness-container" title="Datenqualität: ${awPct}% der Fragen wurden bewertet">
-                    <div class="awareness-pie" style="${pieStyle}"></div>
-                    <span class="awareness-text">${awPct}%</span>
-                </div>
             </div>
         </div>
 
@@ -233,7 +226,7 @@ export function getAreaHBarHTML(areaDistribution, colors) {
 export function getLegendHTML() {
     return `
     <div class="icon-legend-box">
-        <strong class="legend-label">Legende:</strong>
+        <strong class="legend-label">Insights - Symbolerklärung:</strong>
         <span class="legend-item" title="Net Promoter Score - Weiterempfehlungsbereitschaft">📣 NPS</span>
         <span class="legend-item" title="Allgemeine oder spezifische Kommentare vorhanden">💬 Kommentar(e) verfügbar</span>
         <span class="legend-item" title="Strategisch wichtige Kriterien werden schlecht erfüllt">⚠️ Handlungsbedarf</span>
@@ -241,9 +234,18 @@ export function getLegendHTML() {
     </div>`;
 }
 
-export function getInsightNpsHTML(nps, color) {
+export function getInsightNpsHTML(nps, color, promoterPct = 0, passivePct = 0, detractorPct = 0) {
     const sign = nps > 0 ? '+' : '';
-    return `<span class="nps-display" title="NPS Score: ${nps}">📣 <span class="nps-value" style="color:${color};">${sign}${nps}</span></span>`;
+    const p1 = promoterPct;
+    const p2 = promoterPct + passivePct;
+    const detractorDisplay = 100 - promoterPct - passivePct;
+    const pD = promoterPct + detractorPct;
+    const pieStyle = `background: conic-gradient(from 180deg, #2ecc71 0% ${promoterPct}%, #e74c3c ${promoterPct}% ${pD}%, #f1c40f ${pD}% 100%);`;
+    const pieTitle = `Promoter: ${promoterPct}% · Detractor: ${detractorDisplay}% · Passive: ${passivePct}%`;
+    return `<div class="nps-with-pie">
+        <span class="nps-display" title="NPS Score: ${nps}">📣 <span class="nps-value" style="color:${color};">${sign}${nps}</span></span>
+        <div class="nps-pie" style="${pieStyle}" title="${pieTitle}"></div>
+    </div>`;
 }
 
 export function getInsightIconHTML(action, id, title, content) {
