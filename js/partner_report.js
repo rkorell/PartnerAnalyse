@@ -181,8 +181,12 @@ function renderHeader(partner, logoSrc, totalCriteria) {
             <div class="report-kpi-row">
                 <span class="report-kpi">Bewertungen: <strong>${partner.totalAnswers}</strong></span>
                 <span class="report-kpi">Kriterien: <strong>${totalCriteria}</strong></span>
-                <span class="report-kpi">NPS: <strong style="color:${npsColor}">${partner.npsScore > 0 ? '+' : ''}${partner.npsScore}</strong></span>
-                <div class="nps-pie-report" style="${pieStyle}" title="${pieTitle}"></div>
+            </div>
+            <div class="report-kpi-row">
+                <span class="report-kpi">NPS:</span>
+                <div class="nps-pie-report" style="${pieStyle}"></div>
+                <span class="report-kpi"><strong style="color:${npsColor}">${partner.npsScore > 0 ? '+' : ''}${partner.npsScore}</strong></span>
+                <span class="report-kpi" style="color:#555; font-size:0.72em;">Promoter: ${partner.npsPromoterPct}% · Detractor: ${detractorDisplay}% · Passive: ${partner.npsPassivePct}%</span>
             </div>
         </div>
         <div class="report-header-right">
