@@ -25,36 +25,28 @@
 # Modified: 2026-03-13 - Bugfix: Geister-Bewertungen ausschließen (num_assessors + area_distribution mit Feedback-Prüfung)
 # Modified: 2026-03-14 - QS: detractorPct direkt, view_ratings_v2 entfernt
 # Modified: 2026-03-14 - Export: export_raw_data() Funktion für denormalisierten CSV-Dump
+# Modified: 2026-03-14 - DROP-Statements in 0_destroy_database.sql ausgelagert, CREATE TABLE IF NOT EXISTS
+# Modified: 2026-03-14 - Bugfix: get_partner_matrix_details fehlte score IS NOT NULL Filter (verfälschte gewichteten Durchschnitt)
 */
+
+-- Voraussetzung: Datenbank und User müssen vor Ausführung dieses Skripts existieren.
+-- Die CREATE-Befehle stehen (auskommentiert) in /etc/partneranalyse/db_connect.php.
 
 -- pgcrypto für DB-seitiges Hashing (z.B. Migration bestehender IPs)
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-DROP TABLE IF EXISTS admin_users CASCADE;
-DROP TABLE IF EXISTS app_texts CASCADE;
-DROP TABLE IF EXISTS partner_feedback CASCADE;
-DROP TABLE IF EXISTS ratings CASCADE;
-DROP TABLE IF EXISTS participants CASCADE;
-DROP TABLE IF EXISTS criteria CASCADE;
-DROP TABLE IF EXISTS partners CASCADE;
-DROP TABLE IF EXISTS departments CASCADE;
-DROP TABLE IF EXISTS surveys CASCADE;
-DROP FUNCTION IF EXISTS get_department_subtree CASCADE;
-DROP FUNCTION IF EXISTS calculate_partner_bilanz CASCADE;
-DROP FUNCTION IF EXISTS get_partner_matrix_details CASCADE;
-DROP FUNCTION IF EXISTS get_partner_structure_stats CASCADE;
-DROP VIEW IF EXISTS view_ratings_extended CASCADE;
-DROP VIEW IF EXISTS view_survey_fraud CASCADE;
+-- Destruktive Befehle (DROP TABLE/FUNCTION/VIEW) stehen in 0_destroy_database.sql.
+-- Diese Datei ist idempotent: kann auf bestehender DB ausgeführt werden ohne Datenverlust.
 
 -- 1. App Texte (Tooltips & Statische Texte)
-CREATE TABLE app_texts (
+CREATE TABLE IF NOT EXISTS app_texts (
     id SERIAL PRIMARY KEY,
     category VARCHAR(50),
     content TEXT
 );
 
 -- 2. Kampagnen
-CREATE TABLE surveys (
+CREATE TABLE IF NOT EXISTS surveys (
     id SERIAL PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
     start_date DATE,
@@ -65,7 +57,7 @@ CREATE TABLE surveys (
 );
 
 -- 3. Abteilungen (Hierarchie)
-CREATE TABLE departments (
+CREATE TABLE IF NOT EXISTS departments (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     parent_id INTEGER REFERENCES departments(id),
@@ -75,7 +67,7 @@ CREATE TABLE departments (
 );
 
 -- 4. Partner
-CREATE TABLE partners (
+CREATE TABLE IF NOT EXISTS partners (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     be_geo_id INTEGER UNIQUE,
@@ -85,7 +77,7 @@ CREATE TABLE partners (
 );
 
 -- 5. Kriterien
-CREATE TABLE criteria (
+CREATE TABLE IF NOT EXISTS criteria (
     id SERIAL PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
     category VARCHAR(50),
@@ -94,7 +86,7 @@ CREATE TABLE criteria (
 );
 
 -- 6. Teilnehmer
-CREATE TABLE participants (
+CREATE TABLE IF NOT EXISTS participants (
     id SERIAL PRIMARY KEY,
     survey_id INTEGER REFERENCES surveys(id) ON DELETE CASCADE,
     department_id INTEGER REFERENCES departments(id),
@@ -107,7 +99,7 @@ CREATE TABLE participants (
 );
 
 -- 7. Bewertungen
-CREATE TABLE ratings (
+CREATE TABLE IF NOT EXISTS ratings (
     id BIGSERIAL PRIMARY KEY,
     participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
     criterion_id INTEGER REFERENCES criteria(id),
@@ -121,7 +113,7 @@ CREATE TABLE ratings (
 );
 
 -- 8. Partner Feedback (Kopfdaten: Frequenz, NPS, Globaler Kommentar)
-CREATE TABLE partner_feedback (
+CREATE TABLE IF NOT EXISTS partner_feedback (
     id BIGSERIAL PRIMARY KEY,
     participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
     partner_id INTEGER REFERENCES partners(id),
@@ -132,7 +124,7 @@ CREATE TABLE partner_feedback (
 );
 
 -- 9. Authentifizierung (AP 29.1)
-CREATE TABLE admin_users (
+CREATE TABLE IF NOT EXISTS admin_users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL
@@ -450,6 +442,7 @@ BEGIN
         JOIN relevant_participants rp ON r.participant_id = rp.id
         LEFT JOIN partner_feedback pf ON r.participant_id = pf.participant_id AND r.partner_id = pf.partner_id
         WHERE r.partner_id = p_partner_id AND r.rating_type = 'performance'
+          AND r.score IS NOT NULL
         GROUP BY r.criterion_id
     ),
     -- Importance: Einfacher Durchschnitt

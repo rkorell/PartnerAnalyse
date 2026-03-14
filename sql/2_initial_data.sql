@@ -194,8 +194,10 @@ SELECT setval('surveys_id_seq', (SELECT MAX(id) FROM surveys));
 
 -- ============================================================================
 -- APP_TEXTS (Info-Modals, 6 Stück)
+-- Stand: 2026-03-14
 -- ============================================================================
 
+-- 1. entry-mask (Wizard: Methodik & Zielsetzung)
 INSERT INTO app_texts (id, category, content) VALUES
 (1, 'entry-mask', $$<h3>Methodik & Zielsetzung</h3>
 
@@ -240,9 +242,279 @@ INSERT INTO app_texts (id, category, content) VALUES
 </p>
 <BR>$$);
 
--- Hinweis: analytic-mask, nps-explanation, fraud-detection, dsgvo-info und csv-export
--- sind lange HTML-Texte. Sie werden über die Survey-Admin-Oberfläche oder direkt
--- in der Datenbank gepflegt. Die vollständigen Inhalte sind im pg_dump-Backup enthalten.
--- Für eine Neuinstallation müssen sie manuell aus dem Backup eingespielt werden.
+-- 2. analytic-mask (Analyse: Lesehilfe & Methodik)
+INSERT INTO app_texts (id, category, content) VALUES
+(34, 'analytic-mask', $$<div class="help-content">
+    <p style="text-align: center; font-style: italic;">
+        Eine ausf&uuml;hrliche Anleitung zur Analyse findest Du im
+        <a href="docs/CPQI_Analyse_Anleitung.pdf" target="_blank">Analyse-Leitfaden (PDF)</a>.
+    </p>
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+    <h2 class="modal-headline">So liest Du die Partner-Bilanz (Diverging Bar Chart)</h2>
+
+    <h3>Wichtig vorab: Gruppenkonsens</h3>
+    <p>
+        Diese Analyse zeigt nicht die Meinung eines Einzelnen, sondern den <strong>Gruppenkonsens</strong> &ndash;
+        die kumulierte und gemittelte Gesamtbewertung aller Teilnehmer. Jeder Balken, jeder Score und jede
+        Rangfolge basiert auf der aggregierten Einsch&auml;tzung der gesamten Befragungsgruppe. Damit bildet diese
+        Darstellung ab, wie die Organisation als Ganzes die Zusammenarbeit mit ihren Partnern bewertet.
+    </p>
+
+    <h3>Das Prinzip: Belastung vs. Wertbeitrag</h3>
+    <p>
+        Anstatt eines einfachen Durchschnittswerts zeigt diese Grafik eine <strong>Bilanz</strong> der Zusammenarbeit.
+        Sie stellt die Schw&auml;chen eines Partners (Belastung, links) direkt seinen St&auml;rken (Wertbeitrag, rechts) gegen&uuml;ber.
+    </p>
+    <p>Die Balken wachsen von der neutralen Mitte (0) in zwei Richtungen:</p>
+
+    <div style="margin-bottom: 20px;">
+        <h4 style="color: #e74c3c;">1. Der Rote Balken (Links): Das Strategische Defizit</h4>
+        <ul>
+            <li><strong>Was er zeigt:</strong> Die Summe aller negativen Leistungen, gewichtet nach der Wichtigkeit, die die Befragungsgruppe diesen Kriterien beimisst.</li>
+            <li><strong>Bedeutung:</strong> Je l&auml;nger dieser Balken nach links reicht, desto mehr bremst der Partner die strategischen Ziele der Organisation (&bdquo;Liability&ldquo;).</li>
+            <li><strong>Entstehung:</strong> Schwache Leistung (1&ndash;2) in Themen, die der Gruppe wichtig sind.</li>
+        </ul>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <h4 style="color: #2ecc71;">2. Der Gr&uuml;ne Balken (Rechts): Der Strategische Wertbeitrag</h4>
+        <ul>
+            <li><strong>Was er zeigt:</strong> Die Summe aller positiven Leistungen, gewichtet nach der Wichtigkeit, die die Befragungsgruppe diesen Kriterien beimisst.</li>
+            <li><strong>Bedeutung:</strong> Je l&auml;nger dieser Balken nach rechts reicht, desto mehr zahlt der Partner auf die strategischen Ziele der Organisation ein (&bdquo;Asset&ldquo;).</li>
+            <li><strong>Entstehung:</strong> Starke Leistung (4&ndash;5) in Themen, die der Gruppe wichtig sind.</li>
+        </ul>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+    <h3>Die Zahl in Klammern: (Anzahl der Themen)</h3>
+    <p>
+        Neben jedem Balken steht eine Zahl, z.B. <code>(3)</code>. Sie zeigt, aus wie vielen einzelnen Kriterien
+        sich der Balken zusammensetzt &ndash; und damit, wie <strong>breit oder fokussiert</strong> das Urteil der Gruppe ist:
+    </p>
+    <ul>
+        <li><strong>Hohe Anzahl (z.B. 12):</strong> Die St&auml;rke oder Schw&auml;che zieht sich durch viele Bereiche der Zusammenarbeit &ndash; ein systematisches Muster.</li>
+        <li><strong>Niedrige Anzahl (z.B. 3):</strong> Das Ergebnis konzentriert sich auf wenige spezifische Felder. Der Partner wird in einem begrenzten, aber klar definierten Bereich positiv oder negativ bewertet.</li>
+    </ul>
+
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+    <h3>F&uuml;nf Partner-Archetypen als Orientierung</h3>
+    <ul style="list-style-type: none; padding-left: 0;">
+        <li style="margin-bottom: 15px;">
+            <strong>Der Solide</strong> <em>(Lang Gr&uuml;n / Kurz oder Kein Rot)</em><br>
+            Das ist der Wunschpartner. Stark ausgepr&auml;gtes Gr&uuml;n &uuml;ber viele Kriterien hinweg bei wenig oder keinem Rot.
+            Hoher Score, hohes Potenzial, hohe Loyalit&auml;t und Leistungsf&auml;higkeit. Dieser Partner zahlt breit und verl&auml;sslich
+            auf die strategischen Ziele der Organisation ein. Die Zusammenarbeit funktioniert &ndash; und zwar nicht nur punktuell,
+            sondern in der Fl&auml;che. Pflegen, wertsch&auml;tzen, ausbauen.
+        </li>
+        <li style="margin-bottom: 15px;">
+            <strong>Der Spezialist</strong> <em>(Kurz bis Mittel Gr&uuml;n / Kein Rot)</em><br>
+            Kein Fl&auml;chenspieler, aber dort, wo er antritt, ist er exzellent. Dieser Partner hat einige wenige Kriterien
+            mit hoher Importance, in denen er herausragend abschneidet &ndash; und keine Schw&auml;chen. Typisch f&uuml;r
+            technologiefokussierte Spezialistenpartner, die in ihrem Fachgebiet verl&auml;sslich Top-Leistung bringen.
+            Der gr&uuml;ne Balken ist nicht der l&auml;ngste, aber er ist frei von rotem Gegengewicht. Ein wertvoller Partner
+            in seinem Segment.
+        </li>
+        <li style="margin-bottom: 15px;">
+            <strong>Der Stratege ohne Execution</strong> <em>(Lang Gr&uuml;n / Lang Rot)</em><br>
+            Ein Partner mit zwei Gesichtern. Er liefert in wichtigen strategischen Feldern exzellente Ergebnisse &ndash;
+            die gr&uuml;ne Seite ist beeindruckend. Gleichzeitig zeigt die ebenso ausgepr&auml;gte rote Seite, dass es im
+            operativen Bereich erhebliche Schw&auml;chen gibt. Strategisch brillant, in der Umsetzung mit Defiziten.
+            Die Handlungsempfehlung ist klar: Nicht trennen (daf&uuml;r ist das Gr&uuml;n zu wertvoll), sondern die spezifischen
+            roten Blocker gezielt identifizieren und weg-managen.
+        </li>
+        <li style="margin-bottom: 15px;">
+            <strong>Der Sanierungsfall</strong> <em>(Lang Rot / Kurz oder Kein Gr&uuml;n)</em><br>
+            Dieser Partner verursacht deutlich mehr strategische Belastung, als er Wertbeitrag liefert. Die roten Balken
+            dominieren, w&auml;hrend auf der gr&uuml;nen Seite wenig bis nichts zu finden ist. In den Bereichen, die der Gruppe
+            wichtig sind, bleibt er systematisch hinter den Erwartungen zur&uuml;ck &ndash; nicht nur punktuell, sondern strukturell.
+            Hier besteht akuter Handlungsbedarf: Ein strukturiertes Gespr&auml;ch &uuml;ber die Zusammenarbeit ist dringend angeraten,
+            bevor sich die Defizite weiter verfestigen.
+        </li>
+        <li style="margin-bottom: 15px;">
+            <strong>Der Konflikt</strong> <em>(Unterschiedliche Bewertung je nach Perspektive)</em><br>
+            Dieser Archetyp f&auml;llt nicht durch die Balkenl&auml;nge auf, sondern durch eine <strong>Diskrepanz zwischen
+            Management- und Team-Bewertung</strong>. Zwei Szenarien: (1)&nbsp;Das Management ist begeistert &ndash;
+            der Partner macht einen tollen Job auf Entscheider-Ebene &ndash; aber das Team sagt: &bdquo;Der liefert nicht.&ldquo;
+            (2)&nbsp;Umgekehrt: Das Team sch&auml;tzt die operative Zusammenarbeit, aber das Management sieht keinen strategischen
+            Mehrwert. Der Konflikt wird am Divergenz-Symbol im Ranking sichtbar. Der Filter (Alle / Manager / Team)
+            macht die unterschiedlichen Perspektiven transparent.
+        </li>
+    </ul>
+
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+    <p style="text-align: center; font-style: italic;">
+        Eine ausf&uuml;hrliche Anleitung zur Analyse findest Du im
+        <a href="docs/CPQI_Analyse_Anleitung.pdf" target="_blank">Analyse-Leitfaden (PDF)</a>.
+    </p>
+</div>$$);
+
+-- 3. nps-explanation (Wizard: NPS-Erklärung, Schwellenwerte ≥7/≤4)
+INSERT INTO app_texts (id, category, content) VALUES
+(36, 'nps-explanation', $$<div class="info-content">
+    <h3>Der Net Promoter Score (NPS)</h3>
+    <p>
+        Im Rahmen unserer Partnerbewertung stellen wir Dir eine zentrale Frage:
+        <em>"Wie wahrscheinlich ist es, dass Du diesen Partner einem anderen Cisco-Kollegen weiterempfehlen würdest?"</em>
+    </p>
+    <p>
+        Diese Frage liefert uns den <strong>NPS</strong>. Er ist ein weltweit etablierter Standard, um die Loyalität und die Qualität der Geschäftsbeziehung zu messen – er geht damit über eine reine Momentaufnahme der Zufriedenheit hinaus.
+    </p>
+
+    <h4>Die Einteilung der Antworten:</h4>
+    <p>Deine Bewertung auf der Skala von 0 bis 10 klassifiziert den Partner in eine von drei Kategorien:</p>
+    <ul>
+        <li>
+            <strong style="color: #2ecc71;">🟢 Promotoren (7 – 10):</strong>
+            Diese Partner sind unsere strategischen "Fürsprecher". Sie sind hochgradig loyal, treiben gemeinsame Innovationen voran und empfehlen Cisco aktiv weiter.
+        </li>
+        <li>
+            <strong style="color: #f1c40f;">🟡 Passive (5 – 6):</strong>
+            Diese Gruppe verhält sich neutral. Sie sind zufrieden, aber nicht emotional an uns gebunden. Sie sind anfällig für Wettbewerbsangebote und treiben das Geschäft oft nur reaktiv voran.
+        </li>
+        <li>
+            <strong style="color: #e74c3c;">🔴 Detraktoren (0 – 4):</strong>
+            Hier liegt eine Störung in der Geschäftsbeziehung vor. Diese Kritiker sind unzufrieden, was unserem Ruf oder dem gemeinsamen Wachstum schaden kann. Hier besteht Handlungsbedarf.
+        </li>
+    </ul>
+
+    <h4>Angepasste Schwellenwerte:</h4>
+    <p>
+        Die klassische NPS-Methodik nach Reichheld (2003) verwendet die Schwellenwerte ≥ 9 / ≤ 6,
+        die aus der Endkunden-Zufriedenheitsmessung stammen. Im internen Kontext der Partner-Zusammenarbeit
+        ist die Bewertungsskala erfahrungsgemäß moderater — eine 7 bedeutet hier bereits hohe Zufriedenheit,
+        nicht bloße Neutralität. Die verschobenen Schwellenwerte (≥ 7 / ≤ 4) bilden die interne
+        Bewertungskultur realistischer ab.
+    </p>
+
+    <h4>Die Berechnungsformel:</h4>
+    <p>
+        Der NPS ist kein einfacher Durchschnittswert. Er berechnet sich aus dem Verhältnis der positiven zu den negativen Stimmen. Die "Passiven" fließen nicht in den Wert ein.
+    </p>
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; margin: 15px 0; font-weight: bold; border: 1px solid #ddd; color: #2c3e50;">
+        NPS = (% Promotoren) — (% Detraktoren)
+    </div>
+    <p>
+        Das Ergebnis ist eine Kennzahl zwischen <strong>-100</strong> (alle sind Kritiker) und <strong>+100</strong> (alle sind Promotoren). Ein Wert über 0 gilt als gut, Werte über +50 als exzellent.
+    </p>
+
+    <h4>Sinn und Zweck für den Quality Index:</h4>
+    <p>
+        Der NPS fungiert als unser strategisches <strong>Barometer</strong>. Während die Detail-Kriterien die operativen Fakten messen, quantifiziert der NPS das Vertrauen in die Partnerschaft.
+    </p>
+    <p>
+        Ein hoher NPS identifiziert Partner, die als Multiplikatoren für unsere Strategie wirken. Ein niedriger NPS dient als Frühwarnsystem für strukturelle Konflikte, noch bevor diese in den Umsatzzahlen sichtbar werden.
+    </p>
+</div>$$);
+
+-- 4. fraud-detection (Analyse: Fraud-Detection Erklärung)
+INSERT INTO app_texts (id, category, content) VALUES
+(37, 'fraud-detection', $$<div class="help-content">
+    <h2 class="modal-headline">Survey-Fraud-Detection</h2>
+
+    <p>Die Fraud-Detection identifiziert Bewertungen, die auf <strong>Manipulation</strong> oder <strong>nachlässiges Ausfüllen</strong> (Satisficing) hindeuten. Sie basiert auf drei Qualitätsindikatoren:</p>
+
+    <h3>Severity 3 – IP-Duplikate <span style="color:#c0392b;">(starke Indikation)</span></h3>
+    <p>Mehrere Bewertungen von derselben IP-Adresse innerhalb einer Survey. Dies kann auf Mehrfach-Abgaben durch dieselbe Person hindeuten. IP-Adressen werden nur als anonymisierter Hash gespeichert – eine Identifizierung der Person ist nicht möglich.</p>
+
+    <h3>Severity 2 – Häufung identischer Bewertungen <span style="color:#e67e22;">(Verdacht)</span></h3>
+    <p>Alle Kriterien wurden mit demselben Wert bewertet (z.B. durchgängig 5). In der Forschung als "Straightlining" bekannt – typisches Zeichen für fehlende inhaltliche Auseinandersetzung mit den Fragen.</p>
+
+    <h3>Severity 1 – Extreme Scores <span style="color:#f1c40f;">(Hinweis)</span></h3>
+    <p>Durchgängig Extremwerte (nur 1 oder nur 5) ohne weitere Auffälligkeiten. Kann legitim sein, ist aber prüfenswert.</p>
+
+    <h3>So arbeitest Du mit der Fraud-Detection</h3>
+    <p>Die Liste zeigt alle auffälligen Bewertungen, sortiert nach Schweregrad. IP-Duplikate erscheinen als Cluster – eine Zeile fasst alle Bewertungen derselben IP zusammen.</p>
+
+    <p><em>Schritt 1 – Sichten:</em> Klappe die Liste auf und verschaffe Dir einen Überblick. Die Severity-Badges (rot / orange / gelb) zeigen die Gewichtung der Indikation.</p>
+
+    <p><em>Schritt 2 – Bewerten:</em> Prüfe die Indikationen im Kontext. Ein Cluster mit 13 identischen Höchstbewertungen für denselben Partner wiegt anders als zwei Bewertungen von derselben IP mit unterschiedlichen Profilen.</p>
+
+    <p><em>Schritt 3 – Ausschließen:</em> Markiere die Bewertungen, die Du aus der Analyse herausnehmen möchtest, per Checkbox. Der Button zeigt die Anzahl der betroffenen Bewertungen. Nach dem Ausschluss wird das Scoring automatisch neu berechnet.</p>
+
+    <p><em>Schritt 4 – Ergebnis vergleichen:</em> Beobachte, wie sich das Ranking verändert. Verschiebt ein Partner mehrere Plätze, war der Einfluss der ausgeschlossenen Bewertungen signifikant – und der Ausschluss vermutlich berechtigt.</p>
+
+    <p><em>Zurücksetzen:</em> Alle Ausschlüsse können jederzeit über "Ausschlüsse zurücksetzen" rückgängig gemacht werden. Nichts geht verloren.</p>
+
+    <h3>Einordnung</h3>
+    <p>Die Indikationen sind Hinweise, keine Urteile. Die Entscheidung über den Ausschluss liegt beim Analysten. Nicht jede Auffälligkeit ist Manipulation – aber jede verdient einen zweiten Blick.</p>
+</div>$$);
+
+-- 5. dsgvo-info (Beide Seiten: Datenschutz & Sicherheit)
+INSERT INTO app_texts (id, category, content) VALUES
+(38, 'dsgvo-info', $$<div class="help-content">
+    <h2 class="modal-headline">Datenschutz &amp; Sicherheit</h2>
+
+    <p>Die CPQI-Erhebung ist <strong>vollständig anonym</strong>. Es werden weder Name noch E-Mail-Adresse erfasst.</p>
+
+    <h3>Was wird gespeichert?</h3>
+    <ul>
+        <li><strong>Deine Bewertungen</strong> (Skala 1-5) und optionale Kommentare</li>
+        <li><strong>Abteilung und Rolle</strong> (Manager ja/nein) – für die Auswertung nach Gruppen</li>
+        <li><strong>IP-Adresse</strong> – ausschließlich als anonymisierter Hash (SHA-256 mit Salt). Der Klartext wird nicht gespeichert und ist nicht rekonstruierbar.</li>
+    </ul>
+
+    <h3>Was wird <em>nicht</em> gespeichert?</h3>
+    <ul>
+        <li>Kein Name, keine E-Mail-Adresse</li>
+        <li>Keine Cookies, kein Browser-Fingerprinting</li>
+        <li>Keine Tracking-Daten</li>
+    </ul>
+
+    <h3>Wozu der IP-Hash?</h3>
+    <p>Der anonymisierte Hash dient ausschließlich der Qualitätssicherung: Er ermöglicht die Erkennung von Mehrfach-Abgaben (Fraud-Detection), ohne dass Rückschlüsse auf einzelne Personen möglich sind.</p>
+
+    <h3>Technische Maßnahmen</h3>
+    <ul>
+        <li>Verschlüsselte Übertragung (HTTPS/TLS)</li>
+        <li>CSRF-Schutz gegen externe Angriffe</li>
+        <li>Datenbank-Credentials und Salt außerhalb des Webroots</li>
+        <li>Apache-Logs mit anonymisierter IP (letztes Oktett entfernt, 7 Tage Aufbewahrung)</li>
+    </ul>
+
+    <h3>Rechtsrahmen</h3>
+    <p>Das Sicherheitskonzept orientiert sich an der <strong>DSGVO</strong> (Art. 5, 25, 32), den <strong>BSI-Richtlinien</strong> (TR-02102, APP.3.1) und den <strong>OWASP</strong>-Empfehlungen. Das vollständige Konzept mit Quellenverzeichnis steht als PDF zur Verfügung:</p>
+
+    <p style="text-align: center; margin-top: 15px;">
+        <a href="docs/CPQI_Security_Konzept.pdf" target="_blank" style="display: inline-block; padding: 10px 24px; background: #049fd9; color: white; border-radius: 8px; text-decoration: none; font-weight: bold;">📄 Security-Konzept (PDF)</a>
+    </p>
+</div>$$);
+
+-- 6. csv-export (Analyse: Export-Spaltenreferenz)
+INSERT INTO app_texts (id, category, content) VALUES
+(39, 'csv-export', $$
+<h3>CSV-Export — Datenformat</h3>
+<p>Der Export enthält die <strong>denormalisierten Rohdaten</strong> der aktuellen Filterauswahl. Jede Zeile entspricht einer einzelnen Bewertung (Teilnehmer × Partner × Kriterium).</p>
+
+<table style="width:100%; border-collapse:collapse; font-size:0.9em; margin:12px 0;">
+<tr style="background:#2c3e50; color:white;"><th style="padding:6px 8px; text-align:left;">Spalte</th><th style="padding:6px 8px; text-align:left;">Bedeutung</th></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Teilnehmer_ID</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Anonyme laufende Nummer des Bewertenden</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Abteilung</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Zugehörige Abteilung</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Rolle_Manager_JN</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Ja = Manager, Nein = Team-Mitglied</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Partner</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Bewerteter Partner</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Partnergruppe</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Sortiergruppe (1 = Top-Partner)</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Kriterium</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Bewertetes Qualitätskriterium</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Kriterium_Nr</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Sortierung des Kriteriums</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Performance_Rohwert_1-5</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Bewertung: 1 (schlecht) bis 5 (sehr gut), leer = keine Aussage</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Interaktionshaeufigkeit_1-4</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">1 = selten bis 4 = sehr häufig</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Performance_x_Haeufigkeit</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Rohwert × Häufigkeit (für gewichteten Ø in Pivot)</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Importance_Mittelwert_1-5</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Durchschnittliche Wichtigkeit des Kriteriums (über alle Teilnehmer)</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Importance_Faktor_0-12</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Stufenmodell: Note 5→12, 4→7, 3→4, 2→2, sonst→0</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Impact_Faktor_x_Abweichung</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Importance_Faktor × (Rohwert − 3,0). Positiv = Stärke, negativ = Schwäche</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>NPS_Wert_0-10</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Net Promoter Score: ≥7 Promoter, ≤4 Detractor, 5-6 Passiv</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Kommentar_Kriterium</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Freitext zum einzelnen Kriterium</td></tr>
+<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;"><strong>Kommentar_Partner</strong></td><td style="padding:4px 8px; border-bottom:1px solid #eee;">Allgemeiner Freitext zum Partner</td></tr>
+</table>
+
+<h4>Gewichteter Durchschnitt in Excel Pivot</h4>
+<p>Für den häufigkeitsgewichteten Performance-Durchschnitt:<br>
+<code>= SUMME(Performance_x_Haeufigkeit) / SUMME(Interaktionshaeufigkeit_1-4)</code></p>
+
+<h4>Score-Berechnung</h4>
+<p>Der CPQI-Score pro Partner ergibt sich als Summe aller Impact-Werte:<br>
+<code>Score = Σ Impact_Faktor_x_Abweichung</code></p>
+$$);
 
 SELECT setval('app_texts_id_seq', (SELECT MAX(id) FROM app_texts));
