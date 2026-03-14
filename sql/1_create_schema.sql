@@ -22,6 +22,7 @@
 # Modified: 2026-03-02 - AP 56: display_order in departments, get_area_distribution() Funktion
 # Modified: 2026-03-02 - AP 57: logo_file in partners, calculate_partner_bilanz() erweitert
 # Modified: 2026-03-13 - AP 59: NPS-Schwellen (Promoter ≥7, Detractor ≤4), NPS-Verteilung (3 neue Spalten)
+# Modified: 2026-03-13 - Bugfix: Geister-Bewertungen ausschließen (num_assessors + area_distribution mit Feedback-Prüfung)
 */
 
 -- pgcrypto für DB-seitiges Hashing (z.B. Migration bestehender IPs)
@@ -337,9 +338,10 @@ BEGIN
     partner_meta AS (
         SELECT
             r.partner_id,
-            COUNT(DISTINCT r.participant_id) as num_assessors,
-            COUNT(DISTINCT r.participant_id) FILTER (WHERE rp.is_manager) as num_assessors_mgr,
-            COUNT(DISTINCT r.participant_id) FILTER (WHERE NOT rp.is_manager) as num_assessors_team,
+            -- Nur echte Assessoren zählen: hat Score ODER hat Feedback (Geister-Bewertungen ausschließen)
+            COUNT(DISTINCT r.participant_id) FILTER (WHERE r.score IS NOT NULL OR pf.participant_id IS NOT NULL) as num_assessors,
+            COUNT(DISTINCT r.participant_id) FILTER (WHERE rp.is_manager AND (r.score IS NOT NULL OR pf.participant_id IS NOT NULL)) as num_assessors_mgr,
+            COUNT(DISTINCT r.participant_id) FILTER (WHERE NOT rp.is_manager AND (r.score IS NOT NULL OR pf.participant_id IS NOT NULL)) as num_assessors_team,
             ROUND(100.0 * (COUNT(DISTINCT CASE WHEN pf.nps_score >= 7 THEN pf.participant_id END) -
                            COUNT(DISTINCT CASE WHEN pf.nps_score <= 4 THEN pf.participant_id END)) /
                            NULLIF(COUNT(DISTINCT CASE WHEN pf.nps_score IS NOT NULL THEN pf.participant_id END), 0), 0) as nps,
@@ -605,8 +607,9 @@ BEGIN
         SELECT DISTINCT r.partner_id, r.participant_id, rp.department_id
         FROM ratings r
         JOIN relevant_participants rp ON r.participant_id = rp.id
+        LEFT JOIN partner_feedback pf ON r.participant_id = pf.participant_id AND r.partner_id = pf.partner_id
         WHERE r.rating_type = 'performance'
-          AND r.score IS NOT NULL
+          AND (r.score IS NOT NULL OR pf.participant_id IS NOT NULL)
     )
     SELECT
         pa.id::int,

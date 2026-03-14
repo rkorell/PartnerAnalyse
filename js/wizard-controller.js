@@ -16,6 +16,7 @@
   # Modified: 30.11.2025, 10:04 - AP 38: Added openInfoModal() method for app_texts integration
   # Modified: 2026-02-13 - AP 48: Survey date validation (start_date/end_date) with overlay block
   # Modified: 2026-02-14 - AP 50: Header 3-Spalten-Layout (insertLogo angepasst für header-logo-left Container)
+  # Modified: 2026-03-13 - Bugfix: Geister-Bewertungen durch State-Verwaisung (Submit-Filter + State-Bereinigung)
 */
 
 import { CONFIG } from './config.js';
@@ -460,14 +461,23 @@ export class WizardController {
 
         // Zusammenführen
         this.selectedPartners = [...hiddenSelected, ...visibleSelected];
-        
+
+        // Verwaiste State-Daten für abgewählte Partner entfernen
+        const currentIds = new Set(this.selectedPartners.map(p => String(p.id)));
+        for (const pId in this.performanceData) {
+            if (!currentIds.has(String(pId))) delete this.performanceData[pId];
+        }
+        for (const pId in this.partnerFeedback) {
+            if (!currentIds.has(String(pId))) delete this.partnerFeedback[pId];
+        }
+
         document.getElementById('selected-partners-count').textContent = this.selectedPartners.length;
-        
+
         const nextBtn = document.getElementById('next-btn');
         if (this.currentStep === 3) {
             nextBtn.disabled = this.selectedPartners.length === 0;
         }
-        this._updateButtonState(nextBtn, !nextBtn.disabled); 
+        this._updateButtonState(nextBtn, !nextBtn.disabled);
     }
     
     // --- EVALUATION & PARTNER FLOW ---
@@ -740,22 +750,26 @@ export class WizardController {
         toggleGlobalLoader(true);
         
         try {
+            // Nur ausgewählte Partner senden (verhindert Geister-Bewertungen durch State-Verwaisung)
+            const selectedIds = new Set(this.selectedPartners.map(p => String(p.id)));
+
             const performanceData = {};
             for (const partnerId in this.performanceData) {
+                if (!selectedIds.has(String(partnerId))) continue;
                 performanceData[partnerId] = {};
                 for (const critId in this.performanceData[partnerId]) {
-                    const data = this.performanceData[partnerId][critId];
-                    performanceData[partnerId][critId] = data; 
+                    performanceData[partnerId][critId] = this.performanceData[partnerId][critId];
                 }
             }
 
             const partnerFeedbackMapped = {};
             for (const pId in this.partnerFeedback) {
+                if (!selectedIds.has(String(pId))) continue;
                 const fb = this.partnerFeedback[pId];
                 partnerFeedbackMapped[pId] = {
                     frequency: fb.frequency,
                     nps: fb.nps,
-                    general_comment: fb.generalComment 
+                    general_comment: fb.generalComment
                 };
             }
 
