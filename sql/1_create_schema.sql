@@ -23,6 +23,8 @@
 # Modified: 2026-03-02 - AP 57: logo_file in partners, calculate_partner_bilanz() erweitert
 # Modified: 2026-03-13 - AP 59: NPS-Schwellen (Promoter ≥7, Detractor ≤4), NPS-Verteilung (3 neue Spalten)
 # Modified: 2026-03-13 - Bugfix: Geister-Bewertungen ausschließen (num_assessors + area_distribution mit Feedback-Prüfung)
+# Modified: 2026-03-14 - QS: detractorPct direkt, view_ratings_v2 entfernt
+# Modified: 2026-03-14 - Export: export_raw_data() Funktion für denormalisierten CSV-Dump
 */
 
 -- pgcrypto für DB-seitiges Hashing (z.B. Migration bestehender IPs)
@@ -627,6 +629,111 @@ BEGIN
       AND EXISTS (SELECT 1 FROM partner_participants pp2 WHERE pp2.partner_id = pa.id)
     GROUP BY pa.id, pa.name, s.id, s.name, s.display_order
     ORDER BY pa.name, s.display_order;
+END;
+$$ LANGUAGE plpgsql;
+
+
+/* Funktion: export_raw_data (AP 60)
+   Zweck: Denormalisierter Rohdaten-Export für Excel-Pivot-Analyse.
+   Eine Zeile pro Teilnehmer × Partner × Kriterium.
+   Importance als Mittelwert denormalisiert, Performance gewichtet berechnet.
+   Filter identisch mit calculate_partner_bilanz + optionaler Partner-Filter.
+*/
+CREATE OR REPLACE FUNCTION export_raw_data(
+    p_survey_ids INT[],
+    p_dept_ids INT[],
+    p_manager_filter TEXT,
+    p_min_answers INT,
+    p_exclude_ids INT[] DEFAULT '{}',
+    p_partner_ids INT[] DEFAULT '{}'
+)
+RETURNS TABLE (
+    teilnehmer_id INT,
+    abteilung VARCHAR,
+    rolle_manager BOOLEAN,
+    partner VARCHAR,
+    partnergruppe INT,
+    kriterium VARCHAR,
+    kriterium_nr INT,
+    performance_rohwert INT,
+    interaktionshaeufigkeit INT,
+    performance_x_haeufigkeit INT,
+    importance_mittelwert NUMERIC,
+    importance_faktor INT,
+    impact NUMERIC,
+    nps_wert INT,
+    kommentar_kriterium TEXT,
+    kommentar_partner TEXT
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH
+    relevant_participants AS (
+        SELECT p.id, p.is_manager, p.department_id
+        FROM participants p
+        WHERE p.survey_id = ANY(p_survey_ids)
+          AND p.department_id IN (SELECT id FROM get_department_subtree(p_dept_ids))
+          AND p.id != ALL(p_exclude_ids)
+          AND (
+              p_manager_filter = 'alle'
+              OR (p_manager_filter = 'nur_manager' AND p.is_manager = TRUE)
+              OR (p_manager_filter = 'nur_nicht_manager' AND p.is_manager = FALSE)
+          )
+    ),
+    avg_importance AS (
+        SELECT
+            r.criterion_id,
+            ROUND(AVG(r.score)::numeric, 2) as avg_imp,
+            CASE ROUND(AVG(r.score))
+                WHEN 5 THEN 12 WHEN 4 THEN 7 WHEN 3 THEN 4 WHEN 2 THEN 2 ELSE 0
+            END as imp_factor
+        FROM ratings r
+        JOIN relevant_participants rp ON r.participant_id = rp.id
+        WHERE r.rating_type = 'importance'
+        GROUP BY r.criterion_id
+    ),
+    eligible_partners AS (
+        SELECT r.partner_id
+        FROM ratings r
+        JOIN relevant_participants rp ON r.participant_id = rp.id
+        LEFT JOIN partner_feedback pf ON r.participant_id = pf.participant_id AND r.partner_id = pf.partner_id
+        WHERE r.rating_type = 'performance'
+          AND (r.score IS NOT NULL OR pf.participant_id IS NOT NULL)
+        GROUP BY r.partner_id
+        HAVING COUNT(DISTINCT r.participant_id) >= p_min_answers
+    )
+    SELECT
+        r.participant_id::int,
+        d.name::varchar,
+        rp.is_manager,
+        pa.name::varchar,
+        pa.sortgroup::int,
+        c.name::varchar,
+        c.sort_order::int,
+        r.score::int,
+        pf.interaction_frequency::int,
+        (CASE WHEN r.score IS NOT NULL AND pf.interaction_frequency IS NOT NULL
+              THEN r.score * pf.interaction_frequency
+              ELSE NULL END)::int,
+        ai.avg_imp,
+        ai.imp_factor::int,
+        (CASE WHEN r.score IS NOT NULL AND ai.imp_factor IS NOT NULL
+              THEN ROUND((r.score - 3.0) * ai.imp_factor, 2)
+              ELSE NULL END)::numeric,
+        pf.nps_score::int,
+        r.comment::text,
+        pf.general_comment::text
+    FROM ratings r
+    JOIN relevant_participants rp ON r.participant_id = rp.id
+    JOIN departments d ON rp.department_id = d.id
+    JOIN partners pa ON r.partner_id = pa.id
+    JOIN criteria c ON r.criterion_id = c.id
+    LEFT JOIN avg_importance ai ON r.criterion_id = ai.criterion_id
+    LEFT JOIN partner_feedback pf ON r.participant_id = pf.participant_id AND r.partner_id = pf.partner_id
+    JOIN eligible_partners ep ON r.partner_id = ep.partner_id
+    WHERE r.rating_type = 'performance'
+      AND (ARRAY_LENGTH(p_partner_ids, 1) IS NULL OR r.partner_id = ANY(p_partner_ids))
+    ORDER BY pa.name, c.sort_order, r.participant_id;
 END;
 $$ LANGUAGE plpgsql;
 

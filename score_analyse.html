@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CPQI - Score Analyse</title>
-    <link rel="stylesheet" href="css/style.css?v=58">
+    <link rel="stylesheet" href="css/style.css">
     <style>
         .filter-row { display: flex; gap: 24px; margin-bottom: 18px; }
         .filter-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -60,7 +60,7 @@
             <div class="analyse-btn-row">
                 <form id="analyse-filter-form" autocomplete="off" style="display:inline;">
                     <button type="submit" id="analyse-btn" class="btn btn-primary">Analysieren</button>
-                    <button type="button" id="export-btn" class="btn btn-secondary" disabled style="margin-left: 10px;">Export nach Excel</button>
+                    <button type="button" id="export-btn" class="btn btn-secondary" disabled style="margin-left: 10px;">Export nach Excel</button><span onclick="window.openInfoModal('csv-export')" title="Export-Info" style="display:inline-block; width:22px; height:22px; background:#F5A623; color:#fff; border-radius:50%; text-align:center; line-height:22px; font-family:Georgia,serif; font-weight:bold; font-style:italic; font-size:13px; cursor:pointer; margin-left:6px; vertical-align:middle; box-shadow:0 1px 3px rgba(0,0,0,0.15);">i</span>
                     <button type="button" id="report-btn" class="btn btn-secondary" disabled style="margin-left: 10px;">Bericht erstellen</button>
                 </form>
             </div>
@@ -116,7 +116,7 @@
         </div>
     </div>
 
-    <script type="module" src="js/score_analyse.js?v=58"></script>
+    <script type="module" src="js/score_analyse.js"></script>
 
 </body>
 </html>

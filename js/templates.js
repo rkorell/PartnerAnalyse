@@ -17,6 +17,7 @@
   # Modified: 02.12.2025, 15:45 - AP 41: Changed info-trigger to help-beacon-header class
   # Modified: 2026-03-02 - AP 56: Area Distribution (vBar in row, hBar+legend in modal)
   # Modified: 2026-03-13 - AP 59: NPS-Donut (Promoter/Detractor/Passive), Awareness-Torte entfernt, Kachel-Design
+  # Modified: 2026-03-14 - QS: Unbenutzte Variablen entfernt, detractorPct direkt verwendet
 */
 
 import { escapeHtml } from './utils.js';
@@ -236,12 +237,9 @@ export function getLegendHTML() {
 
 export function getInsightNpsHTML(nps, color, promoterPct = 0, passivePct = 0, detractorPct = 0) {
     const sign = nps > 0 ? '+' : '';
-    const p1 = promoterPct;
-    const p2 = promoterPct + passivePct;
-    const detractorDisplay = 100 - promoterPct - passivePct;
     const pD = promoterPct + detractorPct;
     const pieStyle = `background: conic-gradient(from 180deg, #2ecc71 0% ${promoterPct}%, #e74c3c ${promoterPct}% ${pD}%, #f1c40f ${pD}% 100%);`;
-    const pieTitle = `Promoter: ${promoterPct}% · Detractor: ${detractorDisplay}% · Passive: ${passivePct}%`;
+    const pieTitle = `Promoter: ${promoterPct}% · Detractor: ${detractorPct}% · Passive: ${passivePct}%`;
     return `<div class="nps-with-pie">
         <span class="nps-display" title="NPS Score: ${nps}">📣 <span class="nps-value" style="color:${color};">${sign}${nps}</span></span>
         <div class="nps-pie" style="${pieStyle}" title="${pieTitle}"></div>

@@ -33,6 +33,7 @@
   # Modified: 2026-03-02 - AP 57: Report-Button + openPartnerReport()
   # Modified: 2026-03-10 - AP 58: Partner-Filter Panel (Checkbox-Grid, Suche, Sortierung, getFilteredData)
   # Modified: 2026-03-13 - AP 59: NPS-Verteilung (Promoter/Passive/Detractor) Mapping, Awareness-Logik entfernt
+  # Modified: 2026-03-14 - AP 60: CSV-Export über Server-Funktion (denormalisierte Rohdaten)
 */
 
 import { CONFIG } from './config.js';
@@ -1234,39 +1235,50 @@ document.addEventListener("DOMContentLoaded", function() {
         const data = getFilteredData();
         if (!data || data.length === 0) return;
 
-        let csvContent = "Partner;Score;Positiv;Negativ;Awareness;Kriterium;Wichtigkeit;Performance\n";
+        // Partner-IDs für Server-Filter: nur ausgewählte Partner senden
+        const partnerIds = selectedPartnerIds
+            ? Array.from(selectedPartnerIds)
+            : data.map(p => p.partnerId);
 
-        data.forEach(partner => {
-            if (partner.matrixDetails) {
-                partner.matrixDetails.forEach(detail => {
-                    let row = [
-                        partner.partnerName,
-                        partner.score,
-                        partner.scorePositive,
-                        partner.scoreNegative,
-                        partner.awarenessPct,
-                        detail.name, 
-                        detail.imp,
-                        detail.perf
-                    ].map((field, index) => {
-                        if (typeof field === 'string') {
-                            return `"${field.replace(/"/g, '""')}"`;
-                        }
-                        return String(field).replace('.', ',');
-                    }).join(";");
-                    csvContent += row + "\n";
-                });
+        const minAnswers = parseInt(minAnswersSlider.value) || 1;
+
+        toggleGlobalLoader(true);
+
+        fetch('php/export_data.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                ...currentFilterState,
+                min_answers: minAnswers,
+                exclude_ids: excludedParticipantIds,
+                partner_ids: partnerIds
+            })
+        })
+        .then(resp => {
+            toggleGlobalLoader(false);
+            if (resp.status === 401) {
+                showLoginModal();
+                throw new Error("Login required");
+            }
+            if (!resp.ok) throw new Error("Export fehlgeschlagen");
+            return resp.blob();
+        })
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `cpqi_rohdaten_export_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        })
+        .catch(err => {
+            toggleGlobalLoader(false);
+            if (err.message !== "Login required") {
+                showError("CSV-Export fehlgeschlagen: " + err.message);
             }
         });
-
-        const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", `partner_score_export_${new Date().toISOString().slice(0,10)}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
     }
 });

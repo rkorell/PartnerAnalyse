@@ -6,6 +6,7 @@
   # Created: 2026-03-02 - AP 57: Partner-Bericht (Report Page)
   # Modified: 2026-03-10 - AP 58: Partner-Filter (partner_ids aus URL-Parameter auswerten)
   # Modified: 2026-03-13 - AP 59: NPS-Verteilung (Torte), Awareness entfernt
+  # Modified: 2026-03-14 - QS: detractorDisplay aus DB-Wert statt Berechnung
 */
 
 import { CONFIG } from './config.js';
@@ -166,7 +167,7 @@ function renderPartnerSection(partner, allPartners, maxBarValue) {
 
 function renderHeader(partner, logoSrc, totalCriteria) {
     const npsColor = partner.npsScore > 0 ? '#2ecc71' : partner.npsScore < 0 ? '#e74c3c' : '#999';
-    const detractorDisplay = 100 - partner.npsPromoterPct - partner.npsPassivePct;
+    const detractorDisplay = partner.npsDetractorPct;
     const pD = partner.npsPromoterPct + detractorDisplay;
     const pieStyle = `background: conic-gradient(from 180deg, #2ecc71 0% ${partner.npsPromoterPct}%, #e74c3c ${partner.npsPromoterPct}% ${pD}%, #f1c40f ${pD}% 100%);`;
     const pieTitle = `Promoter: ${partner.npsPromoterPct}% · Detractor: ${detractorDisplay}% · Passive: ${partner.npsPassivePct}%`;

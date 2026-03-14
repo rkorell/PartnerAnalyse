@@ -1,7 +1,7 @@
 -- ============================================================================
 -- CPQI - 2_initial_data.sql
--- Zweck: Initialdaten für Kriterien und Partner
--- Stand: 22.01.2026
+-- Zweck: Initialdaten (Stammdaten) für alle Tabellen
+-- Stand: 2026-03-14
 -- ============================================================================
 
 -- ============================================================================
@@ -117,31 +117,132 @@ SELECT setval('criteria_id_seq', (SELECT MAX(id) FROM criteria));
 -- PARTNER (27 Stück)
 -- ============================================================================
 
-INSERT INTO partners (name, be_geo_id) VALUES
-('Accenture', 71517),
-('ACP', 52658),
-('Advanced Unibyte', 534900),
-('Avodaq', 60985),
-('Axians', 17345),
-('Bechtle', 51590),
-('Cancom', 52777),
-('Computacenter', 63917),
-('Conscia', 50058),
-('Controlware', 55017),
-('Damovo', 66698),
-('Fundamental', 46304),
-('Infosys', 695680),
-('Logicalis', 1865),
-('NTS', 657066),
-('NTT Data', 51524),
-('Pandacom', 57342),
-('Scaltel', 50437),
-('SPIE', 57447),
-('SVA', 107667),
-('Systema', 52903),
-('Tata Communications', 497984),
-('Tata Consulting', 634901),
-('Tech Mahindra', 625805),
-('Telekom', 51272),
-('Telent', 35807),
-('Wipro', 606459);
+INSERT INTO partners (name, be_geo_id, sortgroup, logo_file) VALUES
+('Accenture', 71517, 3, 'accenture.png'),
+('ACP', 52658, 2, 'acp.png'),
+('Advanced Unibyte', 534900, 2, 'advancedunibyte.png'),
+('Avodaq', 60985, 2, 'avodaq.png'),
+('Axians', 17345, 2, 'axians.png'),
+('Bechtle', 51590, 1, 'bechtle.png'),
+('Cancom', 52777, 1, 'cancom.png'),
+('Computacenter', 63917, 1, 'computacenter.png'),
+('Conscia', 50058, 2, 'conscia.png'),
+('Controlware', 55017, 1, 'controlware.png'),
+('Damovo', 66698, 2, 'damovo.png'),
+('Fundamental', 46304, 2, 'fundamental.png'),
+('Infosys', 695680, 3, 'infosys.png'),
+('Logicalis', 1865, 2, 'logicalis.png'),
+('NTS', 657066, 2, 'nts.png'),
+('NTT Data', 51524, 1, 'ntt.png'),
+('Pandacom', 57342, 2, 'pandacom.png'),
+('Scaltel', 50437, 2, 'scaltel.png'),
+('SPIE', 57447, 3, 'spie.png'),
+('SVA', 107667, 1, 'sva.png'),
+('Systema', 52903, 2, 'systema.png'),
+('Tata Communications', 497984, 3, 'tatacommunications.png'),
+('Tata Consulting', 634901, 3, 'tataconsulting.png'),
+('Tech Mahindra', 625805, 3, 'techmahindra.png'),
+('Telekom', 51272, 1, 'telekom.png'),
+('Telent', 35807, 2, 'telent.png'),
+('Wipro', 606459, 3, 'wipro.svg');
+
+-- ============================================================================
+-- ABTEILUNGEN (12 Stück, hierarchisch)
+-- ============================================================================
+
+-- Root-Knoten zuerst (kein parent_id)
+INSERT INTO departments (id, name, parent_id, display_order) VALUES (13, 'Cisco Deutschland', NULL, NULL);
+
+-- Ebene 1: Bereiche
+INSERT INTO departments (id, name, parent_id, display_order) VALUES (1, 'Public', 13, 10);
+INSERT INTO departments (id, name, parent_id, display_order) VALUES (11, 'CPSG', 13, 50);
+
+-- Ebene 2: Segmente (unter Public)
+INSERT INTO departments (id, name, parent_id, display_order) VALUES (2, 'Federal', 1, 20);
+INSERT INTO departments (id, name, parent_id, display_order) VALUES (4, 'SLED', 1, 30);
+INSERT INTO departments (id, name, parent_id, display_order) VALUES (3, 'Healthcare', 1, 40);
+
+-- Ebene 3: Teams (unter Federal)
+INSERT INTO departments (id, name, parent_id, display_order) VALUES (5, 'Defense', 2, NULL);
+INSERT INTO departments (id, name, parent_id, display_order) VALUES (6, 'Sovereignity', 2, NULL);
+INSERT INTO departments (id, name, parent_id, display_order) VALUES (7, 'Multicloud', 2, NULL);
+
+-- Ebene 3: Teams (unter SLED)
+INSERT INTO departments (id, name, parent_id, display_order) VALUES (8, 'SLED-Mitte', 4, NULL);
+INSERT INTO departments (id, name, parent_id, display_order) VALUES (9, 'SLED-South', 4, NULL);
+INSERT INTO departments (id, name, parent_id, display_order) VALUES (10, 'SLED-NW', 4, NULL);
+
+SELECT setval('departments_id_seq', (SELECT MAX(id) FROM departments));
+
+-- ============================================================================
+-- ADMIN-BENUTZER (1 Stück)
+-- ============================================================================
+
+INSERT INTO admin_users (username, password_hash) VALUES
+('admin', '$2y$10$Mt6MO0siK.p82Ra.ZJEpVOHMleL7SPljA7x6YP.mUXhoXdyPz51r.');
+
+-- ============================================================================
+-- SURVEYS (Vorlagen, ohne Erhebungsdaten)
+-- ============================================================================
+
+INSERT INTO surveys (id, name, is_active, test_mode, start_date, end_date, description) VALUES
+(1, 'Demo-Survey (Archetypen)', false, false, NULL, NULL, NULL),
+(2, 'Demo-Survey II', false, true, NULL, NULL, 'Test-Survey für Entwicklung'),
+(5, 'Demo-Survey (Fraud)', false, false, '2026-02-14', '2026-12-31', 'AP 50: Fraud-Detection Testdaten');
+
+SELECT setval('surveys_id_seq', (SELECT MAX(id) FROM surveys));
+
+-- ============================================================================
+-- APP_TEXTS (Info-Modals, 6 Stück)
+-- ============================================================================
+
+INSERT INTO app_texts (id, category, content) VALUES
+(1, 'entry-mask', $$<h3>Methodik & Zielsetzung</h3>
+
+<p>
+    <strong>Warum diese Erhebung notwendig ist</strong><br>
+    In der Zusammenarbeit mit Partnern entstehen oft subjektive Eindrücke, die in strategischen Gesprächen schwer als Argument dienen können.
+    Ziel dieses Systems ist die Überführung von Einzelmeinungen in eine <strong>objektivierte, datenbasierte Gesamtsicht</strong>.
+    Dies stärkt die Argumentationsposition und ermöglicht ein gezieltes Feedback, das vom Partner ernst genommen wird.
+</p>
+
+<p>
+    <strong>Warum eine zweistufige Abfrage?</strong><br>
+    Die Erhebung basiert auf der <strong>Importance-Performance Analysis (IPA)</strong>.
+    Eine isolierte Betrachtung der Leistung (Performance) ist strategisch oft irreführend. Daher erfolgt die Bewertung in zwei getrennten Schritten:
+</p>
+
+<ul>
+    <li>
+        <strong>Gewichtung der Relevanz (Importance):</strong><br>
+        Zunächst definierst Du, wie wichtig das Kriterium aktuell für den Erfolg im Public Sector ist.
+    </li>
+    <li>
+        <strong>Bewertung der Leistung (Performance):</strong><br>
+        Erst danach bewertest Du, wie gut der Partner diese Anforderung erfüllt.
+    </li>
+</ul>
+
+<p>
+    <strong>Das Ergebnis</strong><br>
+    Durch diese Trennung entsteht kein einfacher Mittelwert, sondern ein <strong>gewichteter Qualitäts-Index</strong>.
+    Er macht sichtbar, wo Ressourcen nicht optimal eingesetzt werden oder strategische Lücken bestehen.
+</p>
+
+<p>
+    <strong>Unsere Bitte an Dich</strong><br>
+    Diese Analyse ist nur so gut wie die Datenbasis. Bitte nimm Dir daher ausreichend Zeit, um die Kriterien sorgfältig durchzugehen und die Partner differenziert zu bewerten.
+    Die Bearbeitungszeit beträgt in der Regel <strong>mindestens 15 Minuten</strong>. Wenn Du mehrere Partner bewerten möchtest, kann sich die benötigte Zeit entsprechend verlängern. Die investierte Zeit lohnt sich - Deine Einschätzung hat direkten Einfluss auf unsere Partner-Strategie.
+</p>
+<BR>
+<p>
+    Vielen Dank für Deine Unterstützung!
+</p>
+<BR>$$);
+
+-- Hinweis: analytic-mask, nps-explanation, fraud-detection, dsgvo-info und csv-export
+-- sind lange HTML-Texte. Sie werden über die Survey-Admin-Oberfläche oder direkt
+-- in der Datenbank gepflegt. Die vollständigen Inhalte sind im pg_dump-Backup enthalten.
+-- Für eine Neuinstallation müssen sie manuell aus dem Backup eingespielt werden.
+
+SELECT setval('app_texts_id_seq', (SELECT MAX(id) FROM app_texts));
