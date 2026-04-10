@@ -229,6 +229,7 @@ tueroeffner/
 
 # Office-Dokumente
 *.docx
+*.pptx
 
 # Claude Code Dokumentation
 CLAUDE.md
