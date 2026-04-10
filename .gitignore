@@ -224,6 +224,12 @@ serial_protocol.py
 # Backup-System (eigenes Git-Repo)
 backup/
 
+# TuerOeffner Web-App (eigenes Git-Repo)
+tueroeffner/
+
+# Office-Dokumente
+*.docx
+
 # Claude Code Dokumentation
 CLAUDE.md
 .claude/
