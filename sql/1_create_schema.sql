@@ -27,6 +27,7 @@
 # Modified: 2026-03-14 - Export: export_raw_data() Funktion für denormalisierten CSV-Dump
 # Modified: 2026-03-14 - DROP-Statements in 0_destroy_database.sql ausgelagert, CREATE TABLE IF NOT EXISTS
 # Modified: 2026-03-14 - Bugfix: get_partner_matrix_details fehlte score IS NOT NULL Filter (verfälschte gewichteten Durchschnitt)
+# Modified: 2026-04-10 - AP 61: view_survey_fraud IP-Duplikat nur bei gleicher Abteilung (PARTITION BY + department_id)
 */
 
 -- Voraussetzung: Datenbank und User müssen vor Ausführung dieses Skripts existieren.
@@ -731,18 +732,19 @@ END;
 $$ LANGUAGE plpgsql;
 
 
-/* View: view_survey_fraud (AP 50)
+/* View: view_survey_fraud (AP 50, überarbeitet AP 61)
    Zweck: Fraud-Indikatoren pro Teilnehmer für Anomalie-Erkennung.
-   Erkennt: IP-Duplikate, Häufung identischer Bewertungen (≥80% gleicher Score).
+   Erkennt: IP-Duplikate (gleiche IP + gleiche Abteilung), Häufung identischer Bewertungen (≥80% gleicher Score).
+   IP-Duplikate: Nur innerhalb derselben Abteilung — verschiedene Abteilungen von derselben IP sind Infrastruktur-Artefakte (Büro/VPN), kein Fraud-Signal.
    mode_score: Der am häufigsten vergebene Score-Wert (Score 3 = harmlos, da neutraler Effekt im Scoring-Modell).
-   Schweregrad: 3 = IP + Muster (Score≠3), 2 = nur IP, 1 = Häufung (inkl. Score 3), 0 = unauffällig.
+   Schweregrad: 3 = IP + Muster (Score≠3), 2 = nur IP (gleiche Abt.), 1 = Häufung (inkl. Score 3), 0 = unauffällig.
 */
 CREATE OR REPLACE VIEW view_survey_fraud AS
 WITH
 ip_stats AS (
     SELECT
         p.id AS participant_id,
-        COUNT(*) OVER (PARTITION BY p.survey_id, p.ip_hash) AS ip_submit_count
+        COUNT(*) OVER (PARTITION BY p.survey_id, p.ip_hash, p.department_id) AS ip_submit_count
     FROM participants p
     WHERE p.ip_hash IS NOT NULL
 ),

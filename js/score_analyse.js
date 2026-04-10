@@ -34,6 +34,7 @@
   # Modified: 2026-03-10 - AP 58: Partner-Filter Panel (Checkbox-Grid, Suche, Sortierung, getFilteredData)
   # Modified: 2026-03-13 - AP 59: NPS-Verteilung (Promoter/Passive/Detractor) Mapping, Awareness-Logik entfernt
   # Modified: 2026-03-14 - AP 60: CSV-Export über Server-Funktion (denormalisierte Rohdaten)
+  # Modified: 2026-04-10 - AP 61: Fraud-Panel Abteilungs-Zählung in Klammern bei Clustern
 */
 
 import { CONFIG } from './config.js';
@@ -999,7 +1000,11 @@ document.addEventListener("DOMContentLoaded", function() {
             const straightliners = group.filter(r => r.is_straightliner);
             const slScores = [...new Set(straightliners.map(r => r.mode_score))];
             const pids = group.map(r => r.participant_id);
-            const depts = [...new Set(group.map(r => r.department_name))];
+            const deptCounts = {};
+            group.forEach(r => { deptCounts[r.department_name] = (deptCounts[r.department_name] || 0) + 1; });
+            const depts = Object.entries(deptCounts).map(([name, count]) =>
+                count > 1 ? `${name} (${count})` : name
+            );
 
             displayItems.push({
                 type: 'cluster',
