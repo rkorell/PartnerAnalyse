@@ -3,6 +3,8 @@
 <!-- CPQI Live Counter - Teilnehmerübersicht (non-interactive) -->
 <!-- # Modified: 2026-02-16 21:00 - Erstellt: Live-Counter mit Abteilungsbaum -->
 <!-- # Modified: 2026-02-17 08:30 - Stoppuhr (Elapsed Timer) hinzugefügt -->
+<!-- # Modified: 2026-04-17 12:15 - Stoppuhr gestoppt: finale Laufzeit 52:20:39:00 hartcodiert, Label "Beendet" -->
+<!-- # Modified: 2026-04-21 21:00 - Abschluss-Modus: Abteilungszahlen einheitlich #d0e4f2 (Live-Farben als Kommentar erhalten) -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -129,10 +131,17 @@
             color: #04a5e0;
             margin-left: 4px;
         }
-        .tree-count.count-zero { color: #c45050; }
-        .tree-count.count-low { color: #d4883a; }
-        .tree-count.count-mid { color: #c4b044; }
-        .tree-count.count-good { color: #5aaa6a; }
+        /* === ABSCHLUSS-MODUS: Alle Zahlen einheitlich ===
+           Für Live-Betrieb zurückändern auf:
+             .tree-count.count-zero { color: #c45050; }
+             .tree-count.count-low  { color: #d4883a; }
+             .tree-count.count-mid  { color: #c4b044; }
+             .tree-count.count-good { color: #5aaa6a; }
+        */
+        .tree-count.count-zero { color: #d0e4f2; }
+        .tree-count.count-low { color: #d0e4f2; }
+        .tree-count.count-mid { color: #d0e4f2; }
+        .tree-count.count-good { color: #d0e4f2; }
         .tree-bar {
             height: 4px;
             background: rgba(4, 159, 217, 0.6);
@@ -175,37 +184,12 @@
     </div>
 
     <script>
-        // ===== STOPPUHR =====
-        // Startzeitpunkt setzen um die Erhebung zu starten (ISO-Format):
-        // Beispiel: var SURVEY_START = '2026-02-17T09:00:00';
-        var SURVEY_START = '2026-02-23T15:21:00';
-
+        // ===== STOPPUHR (gestoppt) =====
+        // Finale Laufzeit hartcodiert: 52 Tage, 20 Stunden, 39 Minuten
         (function() {
             var swEl = document.getElementById('stopwatch');
-            function updateStopwatch() {
-                if (!SURVEY_START) {
-                    swEl.textContent = 'Nicht gestartet';
-                    swEl.className = 'stopwatch-time not-started';
-                    return;
-                }
-                var start = new Date(SURVEY_START).getTime();
-                var now = Date.now();
-                if (now < start) {
-                    swEl.textContent = 'Nicht gestartet';
-                    swEl.className = 'stopwatch-time not-started';
-                    return;
-                }
-                var diff = Math.floor((now - start) / 1000);
-                var days = Math.floor(diff / 86400);
-                var hrs = Math.floor((diff % 86400) / 3600);
-                var mins = Math.floor((diff % 3600) / 60);
-                var secs = diff % 60;
-                var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
-                swEl.textContent = days + ':' + pad(hrs) + ':' + pad(mins) + ':' + pad(secs);
-                swEl.className = 'stopwatch-time';
-            }
-            updateStopwatch();
-            setInterval(updateStopwatch, 1000);
+            swEl.textContent = '52:20:39:00';
+            swEl.className = 'stopwatch-time';
         })();
         // ===== ENDE STOPPUHR =====
 
@@ -291,7 +275,7 @@
                     container.innerHTML = '';
                     container.appendChild(renderNode(root, maxCount, true));
 
-                    timestampEl.textContent = 'Aktualisiert: ' + new Date().toLocaleTimeString('de-DE');
+                    timestampEl.textContent = 'Beendet: 17.4.2026, 09:00:00';
                 })
                 .catch(function(err) {
                     container.innerHTML = '<div class="error-msg">Verbindungsfehler</div>';
