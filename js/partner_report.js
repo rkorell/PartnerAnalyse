@@ -7,6 +7,7 @@
   # Modified: 2026-03-10 - AP 58: Partner-Filter (partner_ids aus URL-Parameter auswerten)
   # Modified: 2026-03-13 - AP 59: NPS-Verteilung (Torte), Awareness entfernt
   # Modified: 2026-03-14 - QS: detractorDisplay aus DB-Wert statt Berechnung
+  # Modified: 2026-04-21 - AP 61: Anhang 1 Wichtigkeitsverteilung, Anhang 2 Performance-Benchmark, Anhang 3 Kriterienkatalog
 */
 
 import { CONFIG } from './config.js';
@@ -36,6 +37,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     statusEl.textContent = 'Lade Partner-Übersicht...';
 
     let partners;
+    let importanceData = [];
+    let benchmarkData = [];
+    let catalogData = [];
     try {
         // 2a. Bilanz laden
         const bilanzResp = await fetch('php/partner_score_analyse.php', {
@@ -110,7 +114,33 @@ document.addEventListener('DOMContentLoaded', async function() {
             }).then(r => r.json()).catch(() => null)
         );
 
-        const detailResults = await Promise.all(detailPromises);
+        // 2c. Importance-Verteilung + Performance-Benchmark parallel laden
+        const importancePromise = fetch('php/get_importance_distribution.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(filterParams)
+        }).then(r => r.json()).catch(() => []);
+
+        const benchmarkPromise = fetch('php/get_performance_benchmark.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(filterParams)
+        }).then(r => r.json()).catch(() => []);
+
+        const catalogPromise = fetch('php/get_criteria_catalog.php')
+            .then(r => r.json()).catch(() => []);
+
+        const [detailResults, impResult, benchResult, catResult] = await Promise.all([
+            Promise.all(detailPromises),
+            importancePromise,
+            benchmarkPromise,
+            catalogPromise
+        ]);
+
+        importanceData = impResult;
+        benchmarkData = benchResult;
+        catalogData = catResult;
+
         detailResults.forEach((details, i) => {
             if (details && !details.error) {
                 partners[i].matrixDetails = details.matrix_details || [];
@@ -133,6 +163,21 @@ document.addEventListener('DOMContentLoaded', async function() {
     partners.forEach(partner => {
         html += renderPartnerSection(partner, partners, maxBarValue);
     });
+
+    // Anhang 1: Importance-Verteilung
+    if (Array.isArray(importanceData) && importanceData.length > 0) {
+        html += renderImportanceAppendix(importanceData);
+    }
+
+    // Anhang 2: Performance-Benchmark
+    if (Array.isArray(benchmarkData) && benchmarkData.length > 0) {
+        html += renderPerformanceBenchmark(benchmarkData);
+    }
+
+    // Anhang 3: Kriterienkatalog
+    if (Array.isArray(catalogData) && catalogData.length > 0) {
+        html += renderCriteriaCatalog(catalogData);
+    }
 
     container.innerHTML = html;
     loadingOverlay.style.display = 'none';
@@ -478,4 +523,202 @@ function renderComments(partner, details) {
     }
 
     return html;
+}
+
+
+// ============================================================
+// Anhang: Importance-Verteilung
+// ============================================================
+
+function renderImportanceAppendix(data) {
+    const n = data.length > 0 ? data[0].n : 0;
+
+    // Prozente berechnen und Cluster zuordnen
+    const rows = data.map((d, i) => {
+        const pct5 = Math.round(100 * d.n_5 / d.n);
+        const pctWichtig = Math.round(100 * (d.n_5 + d.n_4) / d.n);
+        const pctUnwichtig = Math.round(100 * (d.n_1 + d.n_2) / d.n);
+        const match = d.name.match(/^(\d+)\.\s*(.*)/);
+        const critNum = match ? parseInt(match[1]) : '';
+        const shortName = match ? match[2] : d.name;
+        return { ...d, pct5, pctWichtig, pctUnwichtig, shortName, critNum, rang: i + 1 };
+    });
+
+    // Cluster bestimmen
+    const cluster1 = rows.filter(r => r.pct5 > 50);
+    const cluster3 = rows.filter(r => r.pctWichtig < 65);
+    const cluster2 = rows.filter(r => r.pct5 <= 50 && r.pctWichtig >= 65);
+
+    // Balken-Visualisierung
+    const barWidth = 20;
+
+    let tableHTML = `<table class="report-table">
+        <tr>
+            <th style="width:30px">Rang</th>
+            <th>Kriterium</th>
+            <th style="width:50px">Ø</th>
+            <th>Wichtigkeit 5 (höchste)</th>
+            <th style="width:60px">Wichtig<br>(4+5)</th>
+            <th style="width:60px">Unwichtig<br>(1+2)</th>
+        </tr>`;
+
+    rows.forEach(r => {
+        const filled = Math.round(r.pct5 / 100 * barWidth);
+        const bar = '<span style="color:#049fd9; letter-spacing:-1px;">' + '█'.repeat(filled) + '</span>'
+                  + '<span style="color:#ddd; letter-spacing:-1px;">' + '░'.repeat(barWidth - filled) + '</span>';
+        tableHTML += `<tr>
+            <td class="num">${r.rang}</td>
+            <td>${escapeHtml(r.shortName)} <span style="color:#999; font-size:0.85em;">[K${r.critNum}]</span></td>
+            <td class="num">${r.avg_importance.toFixed(2)}</td>
+            <td><span style="font-family:monospace; font-size:0.85em;">${bar}</span> ${r.pct5}%</td>
+            <td class="num">${r.pctWichtig}%</td>
+            <td class="num">${r.pctUnwichtig}%</td>
+        </tr>`;
+    });
+
+    tableHTML += '</table>';
+
+    // Cluster-Texte
+    let clusterHTML = '';
+
+    if (cluster1.length > 0) {
+        const nameList = cluster1.map(r => `<div style="padding:2px 0;"><strong>${r.shortName}</strong></div>`).join('');
+        clusterHTML += `<div class="report-section" style="margin-top:30px;">
+            <div class="report-section-title">Höchste Wichtigkeit — Strategische Kernthemen (${cluster1.length} Kriterien, &gt;50% Score 5)</div>
+            <p style="font-size:0.9em; line-height:1.5;">Die Organisation ist sich einig — die wichtigsten Partnereigenschaften sind:</p>
+            <div style="font-size:0.9em; margin:8px 0 8px 16px;">${nameList}</div>
+            <p style="font-size:0.9em; line-height:1.5;">Über 84% der Teilnehmer stufen sie als wichtig oder sehr wichtig ein.</p>
+        </div>`;
+    }
+
+    if (cluster2.length > 0) {
+        clusterHTML += `<div class="report-section">
+            <div class="report-section-title">Hohe Wichtigkeit — Basisanforderungen (${cluster2.length} Kriterien, 24–50% Score 5)</div>
+            <p style="font-size:0.9em; line-height:1.5;">Die Mehrheit der Kriterien wird als wichtig eingestuft, aber seltener mit höchster Wichtigkeit bewertet. Der Anteil „Wichtig" (Score 4+5) liegt durchweg über 65%.</p>
+        </div>`;
+    }
+
+    if (cluster3.length > 0) {
+        const items = cluster3.map(r => {
+            if (r.pctUnwichtig >= 30) {
+                return `<div style="padding:2px 0;"><strong>${r.shortName}</strong> (Ø ${r.avg_importance.toFixed(2)}): ${r.pctUnwichtig}% bewerten es als unwichtig — das Thema polarisiert</div>`;
+            }
+            return `<div style="padding:2px 0;"><strong>${r.shortName}</strong> (Ø ${r.avg_importance.toFixed(2)}): nur ${r.pct5}% vergeben die Höchstnote</div>`;
+        });
+        clusterHTML += `<div class="report-section">
+            <div class="report-section-title">Geringe Wichtigkeit — kontrovers oder nachrangig (${cluster3.length} Kriterien, &lt;24% Score 5)</div>
+            <div style="font-size:0.9em; margin-left:16px;">
+                ${items.join('')}
+            </div>
+        </div>`;
+    }
+
+    return `
+    <div class="partner-section">
+        <div class="report-header" style="justify-content:center;">
+            <div class="report-header-center" style="text-align:center;">
+                <h2>Anhang 1: Wichtigkeitsverteilung</h2>
+                <div class="report-kpi-row" style="justify-content:center;">
+                    <span class="report-kpi">Teilnehmer: <strong>${n}</strong></span>
+                    <span class="report-kpi">Kriterien: <strong>${rows.length}</strong></span>
+                </div>
+            </div>
+        </div>
+        <p style="font-size:0.85em; color:#666; margin-bottom:15px;">Anteil der Teilnehmer, die ein Kriterium mit höchster Wichtigkeit (Score 5) einstufen. Die Wichtigkeit wird partnerunabhängig erhoben — sie misst die strategische Relevanz für Cisco, nicht die Performance eines Partners.</p>
+        ${tableHTML}
+        ${clusterHTML}
+    </div>`;
+}
+
+
+// ============================================================
+// Anhang 2: Performance-Benchmark
+// ============================================================
+
+function renderPerformanceBenchmark(data) {
+    const nPartners = data.length > 0 ? data[0].n_partners : 0;
+
+    let tableHTML = `<table class="report-table">
+        <tr>
+            <th>Kriterium</th>
+            <th style="width:120px">Ø alle Partner</th>
+        </tr>`;
+
+    data.forEach(d => {
+        const match = d.name.match(/^(\d+)\.\s*(.*)/);
+        const critNum = match ? parseInt(match[1]) : '';
+        const shortName = match ? match[2] : d.name;
+        tableHTML += `<tr>
+            <td>K${critNum}. ${escapeHtml(shortName)}</td>
+            <td class="num">${d.avg_performance.toFixed(2)} ±${d.stddev_performance.toFixed(2)}</td>
+        </tr>`;
+    });
+
+    tableHTML += '</table>';
+
+    return `
+    <div class="partner-section">
+        <div class="report-header" style="justify-content:center;">
+            <div class="report-header-center" style="text-align:center;">
+                <h2>Anhang 2: Performance-Benchmark</h2>
+                <div class="report-kpi-row" style="justify-content:center;">
+                    <span class="report-kpi">Partner: <strong>${nPartners}</strong></span>
+                    <span class="report-kpi">Kriterien: <strong>${data.length}</strong></span>
+                </div>
+            </div>
+        </div>
+        <p style="font-size:0.85em; color:#666; margin-bottom:15px;">Durchschnittliche Performance pro Kriterium über alle Partner. Min/Max zeigen die anonyme Bandbreite.</p>
+        ${tableHTML}
+    </div>`;
+}
+
+
+// ============================================================
+// Anhang 3: Kriterienkatalog
+// ============================================================
+
+function renderCriteriaCatalog(data) {
+    // Nach Kategorie gruppieren
+    const categories = [];
+    const catMap = {};
+    data.forEach(d => {
+        const cat = d.category || 'Sonstige';
+        if (!catMap[cat]) {
+            catMap[cat] = [];
+            categories.push(cat);
+        }
+        const match = d.name.match(/^(\d+)\.\s*(.*)/);
+        const critNum = match ? parseInt(match[1]) : '';
+        const shortName = match ? match[2] : d.name;
+        catMap[cat].push({ critNum, shortName, description: d.description || '' });
+    });
+
+    let contentHTML = '';
+    categories.forEach(cat => {
+        contentHTML += `<div class="report-section">
+            <div class="report-section-title">${escapeHtml(cat)}</div>
+            <table class="report-table">`;
+        catMap[cat].forEach(c => {
+            contentHTML += `<tr>
+                <td style="width:40px; vertical-align:top; white-space:nowrap;"><strong>K${c.critNum}</strong></td>
+                <td style="vertical-align:top;"><strong>${escapeHtml(c.shortName)}</strong><br>
+                <span style="font-size:0.85em; color:#666;">${escapeHtml(c.description)}</span></td>
+            </tr>`;
+        });
+        contentHTML += '</table></div>';
+    });
+
+    return `
+    <div class="partner-section">
+        <div class="report-header" style="justify-content:center;">
+            <div class="report-header-center" style="text-align:center;">
+                <h2>Anhang 3: Kriterienkatalog</h2>
+                <div class="report-kpi-row" style="justify-content:center;">
+                    <span class="report-kpi">Kategorien: <strong>${categories.length}</strong></span>
+                    <span class="report-kpi">Kriterien: <strong>${data.length}</strong></span>
+                </div>
+            </div>
+        </div>
+        ${contentHTML}
+    </div>`;
 }
