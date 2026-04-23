@@ -536,46 +536,40 @@ function renderComments(partner, details) {
 function renderImportanceAppendix(data) {
     const n = data.length > 0 ? data[0].n : 0;
 
-    // Prozente berechnen und Cluster zuordnen
+    // Prozente berechnen: drei disjunkte Segmente (addieren sich zu 100%)
     const rows = data.map((d, i) => {
-        const pct5 = Math.round(100 * d.n_5 / d.n);
-        const pctWichtig = Math.round(100 * (d.n_5 + d.n_4) / d.n);
+        const pctWichtig = Math.round(100 * d.n_5 / d.n);
         const pctUnwichtig = Math.round(100 * (d.n_1 + d.n_2) / d.n);
+        const pctNeutral = 100 - pctWichtig - pctUnwichtig;
         const match = d.name.match(/^(\d+)\.\s*(.*)/);
         const critNum = match ? parseInt(match[1]) : '';
         const shortName = match ? match[2] : d.name;
-        return { ...d, pct5, pctWichtig, pctUnwichtig, shortName, critNum, rang: i + 1 };
+        return { ...d, pctWichtig, pctNeutral, pctUnwichtig, shortName, critNum, rang: i + 1 };
     });
 
-    // Cluster bestimmen
-    const cluster1 = rows.filter(r => r.pct5 > 50);
-    const cluster3 = rows.filter(r => r.pctWichtig < 65);
-    const cluster2 = rows.filter(r => r.pct5 <= 50 && r.pctWichtig >= 65);
-
-    // Balken-Visualisierung
-    const barWidth = 20;
+    // Cluster bestimmen (basierend auf Anteil Score 5)
+    const cluster1 = rows.filter(r => r.pctWichtig > 50);
+    const cluster3 = rows.filter(r => r.pctWichtig < 24);
+    const cluster2 = rows.filter(r => r.pctWichtig >= 24 && r.pctWichtig <= 50);
 
     let tableHTML = `<table class="report-table">
         <tr>
             <th style="width:30px">Rang</th>
             <th>Kriterium</th>
             <th style="width:50px">Ø</th>
-            <th>Wichtigkeit 5 (höchste)</th>
-            <th style="width:60px">Wichtig<br>(4+5)</th>
-            <th style="width:60px">Unwichtig<br>(1+2)</th>
+            <th style="width:80px">wichtig [%]</th>
+            <th style="width:80px">neutral [%]</th>
+            <th style="width:80px">unwichtig [%]</th>
         </tr>`;
 
     rows.forEach(r => {
-        const filled = Math.round(r.pct5 / 100 * barWidth);
-        const bar = '<span style="color:#049fd9; letter-spacing:-1px;">' + '█'.repeat(filled) + '</span>'
-                  + '<span style="color:#ddd; letter-spacing:-1px;">' + '░'.repeat(barWidth - filled) + '</span>';
         tableHTML += `<tr>
             <td class="num">${r.rang}</td>
             <td>${escapeHtml(r.shortName)} <span style="color:#999; font-size:0.85em;">[K${r.critNum}]</span></td>
             <td class="num">${r.avg_importance.toFixed(2)}</td>
-            <td><span style="font-family:monospace; font-size:0.85em;">${bar}</span> ${r.pct5}%</td>
-            <td class="num">${r.pctWichtig}%</td>
-            <td class="num">${r.pctUnwichtig}%</td>
+            <td class="num">${r.pctWichtig}</td>
+            <td class="num">${r.pctNeutral}</td>
+            <td class="num">${r.pctUnwichtig}</td>
         </tr>`;
     });
 
@@ -587,7 +581,7 @@ function renderImportanceAppendix(data) {
     if (cluster1.length > 0) {
         const nameList = cluster1.map(r => `<div style="padding:2px 0;"><strong>${r.shortName}</strong></div>`).join('');
         clusterHTML += `<div class="report-section" style="margin-top:30px;">
-            <div class="report-section-title">Höchste Wichtigkeit — Strategische Kernthemen (${cluster1.length} Kriterien, &gt;50% Score 5)</div>
+            <div class="report-section-title">Höchste Wichtigkeit — Strategische Kernthemen (${cluster1.length} Kriterien, &gt;50% „wichtig")</div>
             <p style="font-size:0.9em; line-height:1.5;">Die Organisation ist sich einig — die wichtigsten Partnereigenschaften sind:</p>
             <div style="font-size:0.9em; margin:8px 0 8px 16px;">${nameList}</div>
             <p style="font-size:0.9em; line-height:1.5;">Über 84% der Teilnehmer stufen sie als wichtig oder sehr wichtig ein.</p>
@@ -596,8 +590,8 @@ function renderImportanceAppendix(data) {
 
     if (cluster2.length > 0) {
         clusterHTML += `<div class="report-section">
-            <div class="report-section-title">Hohe Wichtigkeit — Basisanforderungen (${cluster2.length} Kriterien, 24–50% Score 5)</div>
-            <p style="font-size:0.9em; line-height:1.5;">Die Mehrheit der Kriterien wird als wichtig eingestuft, aber seltener mit höchster Wichtigkeit bewertet. Der Anteil „Wichtig" (Score 4+5) liegt durchweg über 65%.</p>
+            <div class="report-section-title">Hohe Wichtigkeit — Basisanforderungen (${cluster2.length} Kriterien, 24–50% „wichtig")</div>
+            <p style="font-size:0.9em; line-height:1.5;">Die Mehrheit der Kriterien wird als wichtig eingestuft, aber seltener mit höchster Wichtigkeit bewertet.</p>
         </div>`;
     }
 
@@ -606,10 +600,10 @@ function renderImportanceAppendix(data) {
             if (r.pctUnwichtig >= 30) {
                 return `<div style="padding:2px 0;"><strong>${r.shortName}</strong> (Ø ${r.avg_importance.toFixed(2)}): ${r.pctUnwichtig}% bewerten es als unwichtig — das Thema polarisiert</div>`;
             }
-            return `<div style="padding:2px 0;"><strong>${r.shortName}</strong> (Ø ${r.avg_importance.toFixed(2)}): nur ${r.pct5}% vergeben die Höchstnote</div>`;
+            return `<div style="padding:2px 0;"><strong>${r.shortName}</strong> (Ø ${r.avg_importance.toFixed(2)}): nur ${r.pctWichtig}% vergeben die Höchstnote</div>`;
         });
         clusterHTML += `<div class="report-section">
-            <div class="report-section-title">Geringe Wichtigkeit — kontrovers oder nachrangig (${cluster3.length} Kriterien, &lt;24% Score 5)</div>
+            <div class="report-section-title">Geringe Wichtigkeit — kontrovers oder nachrangig (${cluster3.length} Kriterien, &lt;24% „wichtig")</div>
             <div style="font-size:0.9em; margin-left:16px;">
                 ${items.join('')}
             </div>
@@ -627,7 +621,7 @@ function renderImportanceAppendix(data) {
                 </div>
             </div>
         </div>
-        <p style="font-size:0.85em; color:#666; margin-bottom:15px;">Anteil der Teilnehmer, die ein Kriterium mit höchster Wichtigkeit (Score 5) einstufen. Die Wichtigkeit wird partnerunabhängig erhoben — sie misst die strategische Relevanz für Cisco, nicht die Performance eines Partners.</p>
+        <p style="font-size:0.85em; color:#666; margin-bottom:15px;">„Wie wichtig ist Ihnen dieses Kriterium bei einem Partner?" — ${n} Teilnehmer haben diese Frage für jedes Kriterium auf einer Skala von 1 (unwichtig) bis 5 (höchste Priorität) beantwortet. Die Tabelle zeigt die Ergebnisse, sortiert nach dem Anteil der 5er-Bewertungen. Die drei rechten Spalten zeigen jeweils den Anteil der Stimmen in Prozent: wichtig (Score 5), neutral (Score 3+4), unwichtig (Score 1+2).</p>
         ${tableHTML}
         ${clusterHTML}
     </div>`;
