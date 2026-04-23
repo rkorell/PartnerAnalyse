@@ -12,6 +12,8 @@
   # Modified: 02.12.2025, 17:30 - AP 43: Consolidated all Magic Numbers (NPS, Action-Item, Matrix, Slider-Tooltips)
   # Modified: 2026-03-02 - AP 56: Added AREA_COLORS for area distribution stacked bars
   # Modified: 2026-03-10 - AP 58: Added SORT_GROUP_NAMES for partner filter grouping
+  # Modified: 2026-04-23 - AP 61: BIAS_THRESHOLD für systematische Manager/Team-Divergenz
+  # Modified: 2026-04-23 - AP 61: Action-Item PERFORMANCE_MAX 2.0 → 2.2
 */
 
 export const CONFIG = {
@@ -26,6 +28,9 @@ export const CONFIG = {
         // Mindestanzahl von Bewertern (pro Gruppe: Mgr/Team), damit ein Konflikt angezeigt wird
         CONFLICT_MIN_ASSESSORS: 1,
 
+        // Schwellenwert für systematischen Manager/Team-Bias (Ø Abweichung über alle Kriterien)
+        BIAS_THRESHOLD: 0.4,
+
         // NPS-Schwellenwerte für Farbkodierung
         NPS_THRESHOLDS: {
             PASSIVE_LOW_MAX: 30,   // 0-30: Rot/Orange
@@ -35,8 +40,8 @@ export const CONFIG = {
 
         // Action-Item-Schwellenwerte (Handlungsbedarf)
         ACTION_ITEM: {
-            IMPORTANCE_MIN: 4.0,   // Wichtigkeit >= 4
-            PERFORMANCE_MAX: 2.0,  // Performance <= 2
+            IMPORTANCE_MIN: 4.0,   // Wichtigkeit >= 4 (gerundet)
+            PERFORMANCE_MAX: 2.2,  // Performance <= 2.2
         },
     },
     

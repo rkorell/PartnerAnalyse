@@ -77,6 +77,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             npsDetractorPct: parseInt(row.nps_detractor_pct || 0),
             commentCount: parseInt(row.comment_count || 0),
             maxDivergence: parseFloat(row.max_divergence || 0),
+            bias: parseFloat(row.bias || 0),
             hasActionItem: parseInt(row.has_action_item || 0),
             totalAnswers: parseInt(row.total_answers || 0),
             numAssessorsMgr: parseInt(row.num_assessors_mgr || 0),
@@ -399,7 +400,9 @@ function renderMatrixSVG(details) {
 
         const cx = scaleX(perf + jX);
         const cy = scaleY(imp + jY);
-        dotsHTML += Tpl.getMatrixDotHTML(cx, cy, d.name, imp, perf);
+        const isAction = Math.round(imp) >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN && perf <= CONFIG.ANALYSIS.ACTION_ITEM.PERFORMANCE_MAX;
+        const dotColor = isAction ? '#5C6BC0' : '#3498db';
+        dotsHTML += Tpl.getMatrixDotHTML(cx, cy, d.name, imp, perf, dotColor);
     });
 
     return Tpl.getMatrixSVG_Standard(dotsHTML, size, padding, plotSize);

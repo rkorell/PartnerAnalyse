@@ -35,6 +35,8 @@
   # Modified: 2026-03-13 - AP 59: NPS-Verteilung (Promoter/Passive/Detractor) Mapping, Awareness-Logik entfernt
   # Modified: 2026-03-14 - AP 60: CSV-Export über Server-Funktion (denormalisierte Rohdaten)
   # Modified: 2026-04-10 - AP 61: Fraud-Panel Abteilungs-Zählung in Klammern bei Clustern
+  # Modified: 2026-04-23 - AP 61: Blitz-Indikator erweitert um systematischen Manager/Team-Bias (V2a)
+  # Modified: 2026-04-23 - AP 61: Action-Item Popup Fix (gerundete Importance), Matrix-Dots lila bei Handlungsbedarf
 */
 
 import { CONFIG } from './config.js';
@@ -657,6 +659,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     npsDetractorPct: parseInt(row.nps_detractor_pct || 0),
                     commentCount: row.comment_count,
                     maxDivergence: row.max_divergence,
+                    bias: row.bias,
                     hasActionItem: row.has_action_item,
                     numAssessorsMgr: row.num_assessors_mgr,
                     numAssessorsTeam: row.num_assessors_team,
@@ -721,8 +724,10 @@ document.addEventListener("DOMContentLoaded", function() {
         let html = Tpl.getScoreTableStartHTML(`Ergebnis: Partner Score Ranking (Basierend auf ${globalCount} Teilnehmern)`);
 
         rows.forEach((row, idx) => {
-            const posWidth = (row.scorePositive / maxBarValue) * 100;
-            const negWidth = (row.scoreNegative / maxBarValue) * 100;
+            const posScore = Math.round(row.scorePositive);
+            const negScore = Math.round(row.scoreNegative);
+            const posWidth = posScore > 0 ? (row.scorePositive / maxBarValue) * 100 : 0;
+            const negWidth = negScore > 0 ? (row.scoreNegative / maxBarValue) * 100 : 0;
 
             let slot1 = ''; 
             let slot2 = ''; 
@@ -755,16 +760,24 @@ document.addEventListener("DOMContentLoaded", function() {
             const maxDiv = parseFloat(row.maxDivergence || 0);
             const cntMgr = parseInt(row.numAssessorsMgr || 0);
             const cntTeam = parseInt(row.numAssessorsTeam || 0);
-            
-            if (cntMgr >= CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS && cntTeam >= CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS && maxDiv > CONFIG.ANALYSIS.CONFLICT_THRESHOLD) {
-                const title = `Maximale Divergenz: ${maxDiv.toFixed(1)} (Schwellenwert: ${CONFIG.ANALYSIS.CONFLICT_THRESHOLD})`;
+            const bias = parseFloat(row.bias || 0);
+
+            const hasV1 = cntMgr >= CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS && cntTeam >= CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS && maxDiv > CONFIG.ANALYSIS.CONFLICT_THRESHOLD;
+            const hasV2 = cntMgr >= CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS && cntTeam >= CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS && Math.abs(bias) >= CONFIG.ANALYSIS.BIAS_THRESHOLD;
+
+            if (hasV1 || hasV2) {
+                const biasDir = bias > 0 ? 'Manager bewertet höher' : 'Team bewertet höher';
+                const title = hasV1
+                    ? `Maximale Divergenz: ${maxDiv.toFixed(1)} (Schwellenwert: ${CONFIG.ANALYSIS.CONFLICT_THRESHOLD})`
+                    : `Systematischer Bias: Ø ${bias > 0 ? '+' : ''}${bias.toFixed(2)} (${biasDir})`;
                 slot4 = Tpl.getInsightIconHTML('conflict', row.partnerId, title, '⚡');
             }
 
             html += Tpl.getScoreRowHTML_DBC(row, { slot1, slot2, slot3, slot4 }, {
                 posWidth, negWidth,
-                posCount: row.countPositive, negCount: row.countNegative,
-                posScore: Math.round(row.scorePositive), negScore: Math.round(row.scoreNegative),
+                posCount: posScore > 0 ? row.countPositive : 0,
+                negCount: negScore > 0 ? row.countNegative : 0,
+                posScore, negScore,
                 rank: idx + 1
             });
         });
@@ -842,8 +855,8 @@ document.addEventListener("DOMContentLoaded", function() {
         else if (action === 'action') {
             title = `Handlungsfelder für ${escapeHtml(partner.partnerName)}`;
             if (partner.matrixDetails) {
-                const items = partner.matrixDetails.filter(d => 
-                    parseFloat(d.imp) >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN && 
+                const items = partner.matrixDetails.filter(d =>
+                    Math.round(parseFloat(d.imp)) >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN &&
                     parseFloat(d.perf) <= CONFIG.ANALYSIS.ACTION_ITEM.PERFORMANCE_MAX
                 );
                 if (items.length > 0) {
@@ -854,16 +867,38 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
         else if (action === 'conflict') {
-            title = `Signifikante Abweichungen: ${escapeHtml(partner.partnerName)}`;
+            title = `Manager/Team-Abweichungen: ${escapeHtml(partner.partnerName)}`;
             if (partner.matrixDetails) {
-                const conflicts = partner.matrixDetails.filter(d => 
+                const details = partner.matrixDetails.filter(d => d.perf_mgr != null && d.perf_team != null);
+                const conflicts = details.filter(d =>
                     Math.abs(parseFloat(d.perf_mgr) - parseFloat(d.perf_team)) > CONFIG.ANALYSIS.CONFLICT_THRESHOLD
                 );
-                
-                if (conflicts.length > 0) {
+
+                // Bias berechnen
+                const diffs = details.map(d => parseFloat(d.perf_mgr) - parseFloat(d.perf_team));
+                const bias = diffs.length > 0 ? diffs.reduce((a, b) => a + b, 0) / diffs.length : 0;
+                const mgrHigher = diffs.filter(d => d > 0).length;
+                const teamHigher = diffs.filter(d => d < 0).length;
+                const hasV1 = conflicts.length > 0;
+                const hasV2 = Math.abs(bias) >= CONFIG.ANALYSIS.BIAS_THRESHOLD;
+
+                const cntMgr = parseInt(partner.numAssessorsMgr || 0);
+                const cntTeam = parseInt(partner.numAssessorsTeam || 0);
+
+                if (cntMgr === 1 || cntTeam === 1) {
+                    const wer = cntMgr === 1 ? 'Manager' : 'Team';
+                    content += `<p style="color:#e67e22; font-weight:600; margin-bottom:10px;">Hinweis: Basiert auf einer einzelnen ${wer}-Bewertung.</p>`;
+                }
+
+                if (hasV1) {
+                    // V1 (mit oder ohne V2): Kriterienliste
                     content += Tpl.getConflictTableHTML(conflicts);
-                } else {
-                    content += `<p>Keine Kriterien gefunden, die den Schwellenwert überschreiten.</p>`;
+                } else if (hasV2) {
+                    // Nur V2: Bias-Darstellung
+                    const biasDir = bias > 0 ? 'Manager' : 'Team';
+                    const biasCount = bias > 0 ? mgrHigher : teamHigher;
+                    content += `<p style="font-size:1.05em; margin-bottom:10px;"><strong>${biasDir}</strong> bewertet bei <strong>${biasCount} von ${details.length}</strong> Kriterien höher (Ø ${bias > 0 ? '+' : ''}${bias.toFixed(2)})</p>`;
+                    content += `<p style="color:#666;">Keine einzelne große Abweichung, aber ein durchgängiges Muster.</p>`;
                 }
             }
         }
@@ -924,19 +959,25 @@ document.addEventListener("DOMContentLoaded", function() {
         const scaleY = (val) => padding + plotSize - ((val - valueMin) / valueRange) * plotSize;
 
         const jitterRange = CONFIG.UI.MATRIX_JITTER;
-        const jitter = () => (Math.random() - 0.5) * jitterRange;
 
         let dotsHTML = '';
         details.forEach(d => {
             const valImp = parseFloat(d.imp);
             const valPerf = parseFloat(d.perf);
 
-            const cx = scaleX(valPerf + jitter());
-            const cy = scaleY(valImp + jitter());
+            // Deterministischer Jitter basierend auf Name-Hash (statt random)
+            const hash = d.name.split('').reduce((h, c) => ((h << 5) - h) + c.charCodeAt(0), 0);
+            const jX = ((hash % 100) / 100 - 0.5) * 2 * jitterRange;
+            const jY = (((hash >> 8) % 100) / 100 - 0.5) * 2 * jitterRange;
 
-            dotsHTML += Tpl.getMatrixDotHTML(cx, cy, d.name, valImp, valPerf);
+            const cx = scaleX(valPerf + jX);
+            const cy = scaleY(valImp + jY);
+
+            const isAction = Math.round(valImp) >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN && valPerf <= CONFIG.ANALYSIS.ACTION_ITEM.PERFORMANCE_MAX;
+            const dotColor = isAction ? '#5C6BC0' : '#3498db';
+            dotsHTML += Tpl.getMatrixDotHTML(cx, cy, d.name, valImp, valPerf, dotColor);
         });
-        
+
         matrixContainer.innerHTML = Tpl.getMatrixSVG_Standard(dotsHTML, size, padding, plotSize);
     }
 

@@ -1909,20 +1909,22 @@ input[type=range].slider-neutral {
 }
 
 
-/* Text außerhalb bei kleinen Balken */
-.dbc-bar-left.text-outside,
-.dbc-bar-right.text-outside {
-    overflow: visible;
+/* Text außerhalb bei schmalen Balken */
+.dbc-label-outside {
+    font-size: 1.0em;
+    font-weight: bold;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    padding: 0 3px;
 }
 
-.dbc-bar-right.text-outside {
-    color: #2c3e50;
-    text-shadow: none;
+.dbc-label-neg {
+    color: #c0392b;
 }
 
-.dbc-bar-left.text-outside {
-    color: #2c3e50;
-    text-shadow: none;
+.dbc-label-pos {
+    color: #27ae60;
 }
 
 .dbc-bar-left-wrapper,

@@ -28,6 +28,8 @@
 # Modified: 2026-03-14 - DROP-Statements in 0_destroy_database.sql ausgelagert, CREATE TABLE IF NOT EXISTS
 # Modified: 2026-03-14 - Bugfix: get_partner_matrix_details fehlte score IS NOT NULL Filter (verfälschte gewichteten Durchschnitt)
 # Modified: 2026-04-10 - AP 61: view_survey_fraud IP-Duplikat nur bei gleicher Abteilung (PARTITION BY + department_id)
+# Modified: 2026-04-23 - AP 61: calculate_partner_bilanz um bias-Spalte erweitert (AVG Manager/Team-Differenz)
+# Modified: 2026-04-23 - AP 61: Action-Item Schwelle f_perf <= -0.8 (Performance ≤ 2.2)
 */
 
 -- Voraussetzung: Datenbank und User müssen vor Ausführung dieses Skripts existieren.
@@ -224,6 +226,7 @@ RETURNS TABLE (
     count_negative INT,
     awareness_pct INT,
     max_divergence NUMERIC,
+    bias NUMERIC,
     has_action_item INT,
     total_answers INT,
     num_assessors_mgr INT,
@@ -319,10 +322,12 @@ BEGIN
             COUNT(CASE WHEN (i.f_imp * i.f_perf) > 0 THEN 1 END) as count_pos,
             COUNT(CASE WHEN (i.f_imp * i.f_perf) < 0 THEN 1 END) as count_neg,
             MAX(ABS(COALESCE(i.val_mgr, 0) - COALESCE(i.val_team, 0))) as max_div,
-            
+            -- Systematischer Manager/Team-Bias (Ø gerichtete Abweichung über alle Kriterien)
+            AVG(COALESCE(i.val_mgr, 0) - COALESCE(i.val_team, 0)) FILTER (WHERE i.val_mgr IS NOT NULL AND i.val_team IS NOT NULL) as bias,
+
             -- Action Item Logik angepasst an lineares Modell:
-            -- f_perf <= -1.0 entspricht einer Note <= 2.0 (Echtes Defizit)
-            MAX(CASE WHEN i.f_imp >= 7 AND i.f_perf <= -1.0 THEN 1 ELSE 0 END) as has_action,
+            -- f_perf <= -0.8 entspricht einer Note <= 2.2 (Handlungsbedarf)
+            MAX(CASE WHEN i.f_imp >= 7 AND i.f_perf <= -0.8 THEN 1 ELSE 0 END) as has_action,
             
             SUM(i.comment_cnt) as total_spec_comments
         FROM impacts i
@@ -371,6 +376,7 @@ BEGIN
         COALESCE(pb.count_neg, 0)::int,
         COALESCE(pm.awareness, 0)::int,
         COALESCE(pb.max_div, 0)::numeric,
+        COALESCE(pb.bias, 0)::numeric,
         COALESCE(pb.has_action, 0)::int,
         COALESCE(pm.num_assessors, 0)::int,
         COALESCE(pm.num_assessors_mgr, 0)::int,

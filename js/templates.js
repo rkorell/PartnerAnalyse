@@ -18,6 +18,8 @@
   # Modified: 2026-03-02 - AP 56: Area Distribution (vBar in row, hBar+legend in modal)
   # Modified: 2026-03-13 - AP 59: NPS-Donut (Promoter/Detractor/Passive), Awareness-Torte entfernt, Kachel-Design
   # Modified: 2026-03-14 - QS: Unbenutzte Variablen entfernt, detractorPct direkt verwendet
+  # Modified: 2026-04-23 - AP 61: getMatrixDotHTML mit optionalem fillColor-Parameter
+  # Modified: 2026-04-23 - AP 61: Score-Balken: kein roter Geister-Balken bei 0 Defizit, schmale Balken Label außerhalb
 */
 
 import { escapeHtml } from './utils.js';
@@ -126,10 +128,23 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
         posScore, negScore
     } = scaling;
 
-    const txtPos = posWidth > 0 ? `${posScore} (${posCount})` : '';
-    const txtNeg = negWidth > 0 ? `${negScore} (${negCount})` : '';
-
     const areaVBarHTML = row.areaDistribution ? getAreaVBarHTML(row.areaDistribution, row.areaColors) : '';
+
+    // Schmale Balken: Text außerhalb darstellen (Schwelle: 8% der Balkenfläche)
+    const negNarrow = negWidth > 0 && negWidth < 8;
+    const posNarrow = posWidth > 0 && posWidth < 8;
+    const txtNegInside = negWidth > 0 && !negNarrow ? `${negScore} (${negCount})` : '';
+    const txtPosInside = posWidth > 0 && !posNarrow ? `${posScore} (${posCount})` : '';
+    const txtNegOutside = negNarrow ? `<span class="dbc-label-outside dbc-label-neg">${negScore} (${negCount})</span>` : '';
+    const txtPosOutside = posNarrow ? `<span class="dbc-label-outside dbc-label-pos">${posScore} (${posCount})</span>` : '';
+
+    // Kein roter Balken wenn negWidth = 0
+    const negBarHTML = negWidth > 0
+        ? `${txtNegOutside}<div class="dbc-bar-left" style="width: ${negWidth}%;" title="Strategisches Defizit: ${negScore} (${negCount} Themen)">${txtNegInside}</div>`
+        : '';
+    const posBarHTML = posWidth > 0
+        ? `<div class="dbc-bar-right" style="width: ${posWidth}%;" title="Strategischer Wert: +${posScore} (${posCount} Themen)">${txtPosInside}</div>${txtPosOutside}`
+        : '';
 
     return `
     <div class="criteria-row partner-row-clickable score-table-row" data-partner-id="${row.partnerId}">
@@ -140,15 +155,11 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
                 <div class="dbc-zero-line"></div>
 
                 <div class="dbc-bar-left-wrapper">
-                    <div class="dbc-bar-left" style="width: ${negWidth}%;" title="Strategisches Defizit: ${negScore} (${negCount} Themen)">
-                       ${txtNeg}
-                    </div>
+                    ${negBarHTML}
                 </div>
 
                 <div class="dbc-bar-right-wrapper">
-                    <div class="dbc-bar-right" style="width: ${posWidth}%;" title="Strategischer Wert: +${posScore} (${posCount} Themen)">
-                        ${txtPos}
-                    </div>
+                    ${posBarHTML}
                 </div>
             </div>
         </div>
@@ -362,8 +373,8 @@ export function getMatrixSVG_Standard(dotsHTML, size, padding, plotSize) {
     </svg>`;
 }
 
-export function getMatrixDotHTML(cx, cy, name, imp, perf) {
-    return `<circle cx="${cx}" cy="${cy}" r="6" fill="#3498db" stroke="#fff" stroke-width="1"
-            class="matrix-dot" 
+export function getMatrixDotHTML(cx, cy, name, imp, perf, fillColor = '#3498db') {
+    return `<circle cx="${cx}" cy="${cy}" r="6" fill="${fillColor}" stroke="#fff" stroke-width="1"
+            class="matrix-dot"
             data-name="${escapeHtml(name)}" data-imp="${imp}" data-perf="${perf}" />`;
 }
