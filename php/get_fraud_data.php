@@ -6,6 +6,7 @@
 
   # Created: 2026-02-14 - AP 50: Fraud-Detection API
   # Modified: 2026-02-14 - AP 50: mode_score, department/manager Filter
+  # Modified: 2026-04-24 - Systematischer Bias: is_bias, bias_partner_count, bias_pct_high
 */
 header('Content-Type: application/json');
 
@@ -34,7 +35,7 @@ try {
                    is_manager, ip_hash, created_at,
                    ip_submit_count, is_ip_duplicate,
                    total_perf_ratings, mode_score, straightline_pct, is_straightliner,
-                   avg_score, severity
+                   avg_score, is_bias, bias_partner_count, bias_pct_high, severity
             FROM view_survey_fraud
             WHERE survey_id IN ($placeholders)
               AND severity > 0";
@@ -61,14 +62,17 @@ try {
 
     // Boolean-Werte normalisieren (PDO liefert 't'/'f' für PostgreSQL BOOLEAN)
     foreach ($result as &$row) {
-        $row['is_ip_duplicate']  = $row['is_ip_duplicate'] === true || $row['is_ip_duplicate'] === 't';
-        $row['is_straightliner'] = $row['is_straightliner'] === true || $row['is_straightliner'] === 't';
-        $row['is_manager']       = $row['is_manager'] === true || $row['is_manager'] === 't';
-        $row['severity']         = intval($row['severity']);
-        $row['ip_submit_count']  = intval($row['ip_submit_count']);
-        $row['mode_score']       = intval($row['mode_score']);
-        $row['straightline_pct'] = intval($row['straightline_pct']);
-        $row['avg_score']        = floatval($row['avg_score']);
+        $row['is_ip_duplicate']    = $row['is_ip_duplicate'] === true || $row['is_ip_duplicate'] === 't';
+        $row['is_straightliner']   = $row['is_straightliner'] === true || $row['is_straightliner'] === 't';
+        $row['is_bias']            = $row['is_bias'] === true || $row['is_bias'] === 't';
+        $row['is_manager']         = $row['is_manager'] === true || $row['is_manager'] === 't';
+        $row['severity']           = intval($row['severity']);
+        $row['ip_submit_count']    = intval($row['ip_submit_count']);
+        $row['mode_score']         = intval($row['mode_score']);
+        $row['straightline_pct']   = intval($row['straightline_pct']);
+        $row['avg_score']          = floatval($row['avg_score']);
+        $row['bias_partner_count'] = intval($row['bias_partner_count']);
+        $row['bias_pct_high']      = floatval($row['bias_pct_high']);
     }
     unset($row);
 

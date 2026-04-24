@@ -2084,6 +2084,7 @@ input[type="range"]::-moz-range-thumb:hover {
     color: #fff;
     white-space: nowrap;
 }
+.fraud-badge.sev-4 { background: #8b0000; }
 .fraud-badge.sev-3 { background: #e74c3c; }
 .fraud-badge.sev-2 { background: #e67e22; }
 .fraud-badge.sev-1 { background: #f1c40f; color: #333; }
@@ -2100,6 +2101,7 @@ input[type="range"]::-moz-range-thumb:hover {
 .fraud-tag.ip { background: #fde8e8; color: #c0392b; }
 .fraud-tag.pattern { background: #fef3e2; color: #b45309; }
 .fraud-tag.harmless { background: #e8e8e8; color: #888; }
+.fraud-tag.bias { background: #f3e5f5; color: #6a1b9a; }
 .fraud-info {
     flex: 1;
     min-width: 0;

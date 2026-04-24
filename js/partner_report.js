@@ -309,8 +309,8 @@ function renderMatrixSVG(details) {
         const jX = ((hash % 100) / 100 - 0.5) * 2 * jitterRange;
         const jY = (((hash >> 8) % 100) / 100 - 0.5) * 2 * jitterRange;
 
-        const cx = scaleX(perf + jX);
-        const cy = scaleY(imp + jY);
+        const cx = scaleX(Math.max(valueMin, Math.min(valueMax, perf + jX)));
+        const cy = scaleY(Math.max(valueMin, Math.min(valueMax, imp + jY)));
         const isAction = Math.round(imp) >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN && perf <= CONFIG.ANALYSIS.ACTION_ITEM.PERFORMANCE_MAX;
         const dotColor = isAction ? '#5C6BC0' : '#3498db';
         dotsHTML += Tpl.getMatrixDotHTML(cx, cy, d.name, imp, perf, dotColor);

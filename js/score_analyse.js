@@ -40,6 +40,7 @@
   # Modified: 2026-04-24 - Ergebnistabelle alphabetisch sortiert, Rang-Nummer entfernt
   # Modified: 2026-04-24 - "Partner Score Ranking" → "Partner Score Übersicht"
   # Modified: 2026-04-24 - "Manager/Team-Abweichungen" → "Unterschiede in der Wahrnehmung"
+  # Modified: 2026-04-24 - Fraud-Detection: Severity 4 "Systematischer Bias" (Negativbias über alle Partner)
 */
 
 import { CONFIG } from './config.js';
@@ -974,8 +975,8 @@ document.addEventListener("DOMContentLoaded", function() {
             const jX = ((hash % 100) / 100 - 0.5) * 2 * jitterRange;
             const jY = (((hash >> 8) % 100) / 100 - 0.5) * 2 * jitterRange;
 
-            const cx = scaleX(valPerf + jX);
-            const cy = scaleY(valImp + jY);
+            const cx = scaleX(Math.max(valueMin, Math.min(valueMax, valPerf + jX)));
+            const cy = scaleY(Math.max(valueMin, Math.min(valueMax, valImp + jY)));
 
             const isAction = Math.round(valImp) >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN && valPerf <= CONFIG.ANALYSIS.ACTION_ITEM.PERFORMANCE_MAX;
             const dotColor = isAction ? '#5C6BC0' : '#3498db';
@@ -1114,7 +1115,10 @@ document.addEventListener("DOMContentLoaded", function() {
                 const r = item.entry;
                 const isHarmless = r.is_straightliner && r.mode_score === 3;
                 let sevClass, sevLabel;
-                if (isHarmless) {
+                if (r.is_bias) {
+                    sevClass = 'sev-4';
+                    sevLabel = 'Systematischer Bias';
+                } else if (isHarmless) {
                     sevClass = 'sev-harmless';
                     sevLabel = 'Hinweis';
                 } else {
@@ -1123,6 +1127,9 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
 
                 let tags = '';
+                if (r.is_bias) {
+                    tags += `<span class="fraud-tag bias">Ø ${r.avg_score.toFixed(1)} über ${r.bias_partner_count} Partner, ${r.bias_pct_high.toFixed(0)}% Scores ≥4</span>`;
+                }
                 if (r.is_straightliner) {
                     const tagClass = r.mode_score === 3 ? 'harmless' : 'pattern';
                     tags += `<span class="fraud-tag ${tagClass}">Häufung identischer Bewertungen: ${r.straightline_pct}% Score ${r.mode_score}</span>`;

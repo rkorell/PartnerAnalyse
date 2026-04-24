@@ -740,10 +740,11 @@ $$ LANGUAGE plpgsql;
 
 /* View: view_survey_fraud (AP 50, überarbeitet AP 61)
    Zweck: Fraud-Indikatoren pro Teilnehmer für Anomalie-Erkennung.
-   Erkennt: IP-Duplikate (gleiche IP + gleiche Abteilung), Häufung identischer Bewertungen (≥80% gleicher Score).
+   Erkennt: IP-Duplikate (gleiche IP + gleiche Abteilung), Häufung identischer Bewertungen (≥80% gleicher Score),
+            Systematischer Bias (Ø < 2.5 über ≥3 Partner, <10% Scores ≥4).
    IP-Duplikate: Nur innerhalb derselben Abteilung — verschiedene Abteilungen von derselben IP sind Infrastruktur-Artefakte (Büro/VPN), kein Fraud-Signal.
    mode_score: Der am häufigsten vergebene Score-Wert (Score 3 = harmlos, da neutraler Effekt im Scoring-Modell).
-   Schweregrad: 3 = IP + Muster (Score≠3), 2 = nur IP (gleiche Abt.), 1 = Häufung (inkl. Score 3), 0 = unauffällig.
+   Schweregrad: 4 = Systematischer Bias, 3 = IP + Muster (Score≠3), 2 = nur IP (gleiche Abt.), 1 = Häufung (inkl. Score 3), 0 = unauffällig.
 */
 CREATE OR REPLACE VIEW view_survey_fraud AS
 WITH
@@ -781,6 +782,19 @@ rating_patterns AS (
     FROM rating_score_counts rsc
     JOIN rating_mode rm ON rsc.participant_id = rm.participant_id
     GROUP BY rsc.participant_id, rm.mode_score, rm.mode_count
+),
+bias_detection AS (
+    SELECT
+        r.participant_id,
+        COUNT(DISTINCT r.partner_id) AS partner_count,
+        ROUND(AVG(r.score)::numeric, 2) AS bias_avg,
+        ROUND(COUNT(CASE WHEN r.score >= 4 THEN 1 END)::numeric / NULLIF(COUNT(*)::numeric, 0) * 100, 1) AS pct_high
+    FROM ratings r
+    WHERE r.rating_type = 'performance' AND r.score > 0
+    GROUP BY r.participant_id
+    HAVING COUNT(DISTINCT r.partner_id) >= 3
+       AND AVG(r.score) < 2.5
+       AND COUNT(CASE WHEN r.score >= 4 THEN 1 END)::numeric / NULLIF(COUNT(*)::numeric, 0) < 0.10
 )
 SELECT
     p.id AS participant_id,
@@ -798,7 +812,11 @@ SELECT
     COALESCE(rp.straightline_pct, 0) AS straightline_pct,
     COALESCE(rp.straightline_pct >= 80, FALSE) AS is_straightliner,
     COALESCE(rp.avg_score, 0) AS avg_score,
+    bd.participant_id IS NOT NULL AS is_bias,
+    COALESCE(bd.partner_count, 0) AS bias_partner_count,
+    COALESCE(bd.pct_high, 0) AS bias_pct_high,
     CASE
+        WHEN bd.participant_id IS NOT NULL THEN 4
         WHEN COALESCE(ips.ip_submit_count > 1, FALSE)
              AND COALESCE(rp.straightline_pct >= 80, FALSE)
              AND COALESCE(rp.mode_score, 3) != 3
@@ -811,4 +829,5 @@ FROM participants p
 JOIN surveys s ON p.survey_id = s.id
 JOIN departments d ON p.department_id = d.id
 LEFT JOIN ip_stats ips ON p.id = ips.participant_id
-LEFT JOIN rating_patterns rp ON p.id = rp.participant_id;
+LEFT JOIN rating_patterns rp ON p.id = rp.participant_id
+LEFT JOIN bias_detection bd ON p.id = bd.participant_id;
