@@ -118,7 +118,7 @@ export function getScoreTableStartHTML(title) {
     <div class="criteria-table">
         <div class="criteria-row score-table-header">
             <div class="criteria-content col-partner"><span class="column-header-tile">Partner</span></div>
-            <div class="criteria-content col-score-graph" style="text-align:center;"><span class="column-header-tile">Partner-Bilanz (Potenzial vs. Kompetenz)</span></div>
+            <div class="criteria-content col-score-graph" style="text-align:center;"><span class="column-header-tile">Partner-Bilanz (Potenzial · Kompetenz)</span></div>
             <div class="criteria-content col-count"><span class="column-header-tile">Antworten</span></div>
             <div class="criteria-content col-insights text-center"><span class="column-header-tile">Insights</span></div>
         </div>`;
