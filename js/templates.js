@@ -368,7 +368,7 @@ export function getMatrixSVG_Standard(dotsHTML, size, padding, plotSize) {
         
         <!-- Quadranten-Texte (deutsche Labels, pastell-Farben für oben) -->
         <text x="${padding + 10}" y="${padding + 20}" fill="#e57373" font-size="12" font-weight="bold">Potenzial</text>
-        <text x="${padding + plotSize - 10}" y="${padding + 20}" fill="#81c784" font-size="12" font-weight="bold" text-anchor="end">Stärke</text>
+        <text x="${padding + plotSize - 10}" y="${padding + 20}" fill="#81c784" font-size="12" font-weight="bold" text-anchor="end">Kompetenz</text>
         <text x="${padding + 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12">Nebensache</text>
         <text x="${padding + plotSize - 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12" text-anchor="end">Bonus</text>
         
