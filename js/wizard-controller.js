@@ -1,6 +1,6 @@
 /*
   Datei: js/wizard-controller.js
-  Zweck: Kernlogik der Quality Index Datenerfassung (ehemals QualityIndexWizard in app.js)
+  Zweck: Kernlogik der Questionnaire Insight Datenerfassung (ehemals QualityIndexWizard in app.js)
   (c) - Dr. Ralf Korell, 2025/26
 
   # Created: 27.11.2025, 14:50 - Extracted core logic from app.js (AP 8)

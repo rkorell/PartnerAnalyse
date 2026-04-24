@@ -245,43 +245,38 @@ INSERT INTO app_texts (id, category, content) VALUES
 -- 2. analytic-mask (Analyse: Lesehilfe & Methodik)
 INSERT INTO app_texts (id, category, content) VALUES
 (34, 'analytic-mask', $$<div class="help-content">
-    <p style="text-align: center; font-style: italic;">
-        Eine ausf&uuml;hrliche Anleitung zur Analyse findest Du im
-        <a href="docs/CPQI_Analyse_Anleitung.pdf" target="_blank">Analyse-Leitfaden (PDF)</a>.
-    </p>
-    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
 
     <h2 class="modal-headline">So liest Du die Partner-Bilanz (Diverging Bar Chart)</h2>
 
     <h3>Wichtig vorab: Gruppenkonsens</h3>
     <p>
         Diese Analyse zeigt nicht die Meinung eines Einzelnen, sondern den <strong>Gruppenkonsens</strong> &ndash;
-        die kumulierte und gemittelte Gesamtbewertung aller Teilnehmer. Jeder Balken, jeder Score und jede
-        Rangfolge basiert auf der aggregierten Einsch&auml;tzung der gesamten Befragungsgruppe. Damit bildet diese
-        Darstellung ab, wie die Organisation als Ganzes die Zusammenarbeit mit ihren Partnern bewertet.
+        die kumulierte und gemittelte Gesamtbewertung aller Teilnehmer.
+        Die dargestellten Balken basieren auf der aggregierten Einsch&auml;tzung der gesamten Befragungsgruppe.
+        Damit bildet diese Darstellung ab, wie die Organisation als Ganzes die Zusammenarbeit mit ihren Partnern bewertet.
     </p>
 
-    <h3>Das Prinzip: Belastung vs. Wertbeitrag</h3>
+    <h3>Das Prinzip: Potenzial und Kompetenz</h3>
     <p>
         Anstatt eines einfachen Durchschnittswerts zeigt diese Grafik eine <strong>Bilanz</strong> der Zusammenarbeit.
-        Sie stellt die Schw&auml;chen eines Partners (Belastung, links) direkt seinen St&auml;rken (Wertbeitrag, rechts) gegen&uuml;ber.
+        Sie stellt die potenziellen Verbesserungsbereiche eines Partners (Potenzial, links) sowie seine St&auml;rken (Kompetenz, rechts) dar.
     </p>
     <p>Die Balken wachsen von der neutralen Mitte (0) in zwei Richtungen:</p>
 
     <div style="margin-bottom: 20px;">
-        <h4 style="color: #e74c3c;">1. Der Rote Balken (Links): Das Strategische Defizit</h4>
+        <h4 style="color: #e74c3c;">1. Der Rote Balken (Links): Das Entwicklungspotenzial</h4>
         <ul>
-            <li><strong>Was er zeigt:</strong> Die Summe aller negativen Leistungen, gewichtet nach der Wichtigkeit, die die Befragungsgruppe diesen Kriterien beimisst.</li>
-            <li><strong>Bedeutung:</strong> Je l&auml;nger dieser Balken nach links reicht, desto mehr bremst der Partner die strategischen Ziele der Organisation (&bdquo;Liability&ldquo;).</li>
+            <li><strong>Was er zeigt:</strong> Die Summe aller Kriterien, in denen der Partner schwach performt, gewichtet nach der Wichtigkeit, die die Befragungsgruppe diesen Kriterien beimisst.</li>
+            <li><strong>Bedeutung:</strong> Je l&auml;nger dieser Balken nach links reicht, desto mehr Kriterien mit Entwicklungspotenzial sind bei diesem Partner vorhanden.</li>
             <li><strong>Entstehung:</strong> Schwache Leistung (1&ndash;2) in Themen, die der Gruppe wichtig sind.</li>
         </ul>
     </div>
 
     <div style="margin-bottom: 20px;">
-        <h4 style="color: #2ecc71;">2. Der Gr&uuml;ne Balken (Rechts): Der Strategische Wertbeitrag</h4>
+        <h4 style="color: #2ecc71;">2. Der Gr&uuml;ne Balken (Rechts): Die vorhandene Kompetenz</h4>
         <ul>
-            <li><strong>Was er zeigt:</strong> Die Summe aller positiven Leistungen, gewichtet nach der Wichtigkeit, die die Befragungsgruppe diesen Kriterien beimisst.</li>
-            <li><strong>Bedeutung:</strong> Je l&auml;nger dieser Balken nach rechts reicht, desto mehr zahlt der Partner auf die strategischen Ziele der Organisation ein (&bdquo;Asset&ldquo;).</li>
+            <li><strong>Was er zeigt:</strong> Die Summe aller Kriterien, in denen der Partner gut performt, gewichtet nach der Wichtigkeit, die die Befragungsgruppe diesen Kriterien beimisst.</li>
+            <li><strong>Bedeutung:</strong> Je l&auml;nger dieser Balken nach rechts reicht, desto mehr Kriterien erf&uuml;llt dieser Partner gut.</li>
             <li><strong>Entstehung:</strong> Starke Leistung (4&ndash;5) in Themen, die der Gruppe wichtig sind.</li>
         </ul>
     </div>
@@ -294,61 +289,9 @@ INSERT INTO app_texts (id, category, content) VALUES
         sich der Balken zusammensetzt &ndash; und damit, wie <strong>breit oder fokussiert</strong> das Urteil der Gruppe ist:
     </p>
     <ul>
-        <li><strong>Hohe Anzahl (z.B. 12):</strong> Die St&auml;rke oder Schw&auml;che zieht sich durch viele Bereiche der Zusammenarbeit &ndash; ein systematisches Muster.</li>
-        <li><strong>Niedrige Anzahl (z.B. 3):</strong> Das Ergebnis konzentriert sich auf wenige spezifische Felder. Der Partner wird in einem begrenzten, aber klar definierten Bereich positiv oder negativ bewertet.</li>
+        <li><strong>Hohe Anzahl (z.B. 12):</strong> Die St&auml;rke oder das Verbesserungspotenzial zieht sich durch viele Bereiche der Zusammenarbeit &ndash; ein systematisches Muster.</li>
+        <li><strong>Niedrige Anzahl (z.B. 3):</strong> Das Ergebnis konzentriert sich auf wenige spezifische Felder. Der Partner wird in einem begrenzten, aber klar definierten Bereich bewertet.</li>
     </ul>
-
-    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-
-    <h3>F&uuml;nf Partner-Archetypen als Orientierung</h3>
-    <ul style="list-style-type: none; padding-left: 0;">
-        <li style="margin-bottom: 15px;">
-            <strong>Der Solide</strong> <em>(Lang Gr&uuml;n / Kurz oder Kein Rot)</em><br>
-            Das ist der Wunschpartner. Stark ausgepr&auml;gtes Gr&uuml;n &uuml;ber viele Kriterien hinweg bei wenig oder keinem Rot.
-            Hoher Score, hohes Potenzial, hohe Loyalit&auml;t und Leistungsf&auml;higkeit. Dieser Partner zahlt breit und verl&auml;sslich
-            auf die strategischen Ziele der Organisation ein. Die Zusammenarbeit funktioniert &ndash; und zwar nicht nur punktuell,
-            sondern in der Fl&auml;che. Pflegen, wertsch&auml;tzen, ausbauen.
-        </li>
-        <li style="margin-bottom: 15px;">
-            <strong>Der Spezialist</strong> <em>(Kurz bis Mittel Gr&uuml;n / Kein Rot)</em><br>
-            Kein Fl&auml;chenspieler, aber dort, wo er antritt, ist er exzellent. Dieser Partner hat einige wenige Kriterien
-            mit hoher Importance, in denen er herausragend abschneidet &ndash; und keine Schw&auml;chen. Typisch f&uuml;r
-            technologiefokussierte Spezialistenpartner, die in ihrem Fachgebiet verl&auml;sslich Top-Leistung bringen.
-            Der gr&uuml;ne Balken ist nicht der l&auml;ngste, aber er ist frei von rotem Gegengewicht. Ein wertvoller Partner
-            in seinem Segment.
-        </li>
-        <li style="margin-bottom: 15px;">
-            <strong>Der Stratege ohne Execution</strong> <em>(Lang Gr&uuml;n / Lang Rot)</em><br>
-            Ein Partner mit zwei Gesichtern. Er liefert in wichtigen strategischen Feldern exzellente Ergebnisse &ndash;
-            die gr&uuml;ne Seite ist beeindruckend. Gleichzeitig zeigt die ebenso ausgepr&auml;gte rote Seite, dass es im
-            operativen Bereich erhebliche Schw&auml;chen gibt. Strategisch brillant, in der Umsetzung mit Defiziten.
-            Die Handlungsempfehlung ist klar: Nicht trennen (daf&uuml;r ist das Gr&uuml;n zu wertvoll), sondern die spezifischen
-            roten Blocker gezielt identifizieren und weg-managen.
-        </li>
-        <li style="margin-bottom: 15px;">
-            <strong>Der Sanierungsfall</strong> <em>(Lang Rot / Kurz oder Kein Gr&uuml;n)</em><br>
-            Dieser Partner verursacht deutlich mehr strategische Belastung, als er Wertbeitrag liefert. Die roten Balken
-            dominieren, w&auml;hrend auf der gr&uuml;nen Seite wenig bis nichts zu finden ist. In den Bereichen, die der Gruppe
-            wichtig sind, bleibt er systematisch hinter den Erwartungen zur&uuml;ck &ndash; nicht nur punktuell, sondern strukturell.
-            Hier besteht akuter Handlungsbedarf: Ein strukturiertes Gespr&auml;ch &uuml;ber die Zusammenarbeit ist dringend angeraten,
-            bevor sich die Defizite weiter verfestigen.
-        </li>
-        <li style="margin-bottom: 15px;">
-            <strong>Der Konflikt</strong> <em>(Unterschiedliche Bewertung je nach Perspektive)</em><br>
-            Dieser Archetyp f&auml;llt nicht durch die Balkenl&auml;nge auf, sondern durch eine <strong>Diskrepanz zwischen
-            Management- und Team-Bewertung</strong>. Zwei Szenarien: (1)&nbsp;Das Management ist begeistert &ndash;
-            der Partner macht einen tollen Job auf Entscheider-Ebene &ndash; aber das Team sagt: &bdquo;Der liefert nicht.&ldquo;
-            (2)&nbsp;Umgekehrt: Das Team sch&auml;tzt die operative Zusammenarbeit, aber das Management sieht keinen strategischen
-            Mehrwert. Der Konflikt wird am Divergenz-Symbol im Ranking sichtbar. Der Filter (Alle / Manager / Team)
-            macht die unterschiedlichen Perspektiven transparent.
-        </li>
-    </ul>
-
-    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-    <p style="text-align: center; font-style: italic;">
-        Eine ausf&uuml;hrliche Anleitung zur Analyse findest Du im
-        <a href="docs/CPQI_Analyse_Anleitung.pdf" target="_blank">Analyse-Leitfaden (PDF)</a>.
-    </p>
 </div>$$);
 
 -- 3. nps-explanation (Wizard: NPS-Erklärung, Schwellenwerte ≥7/≤4)
@@ -375,8 +318,8 @@ INSERT INTO app_texts (id, category, content) VALUES
             Diese Gruppe verhält sich neutral. Sie sind zufrieden, aber nicht emotional an uns gebunden. Sie sind anfällig für Wettbewerbsangebote und treiben das Geschäft oft nur reaktiv voran.
         </li>
         <li>
-            <strong style="color: #e74c3c;">🔴 Detraktoren (0 – 4):</strong>
-            Hier liegt eine Störung in der Geschäftsbeziehung vor. Diese Kritiker sind unzufrieden, was unserem Ruf oder dem gemeinsamen Wachstum schaden kann. Hier besteht Handlungsbedarf.
+            <strong style="color: #e74c3c;">🔴 Kritische Stimmen (0 – 4):</strong>
+            Diese Bewertungen signalisieren Entwicklungsbedarf in der Geschäftsbeziehung. Sie zeigen Bereiche auf, in denen die Zusammenarbeit aus Sicht der Bewertenden noch nicht ihr Potenzial erreicht hat.
         </li>
     </ul>
 
@@ -394,18 +337,18 @@ INSERT INTO app_texts (id, category, content) VALUES
         Der NPS ist kein einfacher Durchschnittswert. Er berechnet sich aus dem Verhältnis der positiven zu den negativen Stimmen. Die "Passiven" fließen nicht in den Wert ein.
     </p>
     <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; margin: 15px 0; font-weight: bold; border: 1px solid #ddd; color: #2c3e50;">
-        NPS = (% Promotoren) — (% Detraktoren)
+        NPS = (% Promotoren) — (% Kritische Stimmen)
     </div>
     <p>
-        Das Ergebnis ist eine Kennzahl zwischen <strong>-100</strong> (alle sind Kritiker) und <strong>+100</strong> (alle sind Promotoren). Ein Wert über 0 gilt als gut, Werte über +50 als exzellent.
+        Das Ergebnis ist eine Kennzahl zwischen <strong>-100</strong> (alle bewerten kritisch) und <strong>+100</strong> (alle sind Promotoren). Ein Wert über 0 gilt als gut, Werte über +50 als exzellent.
     </p>
 
-    <h4>Sinn und Zweck für den Quality Index:</h4>
+    <h4>Sinn und Zweck f&uuml;r das Questionnaire Insight:</h4>
     <p>
         Der NPS fungiert als unser strategisches <strong>Barometer</strong>. Während die Detail-Kriterien die operativen Fakten messen, quantifiziert der NPS das Vertrauen in die Partnerschaft.
     </p>
     <p>
-        Ein hoher NPS identifiziert Partner, die als Multiplikatoren für unsere Strategie wirken. Ein niedriger NPS dient als Frühwarnsystem für strukturelle Konflikte, noch bevor diese in den Umsatzzahlen sichtbar werden.
+        Ein hoher NPS identifiziert Partner, die als Multiplikatoren für unsere Strategie wirken. Ein niedriger NPS zeigt Entwicklungspotenzial in der Partnerschaft auf und ermöglicht frühzeitiges Gegensteuern.
     </p>
 </div>$$);
 

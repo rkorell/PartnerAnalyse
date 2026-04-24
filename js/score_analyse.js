@@ -38,6 +38,8 @@
   # Modified: 2026-04-23 - AP 61: Blitz-Indikator erweitert um systematischen Manager/Team-Bias (V2a)
   # Modified: 2026-04-23 - AP 61: Action-Item Popup Fix (gerundete Importance), Matrix-Dots lila bei Handlungsbedarf
   # Modified: 2026-04-24 - Ergebnistabelle alphabetisch sortiert, Rang-Nummer entfernt
+  # Modified: 2026-04-24 - "Partner Score Ranking" → "Partner Score Übersicht"
+  # Modified: 2026-04-24 - "Manager/Team-Abweichungen" → "Unterschiede in der Wahrnehmung"
 */
 
 import { CONFIG } from './config.js';
@@ -722,7 +724,7 @@ document.addEventListener("DOMContentLoaded", function() {
         });
         if (maxBarValue === 0) maxBarValue = 1; 
 
-        let html = Tpl.getScoreTableStartHTML(`Ergebnis: Partner Score Ranking (Basierend auf ${globalCount} Teilnehmern)`);
+        let html = Tpl.getScoreTableStartHTML(`Ergebnis: Partner Score Übersicht (Basierend auf ${globalCount} Teilnehmern)`);
 
         rows = [...rows].sort((a, b) => a.partnerName.localeCompare(b.partnerName, 'de'));
 
@@ -757,7 +759,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
 
             if (parseInt(row.hasActionItem) === 1) {
-                slot3 = Tpl.getInsightIconHTML('action', row.partnerId, 'Handlungsbedarf - Klick für Details', '⚠️');
+                slot3 = Tpl.getInsightIconHTML('action', row.partnerId, 'Potenzial - Klick für Details', '⚠️');
             }
 
             const maxDiv = parseFloat(row.maxDivergence || 0);
@@ -869,7 +871,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
         else if (action === 'conflict') {
-            title = `Manager/Team-Abweichungen: ${escapeHtml(partner.partnerName)}`;
+            title = `Unterschiede in der Wahrnehmung: ${escapeHtml(partner.partnerName)}`;
             if (partner.matrixDetails) {
                 const details = partner.matrixDetails.filter(d => d.perf_mgr != null && d.perf_team != null);
                 const conflicts = details.filter(d =>

@@ -22,6 +22,8 @@
   # Modified: 2026-04-23 - AP 61: Score-Balken: kein roter Geister-Balken bei 0 Defizit, schmale Balken Label außerhalb
   # Modified: 2026-04-24 - Rang-Nummer vor Partnername in Ergebnistabelle entfernt
   # Modified: 2026-04-24 - IPA-Matrix: Quadranten-Labels vereinheitlicht (Handlungsbedarf/Stärke/Nebensache/Bonus)
+  # Modified: 2026-04-24 - NPS-Tooltip: "Detractor" → "Kritisch"
+  # Modified: 2026-04-24 - Wording entschärft: Defizit→Potenzial, Wert→Kompetenz, Tooltips/Legende neutral, text-danger-bold entfernt
 */
 
 import { escapeHtml } from './utils.js';
@@ -116,7 +118,7 @@ export function getScoreTableStartHTML(title) {
     <div class="criteria-table">
         <div class="criteria-row score-table-header">
             <div class="criteria-content col-partner"><span class="column-header-tile">Partner</span></div>
-            <div class="criteria-content col-score-graph" style="text-align:center;"><span class="column-header-tile">Partner-Bilanz (Defizit vs. Wert)</span></div>
+            <div class="criteria-content col-score-graph" style="text-align:center;"><span class="column-header-tile">Partner-Bilanz (Potenzial vs. Kompetenz)</span></div>
             <div class="criteria-content col-count"><span class="column-header-tile">Antworten</span></div>
             <div class="criteria-content col-insights text-center"><span class="column-header-tile">Insights</span></div>
         </div>`;
@@ -142,10 +144,10 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
 
     // Kein roter Balken wenn negWidth = 0
     const negBarHTML = negWidth > 0
-        ? `${txtNegOutside}<div class="dbc-bar-left" style="width: ${negWidth}%;" title="Strategisches Defizit: ${negScore} (${negCount} Themen)">${txtNegInside}</div>`
+        ? `${txtNegOutside}<div class="dbc-bar-left" style="width: ${negWidth}%;" title="Potenzial: ${negScore} (${negCount} Themen)">${txtNegInside}</div>`
         : '';
     const posBarHTML = posWidth > 0
-        ? `<div class="dbc-bar-right" style="width: ${posWidth}%;" title="Strategischer Wert: +${posScore} (${posCount} Themen)">${txtPosInside}</div>${txtPosOutside}`
+        ? `<div class="dbc-bar-right" style="width: ${posWidth}%;" title="Kompetenz: +${posScore} (${posCount} Themen)">${txtPosInside}</div>${txtPosOutside}`
         : '';
 
     return `
@@ -243,8 +245,8 @@ export function getLegendHTML() {
         <strong class="legend-label">Insights - Symbolerklärung:</strong>
         <span class="legend-item" title="Net Promoter Score - Weiterempfehlungsbereitschaft">📣 NPS</span>
         <span class="legend-item" title="Allgemeine oder spezifische Kommentare vorhanden">💬 Kommentar(e) verfügbar</span>
-        <span class="legend-item" title="Strategisch wichtige Kriterien werden schlecht erfüllt">⚠️ Handlungsbedarf</span>
-        <span class="legend-item" title="Manager-Team-Konflikt: Divergente Bewertung zwischen Führungskräften und Team">⚡ Bewertungsunterschied</span>
+        <span class="legend-item" title="Kriterien mit Entwicklungspotenzial">⚠️ Potenzial</span>
+        <span class="legend-item" title="Unterschiedliche Wahrnehmung zwischen Führungskräften und Team">⚡ Bewertungsunterschied</span>
     </div>`;
 }
 
@@ -252,7 +254,7 @@ export function getInsightNpsHTML(nps, color, promoterPct = 0, passivePct = 0, d
     const sign = nps > 0 ? '+' : '';
     const pD = promoterPct + detractorPct;
     const pieStyle = `background: conic-gradient(from 180deg, #2ecc71 0% ${promoterPct}%, #e74c3c ${promoterPct}% ${pD}%, #f1c40f ${pD}% 100%);`;
-    const pieTitle = `Promoter: ${promoterPct}% · Detractor: ${detractorPct}% · Passive: ${passivePct}%`;
+    const pieTitle = `Promoter: ${promoterPct}% · Kritisch: ${detractorPct}% · Passive: ${passivePct}%`;
     return `<div class="nps-with-pie">
         <span class="nps-display" title="NPS Score: ${nps}">📣 <span class="nps-value" style="color:${color};">${sign}${nps}</span></span>
         <div class="nps-pie" style="${pieStyle}" title="${pieTitle}"></div>
@@ -322,7 +324,7 @@ export function getSpecificCommentsHTML(items) {
 export function getActionTableHTML(items) {
     let html = `<table class="modal-table"><tr><th>Kriterium</th><th>Wichtigkeit</th><th>Performance</th></tr>`;
     items.forEach(i => {
-        html += `<tr><td>${escapeHtml(i.name)}</td><td>${i.imp}</td><td class="text-danger-bold">${i.perf}</td></tr>`;
+        html += `<tr><td>${escapeHtml(i.name)}</td><td>${i.imp}</td><td>${i.perf}</td></tr>`;
     });
     html += `</table>`;
     return html;
@@ -365,7 +367,7 @@ export function getMatrixSVG_Standard(dotsHTML, size, padding, plotSize) {
         <text x="${mid}" y="${padding + plotSize + 25}" fill="#7f8c8d" font-size="11" text-anchor="middle">Leistung</text>
         
         <!-- Quadranten-Texte (deutsche Labels, pastell-Farben für oben) -->
-        <text x="${padding + 10}" y="${padding + 20}" fill="#e57373" font-size="12" font-weight="bold">Handlungsbedarf</text>
+        <text x="${padding + 10}" y="${padding + 20}" fill="#e57373" font-size="12" font-weight="bold">Potenzial</text>
         <text x="${padding + plotSize - 10}" y="${padding + 20}" fill="#81c784" font-size="12" font-weight="bold" text-anchor="end">Stärke</text>
         <text x="${padding + 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12">Nebensache</text>
         <text x="${padding + plotSize - 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12" text-anchor="end">Bonus</text>

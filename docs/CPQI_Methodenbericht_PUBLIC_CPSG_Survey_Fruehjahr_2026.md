@@ -8,7 +8,7 @@
 
 ## Management Summary
 
-Der Cisco Partner Quality Index (CPQI) bewertet die Leistung von Cisco-Vertriebspartnern durch eine strukturierte Befragung der Cisco-Belegschaft. Die Methodik basiert auf der wissenschaftlich etablierten Importance-Performance-Analyse (IPA) nach Martilla & James (1977) und kombiniert qualitative Bewertungen über 24 Kriterien mit einem quantitativen Scoring-Modell.
+Das Cisco Partner Questionnaire Insight (CPQI) bewertet die Zusammenarbeit mit Cisco-Vertriebspartnern durch eine strukturierte Befragung der Cisco-Belegschaft. Die Methodik basiert auf der wissenschaftlich etablierten Importance-Performance-Analyse (IPA) nach Martilla & James (1977) und kombiniert qualitative Bewertungen über 24 Kriterien mit einem quantitativen Scoring-Modell.
 
 Im Erhebungszeitraum Februar–April 2026 haben **98 Teilnehmerinnen und Teilnehmer** aus 10 Abteilungen **20 Partner** bewertet. Die Ergebnisse zeigen eine überwiegend positive Bewertungslandschaft mit klarer Differenzierung: Die Score-Spannweite reicht von +232 bis -305, wobei 16 von 20 Partnern im positiven Bereich liegen. Diese Verteilung ist methodisch erklärbar und spiegelt die tatsächliche Wahrnehmung der Belegschaft wider — nicht eine Schwäche des Modells.
 

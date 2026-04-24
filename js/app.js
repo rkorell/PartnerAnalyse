@@ -1,5 +1,5 @@
 // Datei: /var/www/html/js/app.js
-// created: November 21, 2025, 20:50 - Vollständiges JavaScript für Cisco Partner Quality Index Wizard erstellt
+// created: November 21, 2025, 20:50 - Vollständiges JavaScript für Cisco Partner Questionnaire Insight Wizard erstellt
 // # Modified: 22.11.2025, 14:45 - Umstellung auf DB-Backend, Fix Standardwerte, Header-Korrektur, Unique DOM IDs, Name/Email/Manager
 // # Modified: 23.11.2025, 11:35 - Anpassung auf englische JSON-Keys (category, name, description)
 // # Modified: 24.11.2025, 23:10 - Implemented Test-Mode, N/A Slider State (0), Importance Validation

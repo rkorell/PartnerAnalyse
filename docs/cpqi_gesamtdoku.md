@@ -1,6 +1,6 @@
 CPQI - Gesamtdokumentation
 
-Cisco Partner Quality Index Methodik, Kriterienkatalog & Datenmodell
+Cisco Partner Questionnaire Insight Methodik, Kriterienkatalog & Datenmodell
 
 Stand: 2026-02-14 | Dr. Ralf Korell
 

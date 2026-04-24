@@ -1,4 +1,4 @@
-# Cisco Partner Quality Index (CPQI)
+# Cisco Partner Questionnaire Insight (CPQI)
 
 **Version:** 1.2
 **Datum:** 2026-02-16

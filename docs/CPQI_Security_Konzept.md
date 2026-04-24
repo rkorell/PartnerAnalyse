@@ -1,6 +1,6 @@
 # CPQI Security-Konzept
 
-**Cisco Partner Quality Index – Datenschutz, Sicherheitsarchitektur & Fraud-Detection**
+**Cisco Partner Questionnaire Insight – Datenschutz, Sicherheitsarchitektur & Fraud-Detection**
 
 Stand: 2026-02-14 | Dr. Ralf Korell
 

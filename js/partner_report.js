@@ -8,6 +8,8 @@
   # Modified: 2026-03-13 - AP 59: NPS-Verteilung (Torte), Awareness entfernt
   # Modified: 2026-03-14 - QS: detractorDisplay aus DB-Wert statt Berechnung
   # Modified: 2026-04-21 - AP 61: Anhang 1 Wichtigkeitsverteilung, Anhang 2 Performance-Benchmark, Anhang 3 Kriterienkatalog
+  # Modified: 2026-04-24 - Partner alphabetisch sortiert, Mini-Ranking-Diagramm entfernt
+  # Modified: 2026-04-24 - Wording entschärft: Divergenzen, Detractor, rote Performance-Werte, Action-Item Rundung sync
 */
 
 import { CONFIG } from './config.js';
@@ -74,7 +76,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             npsScore: parseInt(row.nps_score || 0),
             npsPromoterPct: parseInt(row.nps_promoter_pct || 0),
             npsPassivePct: parseInt(row.nps_passive_pct || 0),
-            npsDetractorPct: parseInt(row.nps_detractor_pct || 0),
+            npsKritischPct: parseInt(row.nps_detractor_pct || 0),
             commentCount: parseInt(row.comment_count || 0),
             maxDivergence: parseFloat(row.max_divergence || 0),
             bias: parseFloat(row.bias || 0),
@@ -161,8 +163,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     const maxBarValue = Math.max(...partners.map(p => Math.max(p.scorePositive, p.scoreNegative)), 1);
 
     let html = '';
+    partners.sort((a, b) => a.partnerName.localeCompare(b.partnerName, 'de'));
     partners.forEach(partner => {
-        html += renderPartnerSection(partner, partners, maxBarValue);
+        html += renderPartnerSection(partner, maxBarValue);
     });
 
     // Anhang 1: Importance-Verteilung
@@ -190,7 +193,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 // Render Functions
 // ============================================================
 
-function renderPartnerSection(partner, allPartners, maxBarValue) {
+function renderPartnerSection(partner, maxBarValue) {
     const logoSrc = partner.logoFile
         ? `img/partnerlogo/${escapeHtml(partner.logoFile)}`
         : 'img/partnerlogo/partner.png';
@@ -202,7 +205,7 @@ function renderPartnerSection(partner, allPartners, maxBarValue) {
     <div class="partner-section">
         ${renderHeader(partner, logoSrc, totalCriteria)}
         ${renderAreaBar(partner)}
-        ${renderScoreRow(partner, allPartners, maxBarValue)}
+        ${renderScoreRow(partner, maxBarValue)}
         ${renderMatrixAndDetails(details)}
         ${renderDivergences(details)}
         ${renderActionItems(details)}
@@ -213,10 +216,10 @@ function renderPartnerSection(partner, allPartners, maxBarValue) {
 
 function renderHeader(partner, logoSrc, totalCriteria) {
     const npsColor = partner.npsScore > 0 ? '#2ecc71' : partner.npsScore < 0 ? '#e74c3c' : '#999';
-    const detractorDisplay = partner.npsDetractorPct;
+    const detractorDisplay = partner.npsKritischPct;
     const pD = partner.npsPromoterPct + detractorDisplay;
     const pieStyle = `background: conic-gradient(from 180deg, #2ecc71 0% ${partner.npsPromoterPct}%, #e74c3c ${partner.npsPromoterPct}% ${pD}%, #f1c40f ${pD}% 100%);`;
-    const pieTitle = `Promoter: ${partner.npsPromoterPct}% · Detractor: ${detractorDisplay}% · Passive: ${partner.npsPassivePct}%`;
+    const pieTitle = `Promoter: ${partner.npsPromoterPct}% · Kritisch: ${detractorDisplay}% · Passive: ${partner.npsPassivePct}%`;
 
     return `
     <div class="report-header">
@@ -233,7 +236,7 @@ function renderHeader(partner, logoSrc, totalCriteria) {
                 <span class="report-kpi">NPS:</span>
                 <div class="nps-pie-report" style="${pieStyle}"></div>
                 <span class="report-kpi"><strong style="color:${npsColor}">${partner.npsScore > 0 ? '+' : ''}${partner.npsScore}</strong></span>
-                <span class="report-kpi" style="color:#555; font-size:0.72em;">Promoter: ${partner.npsPromoterPct}% · Detractor: ${detractorDisplay}% · Passive: ${partner.npsPassivePct}%</span>
+                <span class="report-kpi" style="color:#555; font-size:0.72em;">Promoter: ${partner.npsPromoterPct}% · Kritisch: ${detractorDisplay}% · Passive: ${partner.npsPassivePct}%</span>
             </div>
         </div>
         <div class="report-header-right">
@@ -248,112 +251,20 @@ function renderAreaBar(partner) {
 }
 
 
-function renderScoreRow(partner, allPartners, maxBarValue) {
-    const scoreBarHTML = getReportScoreBarHTML(partner, maxBarValue);
-    const miniRankingHTML = getMiniRankingHTML(allPartners, partner);
-
-    return `
-    <div class="report-score-row">
-        <div style="flex:1;">
-            ${scoreBarHTML}
-        </div>
-        <div class="mini-ranking">
-            ${miniRankingHTML}
-        </div>
-    </div>`;
-}
-
-
-function getReportScoreBarHTML(partner, maxBarValue) {
-    const posW = maxBarValue > 0 ? (partner.scorePositive / maxBarValue * 50) : 0;
-    const negW = maxBarValue > 0 ? (partner.scoreNegative / maxBarValue * 50) : 0;
+function renderScoreRow(partner, maxBarValue) {
+    const posW = maxBarValue > 0 ? (partner.scorePositive / maxBarValue * 100) : 0;
+    const negW = maxBarValue > 0 ? (partner.scoreNegative / maxBarValue * 100) : 0;
     const score = partner.score;
     const scoreColor = score >= 0 ? '#2ecc71' : '#e74c3c';
 
     return `
-    <div style="display:flex; align-items:center; gap:10px;">
-        <div class="report-score-bar" style="flex:1;">
+    <div class="report-score-row">
+        <div class="report-score-bar">
             ${negW > 0 ? `<div class="report-score-neg" style="flex:${negW.toFixed(1)};">-${Math.round(partner.scoreNegative)}</div>` : ''}
             ${posW > 0 ? `<div class="report-score-pos" style="flex:${posW.toFixed(1)};">+${Math.round(partner.scorePositive)}</div>` : ''}
         </div>
         <div class="report-score-total" style="color:${scoreColor};">${score >= 0 ? '+' : ''}${Math.round(score)}</div>
     </div>`;
-}
-
-
-function getMiniRankingHTML(allPartners, currentPartner) {
-    const sorted = [...allPartners].sort((a, b) => b.score - a.score);
-    const maxAbs = Math.max(...sorted.map(p => Math.abs(p.score)), 1);
-
-    const rowH = 10;         // Gesamthöhe pro Zeile
-    const currentRowH = 18;  // Hervorgehobene Zeile
-    const nameW = 160;
-    const barAreaW = 200;
-    const midX = nameW + barAreaW / 2;
-    const maxBarHalf = barAreaW / 2 - 5;
-    const scoreW = 50;
-    const totalW = nameW + barAreaW + scoreW;
-
-    // Gesamthöhe berechnen
-    let totalH = 20; // Padding oben für Label
-    sorted.forEach(p => {
-        totalH += (p.partnerId === currentPartner.partnerId) ? currentRowH : rowH;
-    });
-    totalH += 5; // Padding unten
-
-    let rows = '';
-    let yPos = 20;
-
-    sorted.forEach(p => {
-        const score = p.score;
-        const isCurrent = p.partnerId === currentPartner.partnerId;
-        const barLen = (Math.abs(score) / maxAbs) * maxBarHalf;
-        const h = isCurrent ? currentRowH : rowH;
-        const barH = isCurrent ? 12 : 3;
-        const barY = yPos + (h - barH) / 2;
-
-        if (isCurrent) {
-            // Hervorgehobener Partner: Name + Balken + Score
-            const color = score >= 0 ? '#3498db' : '#e74c3c';
-            const scoreStr = score >= 0 ? `+${Math.round(score)}` : `${Math.round(score)}`;
-
-            // Hintergrund-Highlight
-            rows += `<rect x="0" y="${yPos}" width="${totalW}" height="${h}" fill="#f0f7ff" rx="3"/>`;
-
-            // Name (rechts ausgerichtet, vor dem Bar-Bereich)
-            rows += `<text x="${nameW - 8}" y="${yPos + h/2 + 4}" text-anchor="end" font-size="11" font-weight="bold" fill="#333">${escapeHtml(p.partnerName)}</text>`;
-
-            // Balken
-            if (score >= 0) {
-                rows += `<rect x="${midX}" y="${barY}" width="${barLen}" height="${barH}" fill="${color}" rx="2"/>`;
-            } else {
-                rows += `<rect x="${midX - barLen}" y="${barY}" width="${barLen}" height="${barH}" fill="${color}" rx="2"/>`;
-            }
-
-            // Score-Wert
-            rows += `<text x="${nameW + barAreaW + 5}" y="${yPos + h/2 + 4}" font-size="11" font-weight="bold" fill="${color}">${scoreStr}</text>`;
-        } else {
-            // Andere Partner: nur 3px Strich
-            const color = '#bdc3c7';
-            if (score >= 0) {
-                rows += `<rect x="${midX}" y="${barY}" width="${barLen}" height="${barH}" fill="${color}" rx="1"/>`;
-            } else {
-                rows += `<rect x="${midX - barLen}" y="${barY}" width="${barLen}" height="${barH}" fill="${color}" rx="1"/>`;
-            }
-        }
-
-        yPos += h;
-    });
-
-    // Mittellinie
-    const lineHTML = `<line x1="${midX}" y1="15" x2="${midX}" y2="${totalH - 5}" stroke="#e0e0e0" stroke-width="1"/>`;
-
-    return `
-    <div class="mini-ranking-label">Ranking (${sorted.length} Partner)</div>
-    <svg viewBox="0 0 ${totalW} ${totalH}" width="${totalW}" height="${totalH}">
-        ${lineHTML}
-        ${rows}
-    </svg>`;
 }
 
 
@@ -452,7 +363,7 @@ function renderDivergences(details) {
     if (conflicts.length === 0) return '';
 
     let html = `<div class="report-section">
-        <div class="report-section-title"><span class="report-insight-badge badge-warning">&#9889;</span> Divergenzen (Manager vs. Team, Delta &gt; ${threshold})</div>
+        <div class="report-section-title">Unterschiede in der Wahrnehmung (Manager vs. Team, Delta &gt; ${threshold})</div>
         <table class="report-table">
             <tr><th>Kriterium</th><th>Manager</th><th>Team</th><th>Delta</th></tr>`;
 
@@ -472,7 +383,7 @@ function renderDivergences(details) {
 
 function renderActionItems(details) {
     const items = details.filter(d => {
-        const imp = parseFloat(d.imp || 0);
+        const imp = Math.round(parseFloat(d.imp || 0));
         const perf = parseFloat(d.perf || 0);
         return imp >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN && perf <= CONFIG.ANALYSIS.ACTION_ITEM.PERFORMANCE_MAX;
     });
@@ -480,12 +391,12 @@ function renderActionItems(details) {
     if (items.length === 0) return '';
 
     let html = `<div class="report-section">
-        <div class="report-section-title"><span class="report-insight-badge badge-danger">&#10071;</span> Handlungsfelder</div>
+        <div class="report-section-title">Vorschlag für Handlungsfelder</div>
         <table class="report-table">
             <tr><th>Kriterium</th><th>Wichtigkeit</th><th>Performance</th></tr>`;
 
     items.forEach(i => {
-        html += `<tr><td>${escapeHtml(i.name)}</td><td class="num">${parseFloat(i.imp).toFixed(1)}</td><td class="num" style="color:#e74c3c; font-weight:bold;">${parseFloat(i.perf).toFixed(1)}</td></tr>`;
+        html += `<tr><td>${escapeHtml(i.name)}</td><td class="num">${parseFloat(i.imp).toFixed(1)}</td><td class="num">${parseFloat(i.perf).toFixed(1)}</td></tr>`;
     });
 
     html += '</table></div>';
