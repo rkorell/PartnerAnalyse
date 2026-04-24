@@ -20,6 +20,8 @@
   # Modified: 2026-03-14 - QS: Unbenutzte Variablen entfernt, detractorPct direkt verwendet
   # Modified: 2026-04-23 - AP 61: getMatrixDotHTML mit optionalem fillColor-Parameter
   # Modified: 2026-04-23 - AP 61: Score-Balken: kein roter Geister-Balken bei 0 Defizit, schmale Balken Label außerhalb
+  # Modified: 2026-04-24 - Rang-Nummer vor Partnername in Ergebnistabelle entfernt
+  # Modified: 2026-04-24 - IPA-Matrix: Quadranten-Labels vereinheitlicht (Handlungsbedarf/Stärke/Nebensache/Bonus)
 */
 
 import { escapeHtml } from './utils.js';
@@ -148,7 +150,7 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
 
     return `
     <div class="criteria-row partner-row-clickable score-table-row" data-partner-id="${row.partnerId}">
-        <div class="criteria-content col-partner col-partner-link"><span class="partner-rank">${scaling.rank}.</span> ${escapeHtml(row.partnerName)} ↗</div>
+        <div class="criteria-content col-partner col-partner-link">${escapeHtml(row.partnerName)} ↗</div>
 
         <div class="criteria-content col-score-graph">
             <div class="dbc-container">
@@ -363,10 +365,10 @@ export function getMatrixSVG_Standard(dotsHTML, size, padding, plotSize) {
         <text x="${mid}" y="${padding + plotSize + 25}" fill="#7f8c8d" font-size="11" text-anchor="middle">Leistung</text>
         
         <!-- Quadranten-Texte (deutsche Labels, pastell-Farben für oben) -->
-        <text x="${padding + 10}" y="${padding + 20}" fill="#e57373" font-size="12" font-weight="bold">Konzentrieren!</text>
-        <text x="${padding + plotSize - 10}" y="${padding + 20}" fill="#81c784" font-size="12" font-weight="bold" text-anchor="end">Weiter so</text>
-        <text x="${padding + 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12">Niedrige Prio</text>
-        <text x="${padding + plotSize - 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12" text-anchor="end">Overkill?</text>
+        <text x="${padding + 10}" y="${padding + 20}" fill="#e57373" font-size="12" font-weight="bold">Handlungsbedarf</text>
+        <text x="${padding + plotSize - 10}" y="${padding + 20}" fill="#81c784" font-size="12" font-weight="bold" text-anchor="end">Stärke</text>
+        <text x="${padding + 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12">Nebensache</text>
+        <text x="${padding + plotSize - 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12" text-anchor="end">Bonus</text>
         
         <!-- Datenpunkte -->
         ${dotsHTML}

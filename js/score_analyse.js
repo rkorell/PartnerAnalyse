@@ -37,6 +37,7 @@
   # Modified: 2026-04-10 - AP 61: Fraud-Panel Abteilungs-Zählung in Klammern bei Clustern
   # Modified: 2026-04-23 - AP 61: Blitz-Indikator erweitert um systematischen Manager/Team-Bias (V2a)
   # Modified: 2026-04-23 - AP 61: Action-Item Popup Fix (gerundete Importance), Matrix-Dots lila bei Handlungsbedarf
+  # Modified: 2026-04-24 - Ergebnistabelle alphabetisch sortiert, Rang-Nummer entfernt
 */
 
 import { CONFIG } from './config.js';
@@ -723,6 +724,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let html = Tpl.getScoreTableStartHTML(`Ergebnis: Partner Score Ranking (Basierend auf ${globalCount} Teilnehmern)`);
 
+        rows = [...rows].sort((a, b) => a.partnerName.localeCompare(b.partnerName, 'de'));
+
         rows.forEach((row, idx) => {
             const posScore = Math.round(row.scorePositive);
             const negScore = Math.round(row.scoreNegative);
@@ -777,8 +780,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 posWidth, negWidth,
                 posCount: posScore > 0 ? row.countPositive : 0,
                 negCount: negScore > 0 ? row.countNegative : 0,
-                posScore, negScore,
-                rank: idx + 1
+                posScore, negScore
             });
         });
         html += `</div>`;
