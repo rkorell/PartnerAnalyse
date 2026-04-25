@@ -14,6 +14,7 @@
   # Modified: 2026-03-10 - AP 58: Added SORT_GROUP_NAMES for partner filter grouping
   # Modified: 2026-04-23 - AP 61: BIAS_THRESHOLD für systematische Manager/Team-Divergenz
   # Modified: 2026-04-23 - AP 61: Action-Item PERFORMANCE_MAX 2.0 → 2.2
+  # Modified: 2026-04-25 - DISPLAY-Modus: RANKING_MODE, Balkenfarben, Matrix-Label-Farben konfigurierbar
 */
 
 export const CONFIG = {
@@ -93,6 +94,35 @@ export const CONFIG = {
         1: 'Systemhäuser',
         2: 'Spezialisierte Partner',
         3: 'Global System Integrators',
+    },
+
+    // --- Branding ---
+    BRANDING: {
+        CPQI_LONG: 'Cisco Partner Questionnaire Insight',
+    },
+
+    // --- Darstellungsmodus ---
+    DISPLAY: {
+        // false = neutral (alphabetisch, Petrol/Blau), true = Ranking (nach Score, Rot/Grün)
+        RANKING_MODE: false,
+
+        // Balkenfarben je Modus
+        BAR_COLORS: {
+            neutral: { left: '#2c8c99', right: '#3498db' },   // Petrol / Blau
+            ranking: { left: '#e74c3c', right: '#2ecc71' },   // Rot / Grün
+        },
+
+        // Gradient-Varianten der Balkenfarben
+        BAR_GRADIENTS: {
+            neutral: { left: 'linear-gradient(90deg, #1a6b75, #4db8c7)', right: 'linear-gradient(90deg, #3498db, #2980b9)' },
+            ranking: { left: 'linear-gradient(90deg, #ef5350, #e57373)', right: 'linear-gradient(90deg, #66bb6a, #43a047)' },
+        },
+
+        // IPA-Matrix Label-Farben (Pastellversionen der Balkenfarben)
+        MATRIX_LABEL_COLORS: {
+            neutral: { potential: '#4db8c7', competence: '#5a9fd4' },
+            ranking: { potential: '#e57373', competence: '#81c784' },
+        },
     },
 
     // --- UI Konstanten (AP 24) ---

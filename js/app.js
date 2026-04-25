@@ -20,8 +20,14 @@
 
 // Wichtig: Die Erweiterung .js am Ende des Imports ist für ES6-Module notwendig
 import { WizardController } from './wizard-controller.js';
+import { CONFIG } from './config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Seitentitel aus Config
+    const pageTitle = document.getElementById('page-title');
+    if (pageTitle) pageTitle.textContent = CONFIG.BRANDING.CPQI_LONG;
+    document.title = CONFIG.BRANDING.CPQI_LONG;
+
     // Macht die openInfoModal Funktion global verfügbar, da die HTML-Datei sie über onclick benötigt.
     // Die Logik ist im Controller, der Aufruf muss hier aber an window gehängt werden.
     window.openInfoModal = (category) => {

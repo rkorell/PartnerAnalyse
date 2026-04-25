@@ -6,6 +6,7 @@
 
   # Modified: 26.11.2025, 16:45 - Change logic to count distinct participants (Assessors) instead of total ratings
   # Modified: 26.11.2025, 17:00 - Added global_participant_count (Total Unique Assessors across all partners)
+  # Modified: 2026-04-25 - Max-Score Berechnung (Σ 2×Importance-Faktor) für RANKING_MODE
   # Modified: 26.11.2025, 21:30 - Extended SQL for Split-Scores (Mgr/Team), NPS and Comment Counts
   # Modified: 27.11.2025, 09:00 - Extended SQL to return actual comment texts (General & Specific)
   # Modified: 27.11.2025, 11:45 - Fix: Cast JSON to text in GROUP BY to avoid DB error
@@ -110,9 +111,35 @@ try {
         ];
     }
 
+    // Max-Score berechnen: Σ 2 × Importance-Faktor pro Kriterium (basierend auf gerundeter Ø-Importance)
+    $sqlMax = "
+        WITH avg_imp AS (
+            SELECT r.criterion_id, ROUND(AVG(r.score)) AS rounded_imp
+            FROM ratings r
+            JOIN participants p ON p.id = r.participant_id
+            WHERE r.rating_type = 'importance' AND r.score > 0
+              AND p.survey_id = ANY(?::int[])
+              AND p.department_id IN (SELECT id FROM get_department_subtree(?::int[]))
+              AND NOT (p.id = ANY(?::int[]))
+            GROUP BY r.criterion_id
+        )
+        SELECT COALESCE(SUM(2 * CASE rounded_imp WHEN 5 THEN 12 WHEN 4 THEN 7 WHEN 3 THEN 4 WHEN 2 THEN 2 ELSE 0 END), 0) AS max_score
+        FROM avg_imp";
+    $stmtMax = $pdo->prepare($sqlMax);
+    $stmtMax->execute([$survey_array_string, $dept_array_string, $exclude_array_string]);
+    $maxScore = (int)$stmtMax->fetchColumn();
+
+    // Ranking-Modus: true wenn mindestens eine gewählte Survey ranking_mode hat
+    $stmtRanking = $pdo->prepare("SELECT BOOL_OR(ranking_mode) FROM surveys WHERE id = ANY(?::int[])");
+    $stmtRanking->execute([$survey_array_string]);
+    $rankingVal = $stmtRanking->fetchColumn();
+    $rankingMode = $rankingVal === true || $rankingVal === 't';
+
     foreach ($result as &$r) {
         $pid = $r['partner_id'];
         $r['area_distribution'] = $areaByPartner[$pid] ?? [];
+        $r['max_score'] = $maxScore;
+        $r['ranking_mode'] = $rankingMode;
     }
     unset($r);
 

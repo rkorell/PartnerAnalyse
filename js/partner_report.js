@@ -95,6 +95,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             areaColors: CONFIG.COLORS.AREA_COLORS
         }));
 
+        // Ranking-Modus aus Survey-Daten setzen
+        CONFIG.DISPLAY.RANKING_MODE = bilanzData[0].ranking_mode === true || bilanzData[0].ranking_mode === 't';
+
         // Partner-Filter anwenden (AP 58)
         if (filterParams.partner_ids) {
             const allowedIds = new Set(filterParams.partner_ids);
@@ -163,9 +166,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     const maxBarValue = Math.max(...partners.map(p => Math.max(p.scorePositive, p.scoreNegative)), 1);
 
     let html = '';
-    partners.sort((a, b) => a.partnerName.localeCompare(b.partnerName, 'de'));
+    if (CONFIG.DISPLAY.RANKING_MODE) {
+        partners.sort((a, b) => (b.scorePositive - b.scoreNegative) - (a.scorePositive - a.scoreNegative));
+    } else {
+        partners.sort((a, b) => a.partnerName.localeCompare(b.partnerName, 'de'));
+    }
     partners.forEach(partner => {
-        html += renderPartnerSection(partner, maxBarValue);
+        html += renderPartnerSection(partner, partners, maxBarValue);
     });
 
     // Anhang 1: Importance-Verteilung
@@ -173,8 +180,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         html += renderImportanceAppendix(importanceData);
     }
 
-    // Anhang 2: Performance-Benchmark
-    if (Array.isArray(benchmarkData) && benchmarkData.length > 0) {
+    // Anhang 2: Performance-Benchmark (nur im Ranking-Modus)
+    if (CONFIG.DISPLAY.RANKING_MODE && Array.isArray(benchmarkData) && benchmarkData.length > 0) {
         html += renderPerformanceBenchmark(benchmarkData);
     }
 
@@ -193,7 +200,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 // Render Functions
 // ============================================================
 
-function renderPartnerSection(partner, maxBarValue) {
+function renderPartnerSection(partner, allPartners, maxBarValue) {
     const logoSrc = partner.logoFile
         ? `img/partnerlogo/${escapeHtml(partner.logoFile)}`
         : 'img/partnerlogo/partner.png';
@@ -205,7 +212,7 @@ function renderPartnerSection(partner, maxBarValue) {
     <div class="partner-section">
         ${renderHeader(partner, logoSrc, totalCriteria)}
         ${renderAreaBar(partner)}
-        ${renderScoreRow(partner, maxBarValue)}
+        ${renderScoreRow(partner, allPartners, maxBarValue)}
         ${renderMatrixAndDetails(details)}
         ${renderDivergences(details)}
         ${renderActionItems(details)}
@@ -229,7 +236,7 @@ function renderHeader(partner, logoSrc, totalCriteria) {
         <div class="report-header-center">
             <h2>${escapeHtml(partner.partnerName)}</h2>
             <div class="report-kpi-row">
-                <span class="report-kpi">Bewertungen: <strong>${partner.totalAnswers}</strong></span>
+                <span class="report-kpi">Antworten: <strong>${partner.totalAnswers}</strong></span>
                 <span class="report-kpi">Kriterien: <strong>${totalCriteria}</strong></span>
             </div>
             <div class="report-kpi-row">
@@ -251,20 +258,95 @@ function renderAreaBar(partner) {
 }
 
 
-function renderScoreRow(partner, maxBarValue) {
+function renderScoreRow(partner, allPartners, maxBarValue) {
     const posW = maxBarValue > 0 ? (partner.scorePositive / maxBarValue * 100) : 0;
     const negW = maxBarValue > 0 ? (partner.scoreNegative / maxBarValue * 100) : 0;
     const score = partner.score;
-    const scoreColor = score >= 0 ? '#2ecc71' : '#e74c3c';
+    const mode = CONFIG.DISPLAY.RANKING_MODE ? 'ranking' : 'neutral';
+    const colors = CONFIG.DISPLAY.BAR_COLORS[mode];
+    const scoreColor = score >= 0 ? colors.right : colors.left;
+
+    const isRanking = CONFIG.DISPLAY.RANKING_MODE;
+    const miniRankingHTML = isRanking ? getMiniRankingHTML(allPartners, partner) : '';
+    const barStyle = isRanking ? '' : ' style="max-width:50%;"';
 
     return `
     <div class="report-score-row">
-        <div class="report-score-bar">
-            ${negW > 0 ? `<div class="report-score-neg" style="flex:${negW.toFixed(1)};">-${Math.round(partner.scoreNegative)}</div>` : ''}
-            ${posW > 0 ? `<div class="report-score-pos" style="flex:${posW.toFixed(1)};">+${Math.round(partner.scorePositive)}</div>` : ''}
+        <div class="report-score-bar"${barStyle}>
+            ${negW > 0 ? `<div class="report-score-neg" style="flex:${negW.toFixed(1)}; background:${colors.left};">-${Math.round(partner.scoreNegative)}</div>` : ''}
+            ${posW > 0 ? `<div class="report-score-pos" style="flex:${posW.toFixed(1)}; background:${colors.right};">+${Math.round(partner.scorePositive)}</div>` : ''}
         </div>
         <div class="report-score-total" style="color:${scoreColor};">${score >= 0 ? '+' : ''}${Math.round(score)}</div>
+        ${miniRankingHTML ? `<div class="mini-ranking">${miniRankingHTML}</div>` : ''}
     </div>`;
+}
+
+
+function getMiniRankingHTML(allPartners, currentPartner) {
+    const sorted = [...allPartners].sort((a, b) => b.score - a.score);
+    const maxAbs = Math.max(...sorted.map(p => Math.abs(p.score)), 1);
+    const colors = CONFIG.DISPLAY.BAR_COLORS.ranking;
+
+    const rowH = 10;
+    const currentRowH = 18;
+    const nameW = 160;
+    const barAreaW = 200;
+    const midX = nameW + barAreaW / 2;
+    const maxBarHalf = barAreaW / 2 - 5;
+    const scoreW = 50;
+    const totalW = nameW + barAreaW + scoreW;
+
+    let totalH = 20;
+    sorted.forEach(p => {
+        totalH += (p.partnerId === currentPartner.partnerId) ? currentRowH : rowH;
+    });
+    totalH += 5;
+
+    let rows = '';
+    let yPos = 20;
+
+    sorted.forEach(p => {
+        const score = p.score;
+        const isCurrent = p.partnerId === currentPartner.partnerId;
+        const barLen = (Math.abs(score) / maxAbs) * maxBarHalf;
+        const h = isCurrent ? currentRowH : rowH;
+        const barH = isCurrent ? 12 : 3;
+        const barY = yPos + (h - barH) / 2;
+
+        if (isCurrent) {
+            const color = score >= 0 ? colors.right : colors.left;
+            const scoreStr = score >= 0 ? `+${Math.round(score)}` : `${Math.round(score)}`;
+
+            rows += `<rect x="0" y="${yPos}" width="${totalW}" height="${h}" fill="#f0f7ff" rx="3"/>`;
+            rows += `<text x="${nameW - 8}" y="${yPos + h/2 + 4}" text-anchor="end" font-size="11" font-weight="bold" fill="#333">${escapeHtml(p.partnerName)}</text>`;
+
+            if (score >= 0) {
+                rows += `<rect x="${midX}" y="${barY}" width="${barLen}" height="${barH}" fill="${color}" rx="2"/>`;
+            } else {
+                rows += `<rect x="${midX - barLen}" y="${barY}" width="${barLen}" height="${barH}" fill="${color}" rx="2"/>`;
+            }
+
+            rows += `<text x="${nameW + barAreaW + 5}" y="${yPos + h/2 + 4}" font-size="11" font-weight="bold" fill="${color}">${scoreStr}</text>`;
+        } else {
+            const color = '#bdc3c7';
+            if (score >= 0) {
+                rows += `<rect x="${midX}" y="${barY}" width="${barLen}" height="${barH}" fill="${color}" rx="1"/>`;
+            } else {
+                rows += `<rect x="${midX - barLen}" y="${barY}" width="${barLen}" height="${barH}" fill="${color}" rx="1"/>`;
+            }
+        }
+
+        yPos += h;
+    });
+
+    const lineHTML = `<line x1="${midX}" y1="15" x2="${midX}" y2="${totalH - 5}" stroke="#e0e0e0" stroke-width="1"/>`;
+
+    return `
+    <div class="mini-ranking-label">Ranking (${sorted.length} Partner)</div>
+    <svg viewBox="0 0 ${totalW} ${totalH}" width="${totalW}" height="${totalH}">
+        ${lineHTML}
+        ${rows}
+    </svg>`;
 }
 
 

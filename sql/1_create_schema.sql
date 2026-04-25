@@ -56,7 +56,8 @@ CREATE TABLE IF NOT EXISTS surveys (
     end_date DATE,
     is_active BOOLEAN DEFAULT FALSE,
     description TEXT,
-    test_mode BOOLEAN DEFAULT FALSE
+    test_mode BOOLEAN DEFAULT FALSE,
+    ranking_mode BOOLEAN DEFAULT FALSE
 );
 
 -- 3. Abteilungen (Hierarchie)

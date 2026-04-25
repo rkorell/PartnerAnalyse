@@ -156,7 +156,7 @@
         }
 
         .report-score-bar {
-            flex: 0 0 50%;
+            flex: 1;
             display: flex;
             height: 34px;
             border-radius: 4px;
@@ -164,7 +164,7 @@
         }
 
         .report-score-neg {
-            background: #e74c3c;
+            background: #2c8c99;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -175,7 +175,7 @@
         }
 
         .report-score-pos {
-            background: #2ecc71;
+            background: #2980b9;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -192,6 +192,17 @@
             text-align: right;
         }
 
+
+        /* --- Mini Ranking (nur bei RANKING_MODE) --- */
+        .mini-ranking {
+            flex: 0 0 280px;
+        }
+
+        .mini-ranking-label {
+            font-size: 0.75em;
+            color: #999;
+            margin-bottom: 4px;
+        }
 
         /* --- Content Sections --- */
         .report-section {

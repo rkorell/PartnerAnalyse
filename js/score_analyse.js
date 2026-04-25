@@ -48,6 +48,11 @@ import { escapeHtml, toggleGlobalLoader, interpolateColor } from './utils.js';
 import * as Tpl from './templates.js';
 
 document.addEventListener("DOMContentLoaded", function() {
+    // Seitentitel aus Config
+    const pageTitle = document.getElementById('page-title');
+    if (pageTitle) pageTitle.textContent = CONFIG.BRANDING.CPQI_LONG;
+    document.title = CONFIG.BRANDING.CPQI_LONG + ' - Partner Analyse';
+
     // Selektoren
     const surveySelect = document.getElementById('survey-filter');
     const departmentTreeContainer = document.getElementById('department-collapsing-tree');
@@ -86,6 +91,25 @@ document.addEventListener("DOMContentLoaded", function() {
     let currentFilterState = null;
     let _deptCounts = null;
     let selectedPartnerIds = null;  // null = alle, Set = Auswahl
+    let surveyMap = {};             // id → Survey-Objekt (inkl. ranking_mode)
+    let rankingMode = false;        // aktiver Darstellungsmodus
+
+    function applyDisplayMode(isRanking) {
+        rankingMode = isRanking;
+        CONFIG.DISPLAY.RANKING_MODE = isRanking;
+        const mode = isRanking ? 'ranking' : 'neutral';
+        const root = document.documentElement;
+        root.style.setProperty('--bar-left-color', CONFIG.DISPLAY.BAR_COLORS[mode].left);
+        root.style.setProperty('--bar-right-color', CONFIG.DISPLAY.BAR_COLORS[mode].right);
+        root.style.setProperty('--bar-left-gradient', CONFIG.DISPLAY.BAR_GRADIENTS[mode].left);
+        root.style.setProperty('--bar-right-gradient', CONFIG.DISPLAY.BAR_GRADIENTS[mode].right);
+    }
+
+    function getRankingModeFromSelection() {
+        const selected = Array.from(surveySelect.selectedOptions);
+        // Wenn mindestens eine gewählte Survey ranking_mode hat → ranking
+        return selected.some(opt => surveyMap[opt.value]?.ranking_mode);
+    }
 
     // Initial Load
     initializeFilters();
@@ -409,8 +433,10 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (data.app_texts) appTexts = data.app_texts;
                 if (data && data.surveys) {
                     surveySelect.innerHTML = '';
+                    surveyMap = {};
                     let anyActive = false;
                     data.surveys.forEach(survey => {
+                        surveyMap[survey.id] = survey;
                         const opt = document.createElement('option');
                         opt.value = survey.id;
                         opt.textContent = survey.name;
@@ -421,6 +447,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         surveySelect.appendChild(opt);
                     });
                     if (!anyActive && surveySelect.options.length) surveySelect.options[0].selected = true;
+                    applyDisplayMode(getRankingModeFromSelection());
                 }
                 onSurveySelectionChange();
             });
@@ -553,6 +580,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function onSurveySelectionChange() {
         const selected = Array.from(surveySelect.selectedOptions);
+        applyDisplayMode(getRankingModeFromSelection());
         if (selected.length === 1) {
             updateDepartmentCounts(parseInt(selected[0].value));
         } else {
@@ -649,6 +677,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     score: row.score,
                     totalAnswers: row.total_answers,
                     globalParticipantCount: row.global_participant_count,
+                    maxScore: parseInt(row.max_score || 0),
 
                     scorePositive: parseFloat(row.score_positive || 0),
                     scoreNegative: Math.abs(parseFloat(row.score_negative || 0)),
@@ -725,9 +754,18 @@ document.addEventListener("DOMContentLoaded", function() {
         });
         if (maxBarValue === 0) maxBarValue = 1; 
 
-        let html = Tpl.getScoreTableStartHTML(`Ergebnis: Partner Score Übersicht (Basierend auf ${globalCount} Teilnehmern)`);
+        const maxScore = rows.length > 0 && rows[0].maxScore ? rows[0].maxScore : 0;
+        const titleText = rankingMode
+            ? `Ergebnis: Partner Score Übersicht (Basierend auf ${globalCount} Teilnehmern, Maximal-Score: ${maxScore})`
+            : `Ergebnis: Partner Übersicht (Basierend auf ${globalCount} Teilnehmern)`;
+        let html = Tpl.getScoreTableStartHTML(titleText);
 
-        rows = [...rows].sort((a, b) => a.partnerName.localeCompare(b.partnerName, 'de'));
+        const mode = rankingMode ? 'ranking' : 'neutral';
+        if (rankingMode) {
+            rows = [...rows].sort((a, b) => (b.scorePositive - b.scoreNegative) - (a.scorePositive - a.scoreNegative));
+        } else {
+            rows = [...rows].sort((a, b) => a.partnerName.localeCompare(b.partnerName, 'de'));
+        }
 
         rows.forEach((row, idx) => {
             const posScore = Math.round(row.scorePositive);
@@ -772,7 +810,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const hasV2 = cntMgr >= CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS && cntTeam >= CONFIG.ANALYSIS.CONFLICT_MIN_ASSESSORS && Math.abs(bias) >= CONFIG.ANALYSIS.BIAS_THRESHOLD;
 
             if (hasV1 || hasV2) {
-                const biasDir = bias > 0 ? 'Manager bewertet höher' : 'Team bewertet höher';
+                const biasDir = bias > 0 ? 'Manager schätzt höher ein' : 'Team schätzt höher ein';
                 const title = hasV1
                     ? `Maximale Divergenz: ${maxDiv.toFixed(1)} (Schwellenwert: ${CONFIG.ANALYSIS.CONFLICT_THRESHOLD})`
                     : `Systematischer Bias: Ø ${bias > 0 ? '+' : ''}${bias.toFixed(2)} (${biasDir})`;
@@ -858,7 +896,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         } 
         else if (action === 'action') {
-            title = `Handlungsfelder für ${escapeHtml(partner.partnerName)}`;
+            title = `Vorschlag für Handlungsfelder: ${escapeHtml(partner.partnerName)}`;
             if (partner.matrixDetails) {
                 const items = partner.matrixDetails.filter(d =>
                     Math.round(parseFloat(d.imp)) >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN &&
@@ -867,7 +905,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (items.length > 0) {
                     content += Tpl.getActionTableHTML(items);
                 } else {
-                    content += "<p>Keine spezifischen Handlungsfelder gefunden.</p>";
+                    content += "<p>Keine spezifischen Handlungsfelder identifiziert.</p>";
                 }
             }
         }

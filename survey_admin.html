@@ -17,6 +17,7 @@
         .admin-table .col-id { width: 50px; text-align: center; color: #999; }
         .admin-table .col-active { width: 60px; text-align: center; }
         .admin-table .col-test { width: 60px; text-align: center; }
+        .admin-table .col-ranking { width: 70px; text-align: center; }
         .admin-table .col-del { width: 50px; text-align: center; }
         .admin-table .col-date { width: 140px; }
         .admin-table .col-count { width: 70px; text-align: center; }
@@ -51,6 +52,7 @@
                         <th class="col-date">Ende</th>
                         <th class="col-active">Aktiv</th>
                         <th class="col-test">Test</th>
+                        <th class="col-ranking">Ranking</th>
                         <th class="col-count">n</th>
                         <th class="col-del">Löschen</th>
                     </tr>
@@ -178,6 +180,7 @@
                     <td class="col-date"><input type="date" data-id="${s.id}" data-field="end_date" value="${s.end_date || ''}"></td>
                     <td class="col-active"><input type="radio" name="is_active" data-id="${s.id}" ${s.is_active ? 'checked' : ''}></td>
                     <td class="col-test"><input type="checkbox" data-id="${s.id}" data-field="test_mode" ${s.test_mode ? 'checked' : ''}></td>
+                    <td class="col-ranking"><input type="checkbox" data-id="${s.id}" data-field="ranking_mode" ${s.ranking_mode ? 'checked' : ''}></td>
                     <td class="col-count"><span class="participant-badge ${hasData ? 'has-data' : ''}">${s.participant_count}</span></td>
                     <td class="col-del"><input type="checkbox" class="del-check" data-id="${s.id}" data-count="${s.participant_count}" data-name="${escapeAttr(s.name)}"></td>
                 `;
@@ -204,6 +207,7 @@
                 const endInput = tr.querySelector('input[data-field="end_date"]');
                 const activeRadio = tr.querySelector('input[name="is_active"]');
                 const testCheck = tr.querySelector('input[data-field="test_mode"]');
+                const rankingCheck = tr.querySelector('input[data-field="ranking_mode"]');
 
                 rows.push({
                     id: id,
@@ -211,7 +215,8 @@
                     start_date: startInput.value || null,
                     end_date: endInput.value || null,
                     is_active: activeRadio.checked,
-                    test_mode: testCheck.checked
+                    test_mode: testCheck.checked,
+                    ranking_mode: rankingCheck.checked
                 });
             });
             return rows;

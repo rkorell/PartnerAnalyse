@@ -40,13 +40,14 @@ try {
     
     // Surveys als Array
     $surveys = [];
-    $stmt = $pdo->query("SELECT id, name, test_mode, is_active, start_date, end_date FROM surveys ORDER BY start_date DESC, id DESC");
+    $stmt = $pdo->query("SELECT id, name, test_mode, is_active, start_date, end_date, ranking_mode FROM surveys ORDER BY start_date DESC, id DESC");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $surveys[] = [
             'id' => intval($row['id']),
             'name' => $row['name'],
             'test_mode' => $row['test_mode'] === true || $row['test_mode'] === 't' || $row['test_mode'] === 1,
             'is_active' => $row['is_active'] === true || $row['is_active'] === 't' || $row['is_active'] === 1,
+            'ranking_mode' => $row['ranking_mode'] === true || $row['ranking_mode'] === 't' || $row['ranking_mode'] === 1,
             'start_date' => $row['start_date'],
             'end_date' => $row['end_date']
         ];

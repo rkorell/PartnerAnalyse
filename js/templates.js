@@ -27,6 +27,7 @@
 */
 
 import { escapeHtml } from './utils.js';
+import { CONFIG } from './config.js';
 
 // --- WIZARD TEMPLATES ---
 
@@ -118,7 +119,7 @@ export function getScoreTableStartHTML(title) {
     <div class="criteria-table">
         <div class="criteria-row score-table-header">
             <div class="criteria-content col-partner"><span class="column-header-tile">Partner</span></div>
-            <div class="criteria-content col-score-graph" style="text-align:center;"><span class="column-header-tile">Partner-Bilanz (Potenzial · Kompetenz)</span></div>
+            <div class="criteria-content col-score-graph" style="text-align:center;"><span class="column-header-tile">Partner-Profil (Potenzial · Kompetenz)</span></div>
             <div class="criteria-content col-count"><span class="column-header-tile">Antworten</span></div>
             <div class="criteria-content col-insights text-center"><span class="column-header-tile">Insights</span></div>
         </div>`;
@@ -134,13 +135,18 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
 
     const areaVBarHTML = row.areaDistribution ? getAreaVBarHTML(row.areaDistribution, row.areaColors) : '';
 
+    // Balkentext: Ranking-Modus zeigt Score(Anzahl), neutral nur Anzahl
+    const isRanking = CONFIG.DISPLAY.RANKING_MODE;
+    const negLabel = isRanking ? `${negScore} (${negCount})` : `${negCount}`;
+    const posLabel = isRanking ? `${posScore} (${posCount})` : `${posCount}`;
+
     // Schmale Balken: Text außerhalb darstellen (Schwelle: 8% der Balkenfläche)
     const negNarrow = negWidth > 0 && negWidth < 8;
     const posNarrow = posWidth > 0 && posWidth < 8;
-    const txtNegInside = negWidth > 0 && !negNarrow ? `${negScore} (${negCount})` : '';
-    const txtPosInside = posWidth > 0 && !posNarrow ? `${posScore} (${posCount})` : '';
-    const txtNegOutside = negNarrow ? `<span class="dbc-label-outside dbc-label-neg">${negScore} (${negCount})</span>` : '';
-    const txtPosOutside = posNarrow ? `<span class="dbc-label-outside dbc-label-pos">${posScore} (${posCount})</span>` : '';
+    const txtNegInside = negWidth > 0 && !negNarrow ? negLabel : '';
+    const txtPosInside = posWidth > 0 && !posNarrow ? posLabel : '';
+    const txtNegOutside = negNarrow ? `<span class="dbc-label-outside dbc-label-neg">${negLabel}</span>` : '';
+    const txtPosOutside = posNarrow ? `<span class="dbc-label-outside dbc-label-pos">${posLabel}</span>` : '';
 
     // Kein roter Balken wenn negWidth = 0
     const negBarHTML = negWidth > 0
@@ -246,7 +252,7 @@ export function getLegendHTML() {
         <span class="legend-item" title="Net Promoter Score - Weiterempfehlungsbereitschaft">📣 NPS</span>
         <span class="legend-item" title="Allgemeine oder spezifische Kommentare vorhanden">💬 Kommentar(e) verfügbar</span>
         <span class="legend-item" title="Kriterien mit Entwicklungspotenzial">⚠️ Potenzial</span>
-        <span class="legend-item" title="Unterschiedliche Wahrnehmung zwischen Führungskräften und Team">⚡ Bewertungsunterschied</span>
+        <span class="legend-item" title="Unterschiedliche Wahrnehmung zwischen Führungskräften und Team">⚡ Wahrnehmungsunterschied</span>
     </div>`;
 }
 
@@ -288,14 +294,14 @@ export function getParticipantStructureHTML(stats) {
                 <tr>
                     <th style="padding: 8px; text-align: left;">Gruppe</th>
                     <th style="padding: 8px; text-align: center;">Anzahl</th>
-                    <th style="padding: 8px; text-align: center;">Ø Note</th>
+                    <th style="padding: 8px; text-align: center;">Ø Wert</th>
                     <th style="padding: 8px; text-align: center;">Ø Frequenz (1-4)</th>
                 </tr>
             </thead>
             <tbody>${rows}</tbody>
         </table>
         <div style="padding: 5px 10px; font-size: 0.8em; color: #7f8c8d; background: #f9f9f9;">
-            * Hinweis: 'Gesamt' ist gewichtet nach Frequenz. (Note 1-5 Skala).
+            * Hinweis: 'Gesamt' ist gewichtet nach Frequenz. (Skala 1-5).
         </div>
     </div>`;
 }
@@ -350,25 +356,27 @@ export function getConflictTableHTML(conflicts) {
 // AP 39: Matrix Redesign - German labels, pastel colors, adjusted line weights
 export function getMatrixSVG_Standard(dotsHTML, size, padding, plotSize) {
     const mid = padding + (plotSize / 2);
-    
+    const mode = CONFIG.DISPLAY.RANKING_MODE ? 'ranking' : 'neutral';
+    const labelColors = CONFIG.DISPLAY.MATRIX_LABEL_COLORS[mode];
+
     return `<svg viewBox="0 0 ${size} ${size}" class="matrix-svg">
         <!-- Koordinatenkreuz (prominent, 1.2px solid) -->
         <line x1="${padding}" y1="${mid}" x2="${padding + plotSize}" y2="${mid}" stroke="#95a5a6" stroke-width="1.2" />
         <line x1="${mid}" y1="${padding}" x2="${mid}" y2="${padding + plotSize}" stroke="#95a5a6" stroke-width="1.2" />
-        
+
         <!-- Achsen (dezent, 1px) -->
         <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${padding + plotSize}" stroke="#bdc3c7" stroke-width="1" />
         <line x1="${padding}" y1="${padding + plotSize}" x2="${padding + plotSize}" y2="${padding + plotSize}" stroke="#bdc3c7" stroke-width="1" />
         <line x1="${padding + plotSize}" y1="${padding}" x2="${padding + plotSize}" y2="${padding + plotSize}" stroke="#bdc3c7" stroke-width="1" />
         <line x1="${padding}" y1="${padding}" x2="${padding + plotSize}" y2="${padding}" stroke="#bdc3c7" stroke-width="1" />
-        
+
         <!-- Achsenbeschriftung -->
         <text x="${padding - 25}" y="${mid}" fill="#7f8c8d" font-size="11" text-anchor="middle" transform="rotate(-90 ${padding - 25},${mid})">Wichtigkeit</text>
         <text x="${mid}" y="${padding + plotSize + 25}" fill="#7f8c8d" font-size="11" text-anchor="middle">Leistung</text>
-        
-        <!-- Quadranten-Texte (deutsche Labels, pastell-Farben für oben) -->
-        <text x="${padding + 10}" y="${padding + 20}" fill="#e57373" font-size="12" font-weight="bold">Potenzial</text>
-        <text x="${padding + plotSize - 10}" y="${padding + 20}" fill="#81c784" font-size="12" font-weight="bold" text-anchor="end">Kompetenz</text>
+
+        <!-- Quadranten-Texte -->
+        <text x="${padding + 10}" y="${padding + 20}" fill="${labelColors.potential}" font-size="12" font-weight="bold">Potenzial</text>
+        <text x="${padding + plotSize - 10}" y="${padding + 20}" fill="${labelColors.competence}" font-size="12" font-weight="bold" text-anchor="end">Kompetenz</text>
         <text x="${padding + 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12">Nebensache</text>
         <text x="${padding + plotSize - 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12" text-anchor="end">Bonus</text>
         

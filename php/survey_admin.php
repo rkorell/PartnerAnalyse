@@ -28,7 +28,7 @@ try {
     // ==================== LIST ====================
     if ($method === 'GET') {
         $stmt = $pdo->query("
-            SELECT s.id, s.name, s.start_date, s.end_date, s.is_active, s.test_mode,
+            SELECT s.id, s.name, s.start_date, s.end_date, s.is_active, s.test_mode, s.ranking_mode,
                    COUNT(p.id) AS participant_count
             FROM surveys s
             LEFT JOIN participants p ON p.survey_id = s.id
@@ -41,6 +41,7 @@ try {
             $s['id'] = intval($s['id']);
             $s['is_active'] = $s['is_active'] === true || $s['is_active'] === 't' || $s['is_active'] === 1;
             $s['test_mode'] = $s['test_mode'] === true || $s['test_mode'] === 't' || $s['test_mode'] === 1;
+            $s['ranking_mode'] = $s['ranking_mode'] === true || $s['ranking_mode'] === 't' || $s['ranking_mode'] === 1;
             $s['participant_count'] = intval($s['participant_count']);
         }
         unset($s);
@@ -101,7 +102,7 @@ try {
 
             $stmt = $pdo->prepare("
                 UPDATE surveys
-                SET name = ?, start_date = ?, end_date = ?, is_active = ?, test_mode = ?
+                SET name = ?, start_date = ?, end_date = ?, is_active = ?, test_mode = ?, ranking_mode = ?
                 WHERE id = ?
             ");
 
@@ -121,8 +122,9 @@ try {
                 $endDate = !empty($s['end_date']) ? $s['end_date'] : null;
                 $isActive = !empty($s['is_active']);
                 $testMode = !empty($s['test_mode']);
+                $rankingMode = !empty($s['ranking_mode']);
 
-                $stmt->execute([$name, $startDate, $endDate, $isActive ? 'true' : 'false', $testMode ? 'true' : 'false', $id]);
+                $stmt->execute([$name, $startDate, $endDate, $isActive ? 'true' : 'false', $testMode ? 'true' : 'false', $rankingMode ? 'true' : 'false', $id]);
             }
 
             $pdo->commit();
