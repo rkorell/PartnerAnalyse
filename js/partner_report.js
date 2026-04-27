@@ -175,19 +175,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         html += renderPartnerSection(partner, partners, maxBarValue);
     });
 
-    // Anhang 1: Importance-Verteilung
+    // Anhänge mit dynamischer Nummerierung
+    let appendixNr = 1;
     if (Array.isArray(importanceData) && importanceData.length > 0) {
-        html += renderImportanceAppendix(importanceData);
+        html += renderImportanceAppendix(importanceData, appendixNr++);
     }
-
-    // Anhang 2: Performance-Benchmark (nur im Ranking-Modus)
     if (CONFIG.DISPLAY.RANKING_MODE && Array.isArray(benchmarkData) && benchmarkData.length > 0) {
-        html += renderPerformanceBenchmark(benchmarkData);
+        html += renderPerformanceBenchmark(benchmarkData, appendixNr++);
     }
-
-    // Anhang 3: Kriterienkatalog
     if (Array.isArray(catalogData) && catalogData.length > 0) {
-        html += renderCriteriaCatalog(catalogData);
+        html += renderCriteriaCatalog(catalogData, appendixNr++);
     }
 
     container.innerHTML = html;
@@ -212,7 +209,7 @@ function renderPartnerSection(partner, allPartners, maxBarValue) {
     <div class="partner-section">
         ${renderHeader(partner, logoSrc, totalCriteria)}
         ${renderAreaBar(partner)}
-        ${renderScoreRow(partner, allPartners, maxBarValue)}
+        ${CONFIG.DISPLAY.RANKING_MODE ? renderScoreRow(partner, allPartners, maxBarValue) : ''}
         ${renderMatrixAndDetails(details)}
         ${renderDivergences(details)}
         ${renderActionItems(details)}
@@ -270,13 +267,19 @@ function renderScoreRow(partner, allPartners, maxBarValue) {
     const miniRankingHTML = isRanking ? getMiniRankingHTML(allPartners, partner) : '';
     const barStyle = isRanking ? '' : ' style="max-width:50%;"';
 
+    const negLabel = isRanking ? `-${Math.round(partner.scoreNegative)}` : `${partner.countNegative}`;
+    const posLabel = isRanking ? `+${Math.round(partner.scorePositive)}` : `${partner.countPositive}`;
+    const scoreTotalHTML = isRanking
+        ? `<div class="report-score-total" style="color:${scoreColor};">${score >= 0 ? '+' : ''}${Math.round(score)}</div>`
+        : '';
+
     return `
     <div class="report-score-row">
         <div class="report-score-bar"${barStyle}>
-            ${negW > 0 ? `<div class="report-score-neg" style="flex:${negW.toFixed(1)}; background:${colors.left};">-${Math.round(partner.scoreNegative)}</div>` : ''}
-            ${posW > 0 ? `<div class="report-score-pos" style="flex:${posW.toFixed(1)}; background:${colors.right};">+${Math.round(partner.scorePositive)}</div>` : ''}
+            ${negW > 0 ? `<div class="report-score-neg" style="flex:${negW.toFixed(1)}; background:${colors.left};">${negLabel}</div>` : ''}
+            ${posW > 0 ? `<div class="report-score-pos" style="flex:${posW.toFixed(1)}; background:${colors.right};">${posLabel}</div>` : ''}
         </div>
-        <div class="report-score-total" style="color:${scoreColor};">${score >= 0 ? '+' : ''}${Math.round(score)}</div>
+        ${scoreTotalHTML}
         ${miniRankingHTML ? `<div class="mini-ranking">${miniRankingHTML}</div>` : ''}
     </div>`;
 }
@@ -526,7 +529,7 @@ function renderComments(partner, details) {
 // Anhang: Importance-Verteilung
 // ============================================================
 
-function renderImportanceAppendix(data) {
+function renderImportanceAppendix(data, nr) {
     const n = data.length > 0 ? data[0].n : 0;
 
     // Prozente berechnen: drei disjunkte Segmente (addieren sich zu 100%)
@@ -607,7 +610,7 @@ function renderImportanceAppendix(data) {
     <div class="partner-section">
         <div class="report-header" style="justify-content:center;">
             <div class="report-header-center" style="text-align:center;">
-                <h2>Anhang 1: Wichtigkeitsverteilung</h2>
+                <h2>Anhang ${nr}: Wichtigkeitsverteilung</h2>
                 <div class="report-kpi-row" style="justify-content:center;">
                     <span class="report-kpi">Teilnehmer: <strong>${n}</strong></span>
                     <span class="report-kpi">Kriterien: <strong>${rows.length}</strong></span>
@@ -625,7 +628,7 @@ function renderImportanceAppendix(data) {
 // Anhang 2: Performance-Benchmark
 // ============================================================
 
-function renderPerformanceBenchmark(data) {
+function renderPerformanceBenchmark(data, nr) {
     const nPartners = data.length > 0 ? data[0].n_partners : 0;
 
     let tableHTML = `<table class="report-table">
@@ -650,7 +653,7 @@ function renderPerformanceBenchmark(data) {
     <div class="partner-section">
         <div class="report-header" style="justify-content:center;">
             <div class="report-header-center" style="text-align:center;">
-                <h2>Anhang 2: Performance-Benchmark</h2>
+                <h2>Anhang ${nr}: Performance-Benchmark</h2>
                 <div class="report-kpi-row" style="justify-content:center;">
                     <span class="report-kpi">Partner: <strong>${nPartners}</strong></span>
                     <span class="report-kpi">Kriterien: <strong>${data.length}</strong></span>
@@ -667,7 +670,7 @@ function renderPerformanceBenchmark(data) {
 // Anhang 3: Kriterienkatalog
 // ============================================================
 
-function renderCriteriaCatalog(data) {
+function renderCriteriaCatalog(data, nr) {
     // Nach Kategorie gruppieren
     const categories = [];
     const catMap = {};
@@ -702,7 +705,7 @@ function renderCriteriaCatalog(data) {
     <div class="partner-section">
         <div class="report-header" style="justify-content:center;">
             <div class="report-header-center" style="text-align:center;">
-                <h2>Anhang 3: Kriterienkatalog</h2>
+                <h2>Anhang ${nr}: Kriterienkatalog</h2>
                 <div class="report-kpi-row" style="justify-content:center;">
                     <span class="report-kpi">Kategorien: <strong>${categories.length}</strong></span>
                     <span class="report-kpi">Kriterien: <strong>${data.length}</strong></span>
