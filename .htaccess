@@ -3,6 +3,7 @@
 # (c) - Dr. Ralf Korell, 2025/26
 #
 # # Created: 28.11.2025, 17:45 - AP 28: Initial security configuration
+# Modified: 2026-04-29 - docs/-Verzeichnis per RewriteRule blockiert (externe Erreichbarkeit geschlossen)
 
 # 1. Directory Browsing deaktivieren
 # Verhindert, dass Besucher eine Dateiliste sehen, wenn sie z.B. /img/ oder /js/ aufrufen.
@@ -17,6 +18,7 @@ Options -Indexes
 # Alternativer Schutz für Verzeichnisse (falls FilesMatch nicht greift)
 RewriteEngine On
 RewriteRule ^(\.git|\.vscode) - [F,L]
+RewriteRule ^docs/ - [F,L]
 
 # 3. Security Headers setzen
 # Benötigt mod_headers. Wenn das Modul fehlt, wird der Block ignoriert (kein Absturz).
