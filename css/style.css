@@ -4,6 +4,8 @@
 /* # Modified: 02.12.2025, 15:45 - AP 41: New .help-beacon classes replacing .info-trigger for visibility upgrade */
 /* # Modified: 2026-02-16 20:15 - Info-Tiles für Willkommensseite (Datenschutz, Security, CPQI) */
 /* # Modified: 2026-03-13 - AP 59: NPS-Donut, Awareness-Torte entfernt, Kachel-Design für Insights + Header */
+/* # Modified: 2026-05-08 09:17 - Bias-Toggle-Button Styles für IPA-Matrix (.bias-toggle-btn / .active) */
+/* # Modified: 2026-05-08 10:05 - Bias-Toggle umgebaut auf Switch (.bias-toggle-label / .bias-toggle-slider) */
 
 /* Reset und Grundlagen */
 * {
@@ -1067,6 +1069,46 @@ input[type=range].slider-neutral {
     r: 9;
     fill: #e74c3c; /* Wird rot beim Hovern */
     z-index: 100;
+}
+
+/* Bias-Toggle (Matrix-Modal, rechts unten) */
+.bias-toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    color: #7f8c8d;
+    font-weight: 500;
+}
+.bias-toggle-label input[type="checkbox"] {
+    display: none;
+}
+.bias-toggle-slider {
+    position: relative;
+    width: 36px;
+    height: 18px;
+    background: #bdc3c7;
+    border-radius: 18px;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+.bias-toggle-slider::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+.bias-toggle-label input[type="checkbox"]:checked ~ .bias-toggle-slider {
+    background: #049fd9;
+}
+.bias-toggle-label input[type="checkbox"]:checked ~ .bias-toggle-slider::before {
+    transform: translateX(18px);
 }
 
 /* =========================================

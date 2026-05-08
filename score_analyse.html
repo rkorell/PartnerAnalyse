@@ -1,5 +1,9 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- # Modified: 2026-05-08 09:17 - Bias-Toggle für IPA-Matrix (Quadranten-Zoom: Origin (mean_perf, 3)) -->
+<!-- # Modified: 2026-05-08 10:05 - Bias-Toggle als Switch rechts unter der Matrix, Label "Ansicht ohne Bias" -->
+<!-- # Modified: 2026-05-08 10:20 - Bias-Toggle absolut in rechte untere Ecke des Matrix-Modals -->
+<!-- # Modified: 2026-05-08 10:25 - Bias-Toggle in rechte untere Ecke des Plots (matrix-area Wrapper) -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,8 +15,8 @@
         .collapsing-tree-container { display: block; margin: 0 auto 24px auto; width: 100%; max-width: 600px; }
         .slider-row { width: 100%; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; }
         .analyse-btn-row { width: 100%; text-align: center; margin: 24px 0 0 0; }
-        .matrix-controls { display: flex; gap: 15px; margin-bottom: 15px; background: #f1f2f6; padding: 8px 15px; border-radius: 20px; font-size: 14px; }
-        .matrix-controls label { cursor: pointer; display: flex; align-items: center; gap: 5px; user-select: none; }
+        .matrix-area { position: relative; width: 100%; max-width: 650px; }
+        .matrix-controls { position: absolute; bottom: 18px; right: 18px; font-size: 13px; z-index: 5; }
     </style>
 </head>
 <body>
@@ -85,12 +89,16 @@
             <span id="close-matrix" class="modal-close">&times;</span>
             <h2 id="matrix-title">Partner Matrix</h2>
             <div id="area-distribution-container"></div>
-            <div class="matrix-controls">
-                <span style="font-weight:bold; color:#7f8c8d; margin-right:5px;">Zentrierung:</span>
-                <label><input type="radio" name="matrix-center" value="standard" checked> Standard (5.0)</label>
-                <label><input type="radio" name="matrix-center" value="mean"> Mittelwert (Ø)</label>
+            <div class="matrix-area">
+                <div id="matrix-container" class="matrix-wrapper"></div>
+                <div class="matrix-controls">
+                    <label class="bias-toggle-label">
+                        <span class="bias-toggle-text">Bias</span>
+                        <input type="checkbox" id="bias-toggle" checked>
+                        <span class="bias-toggle-slider"></span>
+                    </label>
+                </div>
             </div>
-            <div id="matrix-container" class="matrix-wrapper"></div>
             <div id="matrix-tooltip" class="matrix-tooltip" style="visibility: hidden;"></div>
         </div>
     </div>

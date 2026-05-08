@@ -24,6 +24,9 @@
   # Modified: 2026-04-24 - IPA-Matrix: Quadranten-Labels vereinheitlicht (Handlungsbedarf/Stärke/Nebensache/Bonus)
   # Modified: 2026-04-24 - NPS-Tooltip: "Detractor" → "Kritisch"
   # Modified: 2026-04-24 - Wording entschärft: Defizit→Potenzial, Wert→Kompetenz, Tooltips/Legende neutral, text-danger-bold entfernt
+  # Modified: 2026-05-08 09:30 - getMatrixSVG_Standard: optionale crossX/crossY für Bias-Toggle
+  # Modified: 2026-05-08 10:05 - getMatrixSVG_Standard: optionaler hideLowerLabels-Parameter (Nebensache/Bonus weg im Bias-Modus)
+  # Modified: 2026-05-08 11:25 - getSpecificCommentsHTML + getActionTableHTML: imp/perf mit toFixed(1) (DB liefert jetzt ungerundet)
 */
 
 import { escapeHtml } from './utils.js';
@@ -320,7 +323,7 @@ export function getCommentsListHTML(title, items) {
 export function getSpecificCommentsHTML(items) {
     let html = `<h4>Spezifisches Feedback</h4>`;
     items.forEach(d => {
-        html += `<strong>${escapeHtml(d.name)}</strong> (I:${d.imp}/P:${d.perf})<ul>`;
+        html += `<strong>${escapeHtml(d.name)}</strong> (I:${parseFloat(d.imp).toFixed(1)}/P:${parseFloat(d.perf).toFixed(1)})<ul>`;
         d.comments.forEach(c => html += `<li>${escapeHtml(c)}</li>`);
         html += `</ul>`;
     });
@@ -330,7 +333,7 @@ export function getSpecificCommentsHTML(items) {
 export function getActionTableHTML(items) {
     let html = `<table class="modal-table"><tr><th>Kriterium</th><th>Wichtigkeit</th><th>Performance</th></tr>`;
     items.forEach(i => {
-        html += `<tr><td>${escapeHtml(i.name)}</td><td>${i.imp}</td><td>${i.perf}</td></tr>`;
+        html += `<tr><td>${escapeHtml(i.name)}</td><td>${parseFloat(i.imp).toFixed(1)}</td><td>${parseFloat(i.perf).toFixed(1)}</td></tr>`;
     });
     html += `</table>`;
     return html;
@@ -354,15 +357,21 @@ export function getConflictTableHTML(conflicts) {
 }
 
 // AP 39: Matrix Redesign - German labels, pastel colors, adjusted line weights
-export function getMatrixSVG_Standard(dotsHTML, size, padding, plotSize) {
+export function getMatrixSVG_Standard(dotsHTML, size, padding, plotSize, crossX, crossY, hideLowerLabels) {
     const mid = padding + (plotSize / 2);
+    const cx = (typeof crossX === 'number') ? crossX : mid;
+    const cy = (typeof crossY === 'number') ? crossY : mid;
     const mode = CONFIG.DISPLAY.RANKING_MODE ? 'ranking' : 'neutral';
     const labelColors = CONFIG.DISPLAY.MATRIX_LABEL_COLORS[mode];
 
+    const lowerLabels = hideLowerLabels ? '' : `
+        <text x="${padding + 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12">Nebensache</text>
+        <text x="${padding + plotSize - 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12" text-anchor="end">Bonus</text>`;
+
     return `<svg viewBox="0 0 ${size} ${size}" class="matrix-svg">
         <!-- Koordinatenkreuz (prominent, 1.2px solid) -->
-        <line x1="${padding}" y1="${mid}" x2="${padding + plotSize}" y2="${mid}" stroke="#95a5a6" stroke-width="1.2" />
-        <line x1="${mid}" y1="${padding}" x2="${mid}" y2="${padding + plotSize}" stroke="#95a5a6" stroke-width="1.2" />
+        <line x1="${padding}" y1="${cy}" x2="${padding + plotSize}" y2="${cy}" stroke="#95a5a6" stroke-width="1.2" />
+        <line x1="${cx}" y1="${padding}" x2="${cx}" y2="${padding + plotSize}" stroke="#95a5a6" stroke-width="1.2" />
 
         <!-- Achsen (dezent, 1px) -->
         <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${padding + plotSize}" stroke="#bdc3c7" stroke-width="1" />
@@ -377,9 +386,8 @@ export function getMatrixSVG_Standard(dotsHTML, size, padding, plotSize) {
         <!-- Quadranten-Texte -->
         <text x="${padding + 10}" y="${padding + 20}" fill="${labelColors.potential}" font-size="12" font-weight="bold">Potenzial</text>
         <text x="${padding + plotSize - 10}" y="${padding + 20}" fill="${labelColors.competence}" font-size="12" font-weight="bold" text-anchor="end">Kompetenz</text>
-        <text x="${padding + 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12">Nebensache</text>
-        <text x="${padding + plotSize - 10}" y="${padding + plotSize - 10}" fill="#bdc3c7" font-size="12" text-anchor="end">Bonus</text>
-        
+        ${lowerLabels}
+
         <!-- Datenpunkte -->
         ${dotsHTML}
     </svg>`;

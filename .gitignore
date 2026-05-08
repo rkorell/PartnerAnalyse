@@ -236,3 +236,9 @@ CLAUDE.md
 .claude/
 neue_elemente.md
 vault/
+
+# Galerist (eigenes Projekt, separates Repo geplant)
+/galerist/
+
+# InnoSphere (Cisco x NTT GTM, kein eigenes Repo)
+/innosphere/

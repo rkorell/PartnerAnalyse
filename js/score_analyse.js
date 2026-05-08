@@ -41,6 +41,14 @@
   # Modified: 2026-04-24 - "Partner Score Ranking" → "Partner Score Übersicht"
   # Modified: 2026-04-24 - "Manager/Team-Abweichungen" → "Unterschiede in der Wahrnehmung"
   # Modified: 2026-04-24 - Fraud-Detection: Severity 4 "Systematischer Bias" (Negativbias über alle Partner)
+  # Modified: 2026-05-08 09:17 - Bias-Toggle für IPA-Matrix (Quadranten-Zoom: Origin auf (mean_perf, 3))
+  # Modified: 2026-05-08 09:32 - Bias-Toggle korrigiert: Plot [3,max]², Bias-Schwelle als vertikale Linie bei mean_perf
+  # Modified: 2026-05-08 09:42 - Bias-Toggle: rechte X-Grenze = max(perf) + 0.1 statt valueMax (Auto-Fit)
+  # Modified: 2026-05-08 09:50 - Bias-Toggle: Jitter proportional zur Plot-Range (vorher visuell verkipptes Ranking)
+  # Modified: 2026-05-08 10:05 - Bias-Toggle: Switch-UI rechts unten, Beschriftung "Ansicht ohne Bias", Quadranten-Labels Nebensache/Bonus im Zoom verborgen
+  # Modified: 2026-05-08 10:15 - Bias-Toggle: Semantik invertiert (AN=Bias drin=Standard, AUS=Zoom), Label "Bias"
+  # Modified: 2026-05-08 11:25 - Matrix nutzt ungerundete imp/perf, Pixel-Jitter ±2px, Action-Item-Filter konsistent gerundet
+  # Modified: 2026-05-08 11:50 - Tabellen-Balken: Anzeige-Schwelle auf count > 0 (vorher unterdrückt count_negative=1 bei score<0.5)
 */
 
 import { CONFIG } from './config.js';
@@ -93,6 +101,7 @@ document.addEventListener("DOMContentLoaded", function() {
     let selectedPartnerIds = null;  // null = alle, Set = Auswahl
     let surveyMap = {};             // id → Survey-Objekt (inkl. ranking_mode)
     let rankingMode = false;        // aktiver Darstellungsmodus
+    let biasMode = false;           // Bias-Toggle: Quadranten-Zoom auf (mean_perf, 3)
 
     function applyDisplayMode(isRanking) {
         rankingMode = isRanking;
@@ -122,6 +131,15 @@ document.addEventListener("DOMContentLoaded", function() {
     
     closeMatrixBtn.addEventListener('click', () => { matrixModal.style.display = 'none'; });
     window.addEventListener('click', (e) => { if (e.target === matrixModal) matrixModal.style.display = 'none'; });
+
+    const biasToggle = document.getElementById('bias-toggle');
+    if (biasToggle) {
+        biasToggle.addEventListener('change', () => {
+            // Toggle AN = Bias drin = Standard-Ansicht; Toggle AUS = Bias raus = Zoom
+            biasMode = !biasToggle.checked;
+            if (currentPartnerDetails) renderMatrixSVG(currentPartnerDetails.matrixDetails);
+        });
+    }
 
     if(closeInfoBtn) closeInfoBtn.addEventListener('click', () => { infoModal.style.display = 'none'; });
     if(infoModal) infoModal.addEventListener('click', (e) => {
@@ -770,8 +788,12 @@ document.addEventListener("DOMContentLoaded", function() {
         rows.forEach((row, idx) => {
             const posScore = Math.round(row.scorePositive);
             const negScore = Math.round(row.scoreNegative);
-            const posWidth = posScore > 0 ? (row.scorePositive / maxBarValue) * 100 : 0;
-            const negWidth = negScore > 0 ? (row.scoreNegative / maxBarValue) * 100 : 0;
+            // Anzeige-Schwelle: Balken/Count zeigen, sobald Kriterien gezählt wurden,
+            // unabhängig vom gerundeten Score (sonst verschwinden Edge-Cases mit |Score| < 0.5)
+            const showPos = row.countPositive > 0;
+            const showNeg = row.countNegative > 0;
+            const posWidth = showPos ? (row.scorePositive / maxBarValue) * 100 : 0;
+            const negWidth = showNeg ? (row.scoreNegative / maxBarValue) * 100 : 0;
 
             let slot1 = ''; 
             let slot2 = ''; 
@@ -819,8 +841,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
             html += Tpl.getScoreRowHTML_DBC(row, { slot1, slot2, slot3, slot4 }, {
                 posWidth, negWidth,
-                posCount: posScore > 0 ? row.countPositive : 0,
-                negCount: negScore > 0 ? row.countNegative : 0,
+                posCount: showPos ? row.countPositive : 0,
+                negCount: showNeg ? row.countNegative : 0,
                 posScore, negScore
             });
         });
@@ -899,7 +921,7 @@ document.addEventListener("DOMContentLoaded", function() {
             title = `Vorschlag für Handlungsfelder: ${escapeHtml(partner.partnerName)}`;
             if (partner.matrixDetails) {
                 const items = partner.matrixDetails.filter(d =>
-                    Math.round(parseFloat(d.imp)) >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN &&
+                    Math.round(parseFloat(d.imp) * 10) / 10 >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN &&
                     parseFloat(d.perf) <= CONFIG.ANALYSIS.ACTION_ITEM.PERFORMANCE_MAX
                 );
                 if (items.length > 0) {
@@ -976,7 +998,9 @@ document.addEventListener("DOMContentLoaded", function() {
             areaContainer.innerHTML = Tpl.getAreaHBarHTML(partner.areaDistribution, partner.areaColors);
         }
 
-        if(matrixControls) matrixControls.style.display = 'none';
+        // Bias-Toggle bei jedem Öffnen zurücksetzen (Default: Standard-Ansicht = Bias drin)
+        biasMode = false;
+        if (biasToggle) biasToggle.checked = true;
 
         updateMatrixView('standard');
         matrixModal.style.display = 'flex';
@@ -989,39 +1013,78 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // AP 43: Matrix rendering with CONFIG values
     function renderMatrixSVG(details) {
-        const size = CONFIG.UI.MATRIX_SIZE; 
+        const size = CONFIG.UI.MATRIX_SIZE;
         const padding = CONFIG.UI.MATRIX_PADDING;
         const plotSize = size - (padding * 2);
-        
+
         const valueMin = CONFIG.UI.MATRIX_VALUE_MIN;
         const valueMax = CONFIG.UI.MATRIX_VALUE_MAX;
-        const valueRange = valueMax - valueMin;
-        
-        // Skalierungsfunktion: Wert (0.8-5.2) -> Pixel
-        const scaleX = (val) => padding + ((val - valueMin) / valueRange) * plotSize;
-        const scaleY = (val) => padding + plotSize - ((val - valueMin) / valueRange) * plotSize;
 
-        const jitterRange = CONFIG.UI.MATRIX_JITTER;
+        // Bias-Modus: Kompetenz-Quadrant [3, max(perf)] × [3, valueMax] auf vollen Plot aufgespannt.
+        // Vertikale Hilfslinie wandert auf mean_perf (Bias-Schwelle).
+        // Horizontale Hilfslinie liegt am unteren Plot-Rand (y=3, optisch verdeckt).
+        let valueMinX = valueMin;
+        let valueMinY = valueMin;
+        let valueMaxX = valueMax;
+        let valueMaxY = valueMax;
+        let perfThreshold = -Infinity;
+        let impThreshold  = -Infinity;
+        let meanPerf = null;
+        if (biasMode && details.length > 0) {
+            const competence = details.filter(d => parseFloat(d.perf) >= 3 && parseFloat(d.imp) >= 3);
+            if (competence.length > 0) {
+                meanPerf = competence.reduce((s, d) => s + parseFloat(d.perf), 0) / competence.length;
+                const maxPerf = competence.reduce((m, d) => Math.max(m, parseFloat(d.perf)), 0);
+                valueMinX = 3;
+                valueMinY = 3;
+                valueMaxX = maxPerf + 0.1;  // kleines Padding rechts
+                perfThreshold = 3;
+                impThreshold  = 3;
+            }
+        }
+
+        const rangeX = valueMaxX - valueMinX;
+        const rangeY = valueMaxY - valueMinY;
+
+        const scaleX = (val) => padding + ((val - valueMinX) / rangeX) * plotSize;
+        const scaleY = (val) => padding + plotSize - ((val - valueMinY) / rangeY) * plotSize;
+
+        // Pixel-Jitter (Mini-Sicherheitsnetz für theoretische identische Werte; sonst werden ungerundete Werte direkt verwendet)
+        const PIX_JITTER = CONFIG.UI.MATRIX_PIXEL_JITTER;
 
         let dotsHTML = '';
         details.forEach(d => {
             const valImp = parseFloat(d.imp);
             const valPerf = parseFloat(d.perf);
 
-            // Deterministischer Jitter basierend auf Name-Hash (statt random)
+            // Quadranten-Filter im Bias-Modus: nur Punkte rechts oben vom neuen Origin
+            if (valPerf < perfThreshold || valImp < impThreshold) return;
+
+            // Deterministischer Pixel-Jitter (Hash vom Namen)
             const hash = d.name.split('').reduce((h, c) => ((h << 5) - h) + c.charCodeAt(0), 0);
-            const jX = ((hash % 100) / 100 - 0.5) * 2 * jitterRange;
-            const jY = (((hash >> 8) % 100) / 100 - 0.5) * 2 * jitterRange;
+            const jPxX = ((hash % 100) / 100 - 0.5) * 2 * PIX_JITTER;
+            const jPxY = (((hash >> 8) % 100) / 100 - 0.5) * 2 * PIX_JITTER;
 
-            const cx = scaleX(Math.max(valueMin, Math.min(valueMax, valPerf + jX)));
-            const cy = scaleY(Math.max(valueMin, Math.min(valueMax, valImp + jY)));
+            const cx = Math.max(padding, Math.min(padding + plotSize, scaleX(valPerf) + jPxX));
+            const cy = Math.max(padding, Math.min(padding + plotSize, scaleY(valImp)  + jPxY));
 
-            const isAction = Math.round(valImp) >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN && valPerf <= CONFIG.ANALYSIS.ACTION_ITEM.PERFORMANCE_MAX;
+            // Action-Item-Filter: 1-Dezimal-Round-Verhalten der alten DB-Skala bewahren
+            const impRounded = Math.round(valImp * 10) / 10;
+            const isAction = impRounded >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN
+                          && valPerf <= CONFIG.ANALYSIS.ACTION_ITEM.PERFORMANCE_MAX;
             const dotColor = isAction ? '#5C6BC0' : '#3498db';
-            dotsHTML += Tpl.getMatrixDotHTML(cx, cy, d.name, valImp, valPerf, dotColor);
+
+            // data-Attribute mit gerundeten Werten für Tooltip-Anzeige
+            dotsHTML += Tpl.getMatrixDotHTML(cx, cy, d.name, valImp.toFixed(1), valPerf.toFixed(1), dotColor);
         });
 
-        matrixContainer.innerHTML = Tpl.getMatrixSVG_Standard(dotsHTML, size, padding, plotSize);
+        let crossX, crossY;
+        if (biasMode && meanPerf !== null) {
+            crossX = scaleX(meanPerf);
+            crossY = scaleY(3);  // unterer Plot-Rand → optisch verdeckt
+        }
+
+        matrixContainer.innerHTML = Tpl.getMatrixSVG_Standard(dotsHTML, size, padding, plotSize, crossX, crossY, biasMode);
     }
 
     // --- FRAUD DETECTION (AP 50) ---

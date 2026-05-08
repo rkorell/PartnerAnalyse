@@ -10,6 +10,7 @@
   # Modified: 2026-04-21 - AP 61: Anhang 1 Wichtigkeitsverteilung, Anhang 2 Performance-Benchmark, Anhang 3 Kriterienkatalog
   # Modified: 2026-04-24 - Partner alphabetisch sortiert, Mini-Ranking-Diagramm entfernt
   # Modified: 2026-04-24 - Wording entschärft: Divergenzen, Detractor, rote Performance-Werte, Action-Item Rundung sync
+  # Modified: 2026-05-08 11:25 - Matrix nutzt ungerundete imp/perf, Pixel-Jitter ±2px, Action-Item-Filter konsistent gerundet
 */
 
 import { CONFIG } from './config.js';
@@ -378,7 +379,7 @@ function renderMatrixSVG(details) {
     const padding = CONFIG.UI.MATRIX_PADDING;
     const valueMin = CONFIG.UI.MATRIX_VALUE_MIN;
     const valueMax = CONFIG.UI.MATRIX_VALUE_MAX;
-    const jitterRange = CONFIG.UI.MATRIX_JITTER;
+    const PIX_JITTER = CONFIG.UI.MATRIX_PIXEL_JITTER;
     const plotSize = size - 2 * padding;
     const valueRange = valueMax - valueMin;
 
@@ -389,16 +390,20 @@ function renderMatrixSVG(details) {
     details.forEach(d => {
         const imp = parseFloat(d.imp || 3);
         const perf = parseFloat(d.perf || 3);
-        // Deterministischer Jitter basierend auf Name-Hash (statt random)
+        // Deterministischer Pixel-Jitter (Hash vom Namen)
         const hash = d.name.split('').reduce((h, c) => ((h << 5) - h) + c.charCodeAt(0), 0);
-        const jX = ((hash % 100) / 100 - 0.5) * 2 * jitterRange;
-        const jY = (((hash >> 8) % 100) / 100 - 0.5) * 2 * jitterRange;
+        const jPxX = ((hash % 100) / 100 - 0.5) * 2 * PIX_JITTER;
+        const jPxY = (((hash >> 8) % 100) / 100 - 0.5) * 2 * PIX_JITTER;
 
-        const cx = scaleX(Math.max(valueMin, Math.min(valueMax, perf + jX)));
-        const cy = scaleY(Math.max(valueMin, Math.min(valueMax, imp + jY)));
-        const isAction = Math.round(imp) >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN && perf <= CONFIG.ANALYSIS.ACTION_ITEM.PERFORMANCE_MAX;
+        const cx = Math.max(padding, Math.min(padding + plotSize, scaleX(perf) + jPxX));
+        const cy = Math.max(padding, Math.min(padding + plotSize, scaleY(imp)  + jPxY));
+
+        // Action-Item-Filter: 1-Dezimal-Round bewahrt alte DB-Skala-Semantik
+        const impRounded = Math.round(imp * 10) / 10;
+        const isAction = impRounded >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN
+                      && perf <= CONFIG.ANALYSIS.ACTION_ITEM.PERFORMANCE_MAX;
         const dotColor = isAction ? '#5C6BC0' : '#3498db';
-        dotsHTML += Tpl.getMatrixDotHTML(cx, cy, d.name, imp, perf, dotColor);
+        dotsHTML += Tpl.getMatrixDotHTML(cx, cy, d.name, imp.toFixed(1), perf.toFixed(1), dotColor);
     });
 
     return Tpl.getMatrixSVG_Standard(dotsHTML, size, padding, plotSize);
@@ -468,7 +473,7 @@ function renderDivergences(details) {
 
 function renderActionItems(details) {
     const items = details.filter(d => {
-        const imp = Math.round(parseFloat(d.imp || 0));
+        const imp = Math.round(parseFloat(d.imp || 0) * 10) / 10;
         const perf = parseFloat(d.perf || 0);
         return imp >= CONFIG.ANALYSIS.ACTION_ITEM.IMPORTANCE_MIN && perf <= CONFIG.ANALYSIS.ACTION_ITEM.PERFORMANCE_MAX;
     });

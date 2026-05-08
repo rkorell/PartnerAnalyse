@@ -30,6 +30,8 @@
 # Modified: 2026-04-10 - AP 61: view_survey_fraud IP-Duplikat nur bei gleicher Abteilung (PARTITION BY + department_id)
 # Modified: 2026-04-23 - AP 61: calculate_partner_bilanz um bias-Spalte erweitert (AVG Manager/Team-Differenz)
 # Modified: 2026-04-23 - AP 61: Action-Item Schwelle f_perf <= -0.8 (Performance ≤ 2.2)
+# Modified: 2026-05-08 11:30 - get_partner_matrix_details liefert imp/perf ungerundet (perf_mgr/perf_team bleiben ROUND)
+# Modified: 2026-05-08 13:10 - calculate_partner_bilanz: count_neg/score_neg mit f_imp>0 AND f_perf<=0 (perf=3 → Potenzial)
 */
 
 -- Voraussetzung: Datenbank und User müssen vor Ausführung dieses Skripts existieren.
@@ -319,9 +321,9 @@ BEGIN
         SELECT
             i.partner_id,
             SUM(CASE WHEN (i.f_imp * i.f_perf) > 0 THEN (i.f_imp * i.f_perf) ELSE 0 END) as score_pos,
-            SUM(CASE WHEN (i.f_imp * i.f_perf) < 0 THEN (i.f_imp * i.f_perf) ELSE 0 END) as score_neg,
+            SUM(CASE WHEN i.f_imp > 0 AND i.f_perf <= 0 THEN (i.f_imp * i.f_perf) ELSE 0 END) as score_neg,
             COUNT(CASE WHEN (i.f_imp * i.f_perf) > 0 THEN 1 END) as count_pos,
-            COUNT(CASE WHEN (i.f_imp * i.f_perf) < 0 THEN 1 END) as count_neg,
+            COUNT(CASE WHEN i.f_imp > 0 AND i.f_perf <= 0 THEN 1 END) as count_neg,
             MAX(ABS(COALESCE(i.val_mgr, 0) - COALESCE(i.val_team, 0))) as max_div,
             -- Systematischer Manager/Team-Bias (Ø gerichtete Abweichung über alle Kriterien)
             AVG(COALESCE(i.val_mgr, 0) - COALESCE(i.val_team, 0)) FILTER (WHERE i.val_mgr IS NOT NULL AND i.val_team IS NOT NULL) as bias,
@@ -465,8 +467,8 @@ BEGIN
     )
     SELECT
         c.name,
-        ROUND(i.val_imp, 1) as imp,
-        ROUND(p.val_weighted, 1) as perf,
+        i.val_imp           as imp,        -- ungerundet (Frontend rundet bei Anzeige)
+        p.val_weighted      as perf,       -- ungerundet (Frontend rundet bei Anzeige)
         ROUND(p.val_mgr, 1) as perf_mgr,
         ROUND(p.val_team, 1) as perf_team,
         p.comment_list as comments

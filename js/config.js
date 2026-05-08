@@ -15,6 +15,7 @@
   # Modified: 2026-04-23 - AP 61: BIAS_THRESHOLD für systematische Manager/Team-Divergenz
   # Modified: 2026-04-23 - AP 61: Action-Item PERFORMANCE_MAX 2.0 → 2.2
   # Modified: 2026-04-25 - DISPLAY-Modus: RANKING_MODE, Balkenfarben, Matrix-Label-Farben konfigurierbar
+  # Modified: 2026-05-08 11:20 - MATRIX_JITTER (Wert-Einheiten) → MATRIX_PIXEL_JITTER (2 px)
 */
 
 export const CONFIG = {
@@ -135,7 +136,7 @@ export const CONFIG = {
         MATRIX_PADDING: 50,
         MATRIX_VALUE_MIN: 0.8,
         MATRIX_VALUE_MAX: 5.2,
-        MATRIX_JITTER: 0.15,
+        MATRIX_PIXEL_JITTER: 2,   // Pixel-Jitter (vorher MATRIX_JITTER 0.15 in Wert-Einheiten)
     },
 
     // --- Slider-Tooltip-Texte (AP 43) ---
