@@ -6,6 +6,18 @@
 /* # Modified: 2026-03-13 - AP 59: NPS-Donut, Awareness-Torte entfernt, Kachel-Design für Insights + Header */
 /* # Modified: 2026-05-08 09:17 - Bias-Toggle-Button Styles für IPA-Matrix (.bias-toggle-btn / .active) */
 /* # Modified: 2026-05-08 10:05 - Bias-Toggle umgebaut auf Switch (.bias-toggle-label / .bias-toggle-slider) */
+/* # Modified: 2026-05-08 13:30 - .column-header-tile sortable mit hover/active-States, Pfeil-Indikator, Schrift 14px */
+/* # Modified: 2026-05-08 14:50 - .score-saldo: Saldo-Anzeige rechts vom Balken im RANKING_MODE */
+.score-saldo {
+    display: inline-block;
+    margin-top: 4px;
+    font-weight: 700;
+    font-size: 14px;
+    color: #034d68;
+    text-align: right;
+    width: 100%;
+    padding-right: 8px;
+}
 
 /* Reset und Grundlagen */
 * {
@@ -1865,11 +1877,35 @@ input[type=range].slider-neutral {
     background: #f8f9fa;
     border: 1px solid #e9ecef;
     border-radius: 12px;
-    padding: 4px 20px;
+    padding: 6px 14px;
+    font-size: 15px;
     font-weight: 600;
     text-align: center;
     box-sizing: border-box;
     width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.column-header-tile.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s, border-color 0.15s;
+}
+.column-header-tile.sortable:hover {
+    background: #e9ecef;
+    border-color: #ced4da;
+}
+.column-header-tile.sortable.active {
+    background: #d6ebf7;
+    border-color: #049fd9;
+    color: #034d68;
+}
+.column-header-tile .sort-arrow {
+    display: inline-block;
+    color: #049fd9;
+    font-weight: bold;
+    margin-left: 4px;
 }
 
 .insight-slot-icon .insight-icon:hover,

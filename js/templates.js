@@ -27,6 +27,8 @@
   # Modified: 2026-05-08 09:30 - getMatrixSVG_Standard: optionale crossX/crossY für Bias-Toggle
   # Modified: 2026-05-08 10:05 - getMatrixSVG_Standard: optionaler hideLowerLabels-Parameter (Nebensache/Bonus weg im Bias-Modus)
   # Modified: 2026-05-08 11:25 - getSpecificCommentsHTML + getActionTableHTML: imp/perf mit toFixed(1) (DB liefert jetzt ungerundet)
+  # Modified: 2026-05-08 13:30 - getScoreTableStartHTML: sortable column headers (data-sort + sort-arrow)
+  # Modified: 2026-05-08 14:50 - getScoreRowHTML_DBC: Saldo-Anzeige rechts vom Balken im RANKING_MODE
 */
 
 import { escapeHtml } from './utils.js';
@@ -121,10 +123,10 @@ export function getScoreTableStartHTML(title) {
     </div>
     <div class="criteria-table">
         <div class="criteria-row score-table-header">
-            <div class="criteria-content col-partner"><span class="column-header-tile">Partner</span></div>
-            <div class="criteria-content col-score-graph" style="text-align:center;"><span class="column-header-tile">Partner-Profil (Potenzial · Kompetenz)</span></div>
-            <div class="criteria-content col-count"><span class="column-header-tile">Antworten</span></div>
-            <div class="criteria-content col-insights text-center"><span class="column-header-tile">Insights</span></div>
+            <div class="criteria-content col-partner"><span class="column-header-tile sortable" data-sort="partner">Partner<span class="sort-arrow"></span></span></div>
+            <div class="criteria-content col-score-graph" style="text-align:center;"><span class="column-header-tile sortable" data-sort="kompetenz">Partner-Profil (Potenzial · Kompetenz)<span class="sort-arrow"></span></span></div>
+            <div class="criteria-content col-count"><span class="column-header-tile sortable" data-sort="answers">Antworten<span class="sort-arrow"></span></span></div>
+            <div class="criteria-content col-insights text-center"><span class="column-header-tile sortable" data-sort="nps">Insights<span class="sort-arrow"></span></span></div>
         </div>`;
 }
 
@@ -142,6 +144,12 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
     const isRanking = CONFIG.DISPLAY.RANKING_MODE;
     const negLabel = isRanking ? `${negScore} (${negCount})` : `${negCount}`;
     const posLabel = isRanking ? `${posScore} (${posCount})` : `${posCount}`;
+
+    // Saldo-Anzeige rechts neben dem Balken (nur RANKING_MODE)
+    const saldo = posScore - negScore;
+    const saldoHTML = isRanking
+        ? `<span class="score-saldo">${saldo > 0 ? '+' : ''}${saldo}</span>`
+        : '';
 
     // Schmale Balken: Text außerhalb darstellen (Schwelle: 8% der Balkenfläche)
     const negNarrow = negWidth > 0 && negWidth < 8;
@@ -175,6 +183,7 @@ export function getScoreRowHTML_DBC(row, slots, scaling) {
                     ${posBarHTML}
                 </div>
             </div>
+            ${saldoHTML}
         </div>
 
         <div class="criteria-content col-count" style="display:flex; align-items:flex-end; justify-content:center;">

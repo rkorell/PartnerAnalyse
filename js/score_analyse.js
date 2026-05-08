@@ -49,6 +49,10 @@
   # Modified: 2026-05-08 10:15 - Bias-Toggle: Semantik invertiert (AN=Bias drin=Standard, AUS=Zoom), Label "Bias"
   # Modified: 2026-05-08 11:25 - Matrix nutzt ungerundete imp/perf, Pixel-Jitter ±2px, Action-Item-Filter konsistent gerundet
   # Modified: 2026-05-08 11:50 - Tabellen-Balken: Anzeige-Schwelle auf count > 0 (vorher unterdrückt count_negative=1 bei score<0.5)
+  # Modified: 2026-05-08 13:30 - Sortierbare Tabellenspalten (Partner / Kompetenz-Anzahl / Antworten / NPS) mit asc/desc-Toggle
+  # Modified: 2026-05-08 13:50 - Sortier-Defaults pro Spalte: Partner asc, numerische Spalten desc beim ersten Klick
+  # Modified: 2026-05-08 14:30 - Balken im neutralen Modus count-basiert (score-bereinigt); RANKING_MODE bleibt score-basiert
+  # Modified: 2026-05-08 14:35 - Sortier-Achse "Partner-Profil" im RANKING_MODE = Score-Saldo, neutral = count_positive
 */
 
 import { CONFIG } from './config.js';
@@ -102,6 +106,8 @@ document.addEventListener("DOMContentLoaded", function() {
     let surveyMap = {};             // id → Survey-Objekt (inkl. ranking_mode)
     let rankingMode = false;        // aktiver Darstellungsmodus
     let biasMode = false;           // Bias-Toggle: Quadranten-Zoom auf (mean_perf, 3)
+    let sortColumn = null;          // 'partner' | 'kompetenz' | 'answers' | 'nps'  (null = Default)
+    let sortDirection = 'asc';      // 'asc' | 'desc'
 
     function applyDisplayMode(isRanking) {
         rankingMode = isRanking;
@@ -165,11 +171,29 @@ document.addEventListener("DOMContentLoaded", function() {
     
     filterForm.addEventListener('submit', function(e) {
         e.preventDefault();
+        // Sortierung zurück auf Default beim erneuten Filtern
+        sortColumn = null;
+        sortDirection = 'asc';
         analyseScores();
     });
 
     // Event Delegation
     resultSection.addEventListener('click', function(e) {
+        // Sortier-Header
+        const sortHeader = e.target.closest('.column-header-tile.sortable');
+        if (sortHeader) {
+            const col = sortHeader.dataset.sort;
+            const defaults = { partner: 'asc', kompetenz: 'desc', answers: 'desc', nps: 'desc' };
+            if (sortColumn === col) {
+                sortDirection = (sortDirection === 'asc') ? 'desc' : 'asc';
+            } else {
+                sortColumn = col;
+                sortDirection = defaults[col] || 'asc';
+            }
+            renderResultTable(getFilteredData());
+            return;
+        }
+
         const insightIcon = e.target.closest('.insight-icon');
         if (insightIcon) {
             e.stopPropagation();
@@ -770,7 +794,15 @@ document.addEventListener("DOMContentLoaded", function() {
             if (r.scorePositive > maxBarValue) maxBarValue = r.scorePositive;
             if (r.scoreNegative > maxBarValue) maxBarValue = r.scoreNegative;
         });
-        if (maxBarValue === 0) maxBarValue = 1; 
+        if (maxBarValue === 0) maxBarValue = 1;
+
+        // Bezugsgröße für count-basierte Balken im neutralen Modus: max Anzahl Kriterien je Partner
+        let maxCriteria = 0;
+        rows.forEach(r => {
+            const t = (r.countPositive || 0) + (r.countNegative || 0);
+            if (t > maxCriteria) maxCriteria = t;
+        });
+        if (maxCriteria === 0) maxCriteria = 1;
 
         const maxScore = rows.length > 0 && rows[0].maxScore ? rows[0].maxScore : 0;
         const titleText = rankingMode
@@ -779,7 +811,28 @@ document.addEventListener("DOMContentLoaded", function() {
         let html = Tpl.getScoreTableStartHTML(titleText);
 
         const mode = rankingMode ? 'ranking' : 'neutral';
-        if (rankingMode) {
+
+        // Sortierung: User-Override > Mode-Default
+        const sortKeyFn = {
+            partner:   r => r.partnerName,
+            // Im RANKING_MODE: Score-Saldo (passt zur score-basierten Balkenlänge)
+            // Im neutralen Modus: count_positive (passt zur count-basierten Balkenlänge)
+            kompetenz: r => rankingMode
+                ? (parseFloat(r.scorePositive || 0) - parseFloat(r.scoreNegative || 0))
+                : parseInt(r.countPositive || 0),
+            answers:   r => parseInt(r.totalAnswers || 0),
+            nps:       r => (r.npsScore === null || r.npsScore === undefined) ? -Infinity : parseInt(r.npsScore)
+        };
+
+        if (sortColumn && sortKeyFn[sortColumn]) {
+            const keyFn = sortKeyFn[sortColumn];
+            const dir = sortDirection === 'asc' ? 1 : -1;
+            rows = [...rows].sort((a, b) => {
+                const av = keyFn(a), bv = keyFn(b);
+                if (typeof av === 'string') return av.localeCompare(bv, 'de') * dir;
+                return (av - bv) * dir;
+            });
+        } else if (rankingMode) {
             rows = [...rows].sort((a, b) => (b.scorePositive - b.scoreNegative) - (a.scorePositive - a.scoreNegative));
         } else {
             rows = [...rows].sort((a, b) => a.partnerName.localeCompare(b.partnerName, 'de'));
@@ -792,8 +845,15 @@ document.addEventListener("DOMContentLoaded", function() {
             // unabhängig vom gerundeten Score (sonst verschwinden Edge-Cases mit |Score| < 0.5)
             const showPos = row.countPositive > 0;
             const showNeg = row.countNegative > 0;
-            const posWidth = showPos ? (row.scorePositive / maxBarValue) * 100 : 0;
-            const negWidth = showNeg ? (row.scoreNegative / maxBarValue) * 100 : 0;
+            // Balkenlänge: im RANKING_MODE score-basiert (zeigt Stärke), im neutralen Modus count-basiert (score-bereinigt)
+            const posWidth = showPos
+                ? (rankingMode ? (row.scorePositive / maxBarValue) * 100
+                               : (row.countPositive  / maxCriteria) * 100)
+                : 0;
+            const negWidth = showNeg
+                ? (rankingMode ? (row.scoreNegative / maxBarValue) * 100
+                               : (row.countNegative  / maxCriteria) * 100)
+                : 0;
 
             let slot1 = ''; 
             let slot2 = ''; 
@@ -849,6 +909,16 @@ document.addEventListener("DOMContentLoaded", function() {
         html += `</div>`;
         html += Tpl.getLegendHTML();
         resultSection.innerHTML = html;
+
+        // Sort-Pfeil im aktiven Header setzen
+        if (sortColumn) {
+            const activeHeader = resultSection.querySelector(`.column-header-tile.sortable[data-sort="${sortColumn}"]`);
+            if (activeHeader) {
+                activeHeader.classList.add('active');
+                const arrow = activeHeader.querySelector('.sort-arrow');
+                if (arrow) arrow.textContent = sortDirection === 'asc' ? ' ▲' : ' ▼';
+            }
+        }
     }
 
     async function ensurePartnerDetails(partner) {
