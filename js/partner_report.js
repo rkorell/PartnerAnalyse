@@ -11,6 +11,9 @@
   # Modified: 2026-04-24 - Partner alphabetisch sortiert, Mini-Ranking-Diagramm entfernt
   # Modified: 2026-04-24 - Wording entschärft: Divergenzen, Detractor, rote Performance-Werte, Action-Item Rundung sync
   # Modified: 2026-05-08 11:25 - Matrix nutzt ungerundete imp/perf, Pixel-Jitter ±2px, Action-Item-Filter konsistent gerundet
+  # Modified: 2026-05-08 14:55 - Kriteriendetails-Tabelle: Sortierung Performance DESC, Tie-Break Importance DESC
+  # Modified: 2026-05-08 15:05 - Kriteriendetails-Tabelle: Kriteriennummer ans Ende ("Foo (1.)" statt "1. Foo")
+  # Modified: 2026-05-08 15:15 - Kriteriendetails-Tabelle: Mgr/Team in einer Spalte, dezent grau, mit Trennlinie
 */
 
 import { CONFIG } from './config.js';
@@ -411,27 +414,35 @@ function renderMatrixSVG(details) {
 
 
 function renderDetailTable(details) {
+    // Sortierung: Performance absteigend (Stärken oben), bei Gleichstand Importance absteigend
+    const sorted = [...details].sort((a, b) => {
+        const dPerf = parseFloat(b.perf || 0) - parseFloat(a.perf || 0);
+        if (dPerf !== 0) return dPerf;
+        return parseFloat(b.imp || 0) - parseFloat(a.imp || 0);
+    });
+
     let html = `<table class="report-table">
         <tr>
             <th>Kriterium</th>
             <th>Wichtigkeit</th>
             <th>Performance</th>
-            <th>Mgr</th>
-            <th>Team</th>
+            <th class="report-mt-head">Mgr / Team</th>
         </tr>`;
 
-    details.forEach(d => {
+    sorted.forEach(d => {
         const imp = parseFloat(d.imp || 0).toFixed(1);
         const perf = parseFloat(d.perf || 0).toFixed(1);
         const mgrVal = d.perf_mgr ? parseFloat(d.perf_mgr).toFixed(1) : '-';
         const teamVal = d.perf_team ? parseFloat(d.perf_team).toFixed(1) : '-';
 
+        // Nummer ans Ende: "1. Foo" → "Foo (1.)"
+        const displayName = (d.name || '').replace(/^(\d+)\.\s*(.+)$/, '$2 ($1.)');
+
         html += `<tr>
-            <td>${escapeHtml(d.name)}</td>
+            <td>${escapeHtml(displayName)}</td>
             <td class="num">${imp}</td>
             <td class="num">${perf}</td>
-            <td class="num">${mgrVal}</td>
-            <td class="num">${teamVal}</td>
+            <td class="num report-mt-cell">${mgrVal} / ${teamVal}</td>
         </tr>`;
     });
 

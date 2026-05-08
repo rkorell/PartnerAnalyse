@@ -244,11 +244,12 @@
         .report-table th {
             background: #f8f9fa;
             padding: 6px 8px;
-            text-align: left;
+            text-align: center;
             font-weight: 600;
             border-bottom: 2px solid #dee2e6;
             white-space: nowrap;
         }
+        .report-table th:first-child { text-align: left; }
 
         .report-table td {
             padding: 5px 8px;
@@ -256,11 +257,19 @@
         }
 
         .report-table td.num {
-            text-align: right;
+            text-align: center;
             font-variant-numeric: tabular-nums;
         }
 
         .report-table tr:last-child td { border-bottom: none; }
+
+        /* Mgr/Team-Spalte: dezent + visuell abgesetzt */
+        .report-table .report-mt-head,
+        .report-table .report-mt-cell {
+            color: #7f8c8d;
+            border-left: 1px solid #e9ecef;
+            padding-left: 12px;
+        }
 
         /* --- Area Bar (reuse from main CSS) --- */
         .area-hbar {
