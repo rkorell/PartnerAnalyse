@@ -32,6 +32,7 @@
 # Modified: 2026-04-23 - AP 61: Action-Item Schwelle f_perf <= -0.8 (Performance ≤ 2.2)
 # Modified: 2026-05-08 11:30 - get_partner_matrix_details liefert imp/perf ungerundet (perf_mgr/perf_team bleiben ROUND)
 # Modified: 2026-05-08 13:10 - calculate_partner_bilanz: count_neg/score_neg mit f_imp>0 AND f_perf<=0 (perf=3 → Potenzial)
+# Modified: 2026-05-09 - Quadrant-Seite: short_name VARCHAR(12) in partners (Kurzlabel für Strip-/Quadrant-Plots)
 */
 
 -- Voraussetzung: Datenbank und User müssen vor Ausführung dieses Skripts existieren.
@@ -79,7 +80,8 @@ CREATE TABLE IF NOT EXISTS partners (
     be_geo_id INTEGER UNIQUE,
     sortgroup INTEGER,
     active BOOLEAN DEFAULT TRUE,
-    logo_file VARCHAR(200)
+    logo_file VARCHAR(200),
+    short_name VARCHAR(12)
 );
 
 -- 5. Kriterien

@@ -77,6 +77,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const closeErrorBtn = document.getElementById('close-error');
     const exportBtn = document.getElementById('export-btn');
     const reportBtn = document.getElementById('report-btn');
+    const kriterienBtn = document.getElementById('kriterien-btn');
     const partnerFilterSection = document.getElementById('partner-filter-section');
 
     const matrixModal = document.getElementById('matrix-modal');
@@ -154,6 +155,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     if(exportBtn) exportBtn.addEventListener('click', exportToCSV);
     if(reportBtn) reportBtn.addEventListener('click', openPartnerReport);
+    if(kriterienBtn) kriterienBtn.addEventListener('click', openKriterienAnalyse);
     surveySelect.addEventListener('change', onSurveySelectionChange);
 
     if (loginForm) {
@@ -286,6 +288,13 @@ document.addEventListener("DOMContentLoaded", function() {
             reportBtn.disabled = !enabled;
             if (enabled) reportBtn.classList.replace('btn-secondary', 'btn-primary');
             else reportBtn.classList.replace('btn-primary', 'btn-secondary');
+        }
+        if (kriterienBtn) {
+            const isRanking = getRankingModeFromSelection();
+            kriterienBtn.style.display = (enabled && isRanking) ? '' : 'none';
+            kriterienBtn.disabled = !enabled;
+            if (enabled) kriterienBtn.classList.replace('btn-secondary', 'btn-primary');
+            else kriterienBtn.classList.replace('btn-primary', 'btn-secondary');
         }
     }
 
@@ -1457,6 +1466,19 @@ document.addEventListener("DOMContentLoaded", function() {
             partner_ids: selectedPartnerIds ? [...selectedPartnerIds] : null
         };
         window.open('partner_report.html?filter=' + encodeURIComponent(btoa(JSON.stringify(filterPayload))), '_blank');
+    }
+
+    function openKriterienAnalyse() {
+        if (!currentFilterState || !analysisData.length) return;
+        const filterPayload = {
+            survey_ids: currentFilterState.survey_ids,
+            department_ids: currentFilterState.department_ids,
+            manager_filter: currentFilterState.manager_filter,
+            min_answers: parseInt(minAnswersSlider.value),
+            exclude_ids: excludedParticipantIds,
+            partner_ids: selectedPartnerIds ? [...selectedPartnerIds] : null
+        };
+        window.open('kriterien_strips.html?filter=' + encodeURIComponent(btoa(JSON.stringify(filterPayload))), '_blank');
     }
 
     function exportToCSV() {

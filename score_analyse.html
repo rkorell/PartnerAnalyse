@@ -4,6 +4,7 @@
 <!-- # Modified: 2026-05-08 10:05 - Bias-Toggle als Switch rechts unter der Matrix, Label "Ansicht ohne Bias" -->
 <!-- # Modified: 2026-05-08 10:20 - Bias-Toggle absolut in rechte untere Ecke des Matrix-Modals -->
 <!-- # Modified: 2026-05-08 10:25 - Bias-Toggle in rechte untere Ecke des Plots (matrix-area Wrapper) -->
+<!-- # Modified: 2026-05-09 - Button "Kriterienanalyse" (sichtbar bei ranking_mode), öffnet kriterien_strips.html mit Filter-Param -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -66,6 +67,7 @@
                     <button type="submit" id="analyse-btn" class="btn btn-primary">Analysieren</button>
                     <button type="button" id="export-btn" class="btn btn-secondary" disabled style="margin-left: 10px;">Export nach Excel</button><span onclick="window.openInfoModal('csv-export')" title="Export-Info" style="display:inline-block; width:22px; height:22px; background:#F5A623; color:#fff; border-radius:50%; text-align:center; line-height:22px; font-family:Georgia,serif; font-weight:bold; font-style:italic; font-size:13px; cursor:pointer; margin-left:6px; vertical-align:middle; box-shadow:0 1px 3px rgba(0,0,0,0.15);">i</span>
                     <button type="button" id="report-btn" class="btn btn-secondary" disabled style="margin-left: 10px;">Bericht erstellen</button>
+                    <button type="button" id="kriterien-btn" class="btn btn-secondary" disabled style="margin-left: 10px; display:none;">Kriterienanalyse</button>
                 </form>
             </div>
             <div id="loading-overlay" class="loading-overlay" style="display: none;">

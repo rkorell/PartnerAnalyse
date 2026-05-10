@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="de">
+<!-- # Modified: 2026-05-09 - Initial Prototyp Strip-Diagnose (24 Kriterien, alle Partner pro Strip) -->
+<!-- # Modified: 2026-05-09 - Iteration 2: Filterboxen, Slider, Sortier-Toggle, Drag-Reorder, Klick-Lupe -->
+<!-- # Modified: 2026-05-09 - Iteration 3: Helles App-Design + In-Place-Zoom (Range um Klickposition) -->
+<!-- # Modified: 2026-05-09 - Iteration 4: Accordion-Filterboxen (partner-filter-panel-Stil), volle Namen, Floating-Zoom-Popup -->
+<!-- # Modified: 2026-05-09 - Iteration 5: Partner-Liste folgt min-ratings-Slider (eligible = ≥1 Kriterium über Schwelle) -->
+<!-- # Modified: 2026-05-09 - Iteration 6: Zoom-Popup over-strip (volle Strip-Breite, einzeilig, Labels horizontal neben Punkt) -->
+<!-- # Modified: 2026-05-09 - Iteration 7: Zoom-Labels mittig unter Punkt, zoom-in-Cursor -->
+<!-- # Modified: 2026-05-09 - Iteration 8: Zoom visuell klar (höher, große Punkte, Range-Header, Lupen-Indikator) -->
+<!-- # Modified: 2026-05-09 - Iteration 9: Cluster-Erkennung über Label-Boxen, Spread auf volle Popup-Breite, vertikaler Versatz bei Restüberlapp -->
+<!-- # Modified: 2026-05-09 - Rename → kriterien_strips.html, neue Headlines, N im Subtitle, Filter-Param weiterleiten, (n=) pro Strip raus -->
+<!-- # Modified: 2026-05-09 - Refactor: POST-Body, Standalone-Filter (Survey + Manager + Min-Slider), kein Per-Strip-Filter mehr (Backend liefert eligible Partner) -->
+<!-- # Modified: 2026-05-09 - Survey-Auswahl als Dropdown (single-select), Vorstellungspartner-Stern pro Chip, Anonymisierung im Strip + Lupe -->
+<!-- # Modified: 2026-05-09 - Chip-Layout: Label-first / Checkbox rechts; Partner-Chip: Stern vor Name -->
+<!-- # Modified: 2026-05-10 - Vision × Execution Partner-Quadrant integriert (Klapp-Panel, Sub-Scores client-seitig aus per_partner_perf) -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPQI: Kriterienanalyse</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .strip-controls { display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-start; }
+        .strip-controls > .partner-filter-panel { flex: 1; min-width: 0; }
+
+        .strip-sort-row { font-size: 13px; color: #34495e; margin-bottom: 12px; display: flex; gap: 18px; align-items: center; }
+        .strip-sort-row label { cursor: pointer; }
+        .strip-sort-hint { color: #888; font-size: 11px; }
+
+        .strip-row { background: #ffffff; border: 1px solid #e1e4e8; border-radius: 6px; padding: 8px 12px; margin-bottom: 6px; display: flex; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .strip-row.dragging { opacity: 0.4; }
+        .strip-handle { color: #999; cursor: grab; padding: 0 8px 0 0; user-select: none; font-size: 16px; }
+        .strip-head { width: 320px; flex-shrink: 0; padding-right: 12px; }
+        .strip-name { font-size: 13px; color: #2c3e50; line-height: 1.25; font-weight: 600; }
+        .strip-cat { font-size: 11px; color: #7f8c8d; margin-top: 2px; }
+        .strip-imp { font-size: 12px; color: #2471a3; margin-top: 4px; }
+        .strip-svg-wrap { flex: 1; min-width: 0; cursor: zoom-in; position: relative; }
+        svg.strip-svg { width: 100%; height: 70px; display: block; }
+        .axis { stroke: #95a5a6; stroke-width: 1; }
+        .grid-line { stroke: #e1e4e8; stroke-width: 1; }
+        .axt { fill: #7f8c8d; font-size: 10px; font-family: sans-serif; }
+        .pt  { fill: #2471a3; }
+        .lbl { fill: #2c3e50; font-size: 10px; font-family: sans-serif; }
+        .lbl-zoom { fill: #2c3e50; font-size: 13px; font-family: sans-serif; }
+        .err { color: #c0392b; padding: 20px; }
+        .empty-hint { color: #555; padding: 30px; text-align: center; font-size: 14px; background: #fff; border: 1px dashed #c8d4dc; border-radius: 6px; }
+
+        /* Floating Zoom-Popup */
+        #zoom-popup {
+            position: absolute; display: none; z-index: 200;
+            background: #ffffff; border: 2px solid #2471a3; border-radius: 6px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+            padding: 4px 24px 4px 4px;
+        }
+        #zoom-popup.open { display: block; }
+        #zoom-close {
+            position: absolute; top: 2px; right: 4px; cursor: pointer;
+            color: #888; font-size: 18px; line-height: 1; padding: 1px 6px; border-radius: 3px;
+        }
+        #zoom-close:hover { background: #f0f0f0; color: #333; }
+        #zoom-popup svg { width: 100%; display: block; }
+        #zoom-popup .lbl-zoom { fill: #2c3e50; font-size: 13px; font-family: sans-serif; }
+
+        /* Survey-Picker-Felder */
+        .picker-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin: 10px 0; font-size: 13px; color: #34495e; }
+        .picker-row label { cursor: pointer; }
+        .slider-inline { display: flex; align-items: center; gap: 8px; }
+        .slider-inline input[type=range] { width: 180px; }
+        #survey-select { font-size: 13px; padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; min-width: 320px; }
+
+        /* Vorstellungspartner-Stern im Chip (vor dem Namen) */
+        .star-toggle { cursor: pointer; color: #ccc; font-size: 14px; user-select: none; flex-shrink: 0; }
+        .star-toggle.on { color: #f5a623; }
+        .star-toggle:hover { color: #f5a623; }
+
+        /* Chip-Layout: Inhalt links, Checkbox rechts (überstimmt globalen partner-filter-item) */
+        #crit-grid .partner-filter-item, #part-grid .partner-filter-item { display: flex; align-items: center; gap: 6px; }
+        #crit-grid .chip-name, #part-grid .chip-name { flex: 1; min-width: 0; }
+        #crit-grid input[type=checkbox], #part-grid input[type=checkbox] { margin-left: auto; flex-shrink: 0; }
+
+        /* Vision × Execution Quadrant */
+        #quadrant-panel { margin-bottom: 16px; }
+        #quadrant-svg-container { max-width: 780px; margin: 0 auto; }
+        #quadrant-svg-container svg { width: 100%; height: auto; display: block; }
+        .q-axis { stroke: #6b7c93; stroke-width: 1.6; }
+        .q-midline { stroke: #b0bec5; stroke-width: 1.4; stroke-dasharray: 7,5; }
+        .q-pt { fill: #049fd9; stroke: #034d68; stroke-width: 1.6; opacity: 0.9; }
+        .q-leader { stroke: #6b7c93; stroke-width: 2; }
+        .q-axt-bold { fill: #034d68; font-size: 24px; font-family: sans-serif; font-weight: 600; }
+        .q-axt-emph { font-size: 28px; }
+        .q-axt-paren { fill: hsl(197, 80%, 40%); }
+        .q-off-arrow { fill: #c0392b; }
+        .q-off-lbl { fill: #c0392b; font-size: 16px; font-family: sans-serif; font-weight: 600; }
+        .q-frame-fb { fill: #2c3e50; font-size: 16px; font-family: sans-serif; font-weight: 600; text-anchor: middle; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-logo-left">
+                <img src="img/cisco.png" alt="Cisco Logo">
+            </div>
+            <div class="header-center">
+                <h1 class="page-brand-title">CPQI: Kriterienanalyse</h1>
+                <p class="subtitle" id="page-subtitle">Performancedarstellung. Bewertung durch <span id="total-n">…</span> Umfrageteilnehmer.</p>
+            </div>
+            <div class="header-logo-right"></div>
+        </header>
+
+        <div class="wizard-container">
+            <!-- Survey/Filter-Picker (Standalone-Modus) -->
+            <div class="partner-filter-panel" id="picker-panel" style="margin-bottom:16px;">
+                <div class="partner-filter-header" id="picker-toggle">
+                    <span class="chevron">&#9654;</span>
+                    <span class="pf-header-text" id="picker-header-text">Auswahl</span>
+                </div>
+                <div class="partner-filter-body" id="picker-body">
+                    <div class="picker-row">
+                        <strong>Survey:</strong>
+                        <select id="survey-select"></select>
+                    </div>
+
+                    <div class="picker-row">
+                        <strong>Gruppe:</strong>
+                        <label><input type="radio" name="mgr-filter" value="alle" checked> Alle</label>
+                        <label><input type="radio" name="mgr-filter" value="nur_manager"> Nur Manager</label>
+                        <label><input type="radio" name="mgr-filter" value="nur_nicht_manager"> Nur Nicht-Manager</label>
+                    </div>
+
+                    <div class="picker-row">
+                        <div class="slider-inline">
+                            <span>Mindestanzahl Antworten pro Partner:</span>
+                            <input type="range" id="min-slider" min="1" max="20" value="5">
+                            <span id="min-val" style="font-weight:bold; min-width:24px;">5</span>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:12px;">
+                        <button type="button" id="picker-apply" class="btn btn-primary">Anzeigen</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Strip-Filter (Kriterien + Partner) -->
+            <div class="strip-controls">
+                <div class="partner-filter-panel" id="crit-panel">
+                    <div class="partner-filter-header" id="crit-toggle">
+                        <span class="chevron">&#9654;</span>
+                        <span class="pf-header-text" id="crit-header-text">Kriterien</span>
+                    </div>
+                    <div class="partner-filter-body" id="crit-body">
+                        <div class="partner-filter-actions">
+                            <button type="button" id="crit-all">Alle</button>
+                            <button type="button" id="crit-none">Keine</button>
+                        </div>
+                        <div class="partner-filter-grid" id="crit-grid"></div>
+                    </div>
+                </div>
+                <div class="partner-filter-panel" id="part-panel">
+                    <div class="partner-filter-header" id="part-toggle">
+                        <span class="chevron">&#9654;</span>
+                        <span class="pf-header-text" id="part-header-text">Partner</span>
+                    </div>
+                    <div class="partner-filter-body" id="part-body">
+                        <div class="partner-filter-actions">
+                            <button type="button" id="part-all">Alle</button>
+                            <button type="button" id="part-none">Keine</button>
+                        </div>
+                        <div class="partner-filter-grid" id="part-grid"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vision × Execution Partner-Quadrant -->
+            <div class="partner-filter-panel" id="quadrant-panel">
+                <div class="partner-filter-header" id="quadrant-toggle">
+                    <span class="chevron">&#9654;</span>
+                    <span class="pf-header-text">Vision × Execution — Partner-Quadrant</span>
+                </div>
+                <div class="partner-filter-body" id="quadrant-body">
+                    <div id="quadrant-svg-container"><div class="empty-hint">Quadrant erscheint nach Survey-Auswahl.</div></div>
+                </div>
+            </div>
+
+            <div class="strip-sort-row">
+                <strong>Sortierung:</strong>
+                <label><input type="radio" name="sort" value="seq" checked> Kriteriennummer</label>
+                <label><input type="radio" name="sort" value="imp"> Importance &darr;</label>
+                <span class="strip-sort-hint">(Drag-Sortierung &uuml;berschreibt – Klick auf Sortier-Modus stellt zur&uuml;ck)</span>
+            </div>
+
+            <div id="strips"></div>
+        </div>
+    </div>
+
+    <div id="zoom-popup">
+        <span id="zoom-close" title="schließen">×</span>
+        <svg id="zoom-svg" viewBox="0 0 1000 80" preserveAspectRatio="none"></svg>
+    </div>
+
+<script>
+const ENDPOINT = 'php/kriterien_strips.php';
+
+let STATE = {
+    appliedFilter: null,    // letzter gesendeter Filter-Payload
+    allSurveys: [],         // aus Backend
+    criteria: [],
+    partners: [],
+    perfMap: {},            // criterion_id → partner_id → perf
+    critActive: new Set(),
+    partActive: new Set(),
+    sortMode: 'seq',
+    order: [],
+    minRatings: 5,
+    managerFilter: 'alle',
+    surveyIds: [],          // aktuell selektierte Surveys (Picker)
+    highlightPid: null      // Vorstellungspartner-ID (genau einer oder null)
+};
+
+// --- Initial-Filter aus URL ---
+function readFilterFromUrl() {
+    const raw = new URLSearchParams(window.location.search).get('filter');
+    if (!raw) return null;
+    try {
+        const payload = JSON.parse(atob(decodeURIComponent(raw)));
+        if (!payload || !Array.isArray(payload.survey_ids) || payload.survey_ids.length === 0) return null;
+        return payload;
+    } catch (e) {
+        return null;
+    }
+}
+
+// --- Backend-Aufruf ---
+async function loadData(payload) {
+    document.getElementById('strips').innerHTML = '<div class="empty-hint">Lade…</div>';
+    try {
+        const resp = await fetch(ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        if (resp.status === 401) {
+            document.getElementById('strips').innerHTML = '<div class="err">Nicht eingeloggt — bitte zuerst auf der <a href="score_analyse.html">Analyseseite</a> anmelden.</div>';
+            return;
+        }
+        if (data.error) {
+            document.getElementById('strips').innerHTML = '<div class="err">'+escapeHtml(data.error)+'</div>';
+            // bei 400 dennoch all_surveys zur Picker-Befüllung nutzen
+            if (data.all_surveys) {
+                STATE.allSurveys = data.all_surveys;
+                renderSurveyPickerOptions();
+            }
+            return;
+        }
+        applyServerData(data);
+    } catch (e) {
+        document.getElementById('strips').innerHTML = '<div class="err">Fehler: '+escapeHtml(e.message)+'</div>';
+    }
+}
+
+function applyServerData(data) {
+    STATE.appliedFilter = data.applied_filter || null;
+    STATE.allSurveys = data.all_surveys || [];
+    STATE.criteria = data.criteria || [];
+    STATE.partners = data.partners || [];
+    STATE.surveyIds = data.applied_filter?.survey_ids || [];
+    if (data.applied_filter) {
+        STATE.managerFilter = data.applied_filter.manager_filter || 'alle';
+        STATE.minRatings    = data.applied_filter.min_answers || 5;
+    }
+
+    // perf-Map aufbauen
+    STATE.perfMap = {};
+    (data.per_partner_perf || []).forEach(row => {
+        if (!STATE.perfMap[row.criterion_id]) STATE.perfMap[row.criterion_id] = {};
+        STATE.perfMap[row.criterion_id][row.partner_id] = row.perf;
+    });
+
+    // Default-Auswahl: alle Kriterien an. Partner: wenn applied_filter.partner_ids gesetzt → nur die, sonst alle.
+    STATE.critActive = new Set(STATE.criteria.map(c => c.id));
+    const presetPartnerIds = data.applied_filter?.partner_ids;
+    if (Array.isArray(presetPartnerIds) && presetPartnerIds.length > 0) {
+        const setPre = new Set(presetPartnerIds.map(Number));
+        STATE.partActive = new Set(STATE.partners.filter(p => setPre.has(p.id)).map(p => p.id));
+    } else {
+        STATE.partActive = new Set(STATE.partners.map(p => p.id));
+    }
+    STATE.order = applySortOrder();
+
+    document.getElementById('total-n').textContent = data.total_participants ?? '?';
+
+    // Picker-UI synchron halten
+    renderSurveyPickerOptions();
+    syncPickerControls();
+    updatePickerHeader();
+
+    renderChips();
+    renderStrips();
+    updateStripHeaders();
+    renderQuadrant();
+    hideZoom();
+}
+
+function applySortOrder() {
+    if (STATE.sortMode === 'seq') return STATE.criteria.map(c => c.id);
+    return STATE.criteria.slice().sort((a,b) => (b.imp_avg||0) - (a.imp_avg||0)).map(c => c.id);
+}
+
+// --- Picker-UI ---
+function renderSurveyPickerOptions() {
+    const sel = document.getElementById('survey-select');
+    const currentSelected = STATE.surveyIds[0] || null;
+    sel.innerHTML = '';
+    STATE.allSurveys.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        const flags = [];
+        if (s.is_active) flags.push('aktiv');
+        if (s.test_mode) flags.push('Test');
+        if (s.ranking_mode) flags.push('Ranking');
+        opt.textContent = s.name + (flags.length ? ' [' + flags.join(', ') + ']' : '');
+        if (currentSelected !== null && s.id === currentSelected) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    // Wenn nichts vorausgewählt, ersten Eintrag selektieren (UI-Feedback, wirkt erst bei "Anzeigen")
+    if (!currentSelected && sel.options.length > 0) sel.selectedIndex = 0;
+}
+
+function syncPickerControls() {
+    document.getElementById('min-slider').value = STATE.minRatings;
+    document.getElementById('min-val').textContent = STATE.minRatings;
+    const mgr = document.querySelector('input[name="mgr-filter"][value="'+STATE.managerFilter+'"]');
+    if (mgr) mgr.checked = true;
+}
+
+function updatePickerHeader() {
+    const names = STATE.allSurveys.filter(s => STATE.surveyIds.includes(s.id)).map(s => s.name);
+    const surveyPart = names.length ? (names.length === 1 ? 'Survey: '+names[0] : 'Surveys: '+names.join(', ')) : 'Survey wählen';
+    const mgrLabel = STATE.managerFilter === 'nur_manager' ? 'nur Manager'
+                    : (STATE.managerFilter === 'nur_nicht_manager' ? 'nur Team' : 'alle');
+    document.getElementById('picker-header-text').textContent =
+        surveyPart + ' • Gruppe: ' + mgrLabel + ' • min. Antworten: ' + STATE.minRatings;
+}
+
+document.getElementById('picker-toggle').addEventListener('click', () => {
+    document.getElementById('picker-toggle').classList.toggle('open');
+    document.getElementById('picker-body').classList.toggle('open');
+});
+
+document.getElementById('picker-apply').addEventListener('click', () => {
+    const sel = document.getElementById('survey-select');
+    const sid = sel.value ? parseInt(sel.value, 10) : null;
+    if (!sid) { alert('Bitte eine Survey auswählen.'); return; }
+    const mgr = document.querySelector('input[name="mgr-filter"]:checked')?.value || 'alle';
+    const min = parseInt(document.getElementById('min-slider').value, 10);
+    const payload = { survey_ids: [sid], manager_filter: mgr, min_answers: min };
+    loadData(payload);
+});
+
+// Slider live: Wert anzeigen, debounced Re-Fetch
+let sliderDebounce = null;
+document.getElementById('min-slider').addEventListener('input', e => {
+    document.getElementById('min-val').textContent = e.target.value;
+});
+document.getElementById('min-slider').addEventListener('change', e => {
+    if (!STATE.appliedFilter || !STATE.appliedFilter.survey_ids?.length) return;
+    clearTimeout(sliderDebounce);
+    sliderDebounce = setTimeout(() => {
+        const payload = {
+            ...STATE.appliedFilter,
+            min_answers: parseInt(e.target.value, 10)
+        };
+        loadData(payload);
+    }, 100);
+});
+
+// Manager-Filter live (kein "Anzeigen" nötig)
+document.querySelectorAll('input[name="mgr-filter"]').forEach(inp => {
+    inp.addEventListener('change', () => {
+        if (!STATE.appliedFilter || !STATE.appliedFilter.survey_ids?.length) return;
+        const mgr = document.querySelector('input[name="mgr-filter"]:checked')?.value || 'alle';
+        const payload = { ...STATE.appliedFilter, manager_filter: mgr };
+        loadData(payload);
+    });
+});
+
+// --- Akkordeon-Toggles für Kriterien/Partner-Boxen ---
+function bindToggle(headerId, bodyId) {
+    const h = document.getElementById(headerId), b = document.getElementById(bodyId);
+    h.addEventListener('click', () => { h.classList.toggle('open'); b.classList.toggle('open'); });
+}
+bindToggle('crit-toggle','crit-body');
+bindToggle('part-toggle','part-body');
+bindToggle('quadrant-toggle','quadrant-body');
+// Quadrant beim Seitenstart geöffnet
+document.getElementById('quadrant-toggle').classList.add('open');
+document.getElementById('quadrant-body').classList.add('open');
+
+// --- Strip-Filter (Kriterien/Partner-Auswahl, rein clientseitig) ---
+function updateStripHeaders() {
+    document.getElementById('crit-header-text').textContent =
+        'Kriterien (' + STATE.critActive.size + ' / ' + STATE.criteria.length + ')';
+    document.getElementById('part-header-text').textContent =
+        'Partner (' + STATE.partActive.size + ' / ' + STATE.partners.length + ')';
+}
+
+function renderChips() {
+    const cc = document.getElementById('crit-grid');
+    cc.innerHTML = '';
+    STATE.criteria.forEach(c => {
+        const lbl = document.createElement('label');
+        lbl.className = 'partner-filter-item' + (STATE.critActive.has(c.id) ? '' : ' deselected');
+        lbl.innerHTML =
+            '<span class="chip-name">'+escapeHtml(c.name)+'</span>'+
+            '<input type="checkbox" '+(STATE.critActive.has(c.id)?'checked':'')+' value="'+c.id+'" data-cid="'+c.id+'">';
+        cc.appendChild(lbl);
+    });
+    const pc = document.getElementById('part-grid');
+    pc.innerHTML = '';
+    STATE.partners.slice().sort((a,b) => a.name.localeCompare(b.name, 'de')).forEach(p => {
+        const lbl = document.createElement('label');
+        lbl.className = 'partner-filter-item' + (STATE.partActive.has(p.id) ? '' : ' deselected');
+        const isStar = STATE.highlightPid === p.id;
+        lbl.innerHTML =
+            '<span class="star-toggle '+(isStar?'on':'')+'" data-star-pid="'+p.id+'" title="Als Vorstellungspartner hervorheben">'+(isStar?'★':'☆')+'</span>'+
+            '<span class="chip-name">'+escapeHtml(p.name)+'</span>'+
+            '<input type="checkbox" '+(STATE.partActive.has(p.id)?'checked':'')+' value="'+p.id+'" data-pid="'+p.id+'">';
+        pc.appendChild(lbl);
+    });
+    cc.querySelectorAll('input').forEach(inp => inp.addEventListener('change', e => {
+        const cid = +e.target.dataset.cid;
+        if (e.target.checked) STATE.critActive.add(cid); else STATE.critActive.delete(cid);
+        renderChips(); renderStrips(); updateStripHeaders(); hideZoom();
+    }));
+    pc.querySelectorAll('input').forEach(inp => inp.addEventListener('change', e => {
+        const pid = +e.target.dataset.pid;
+        if (e.target.checked) STATE.partActive.add(pid); else STATE.partActive.delete(pid);
+        renderChips(); renderStrips(); updateStripHeaders(); renderQuadrant(); hideZoom();
+    }));
+    // Star-Toggle: ein Klick auf den Stern wechselt Vorstellungspartner-Status
+    pc.querySelectorAll('.star-toggle').forEach(s => s.addEventListener('click', e => {
+        e.preventDefault(); e.stopPropagation();
+        const pid = +e.target.dataset.starPid;
+        STATE.highlightPid = (STATE.highlightPid === pid) ? null : pid;
+        renderChips(); renderStrips(); hideZoom();
+    }));
+}
+
+document.getElementById('crit-all').onclick  = () => { STATE.critActive = new Set(STATE.criteria.map(c=>c.id)); renderChips(); renderStrips(); updateStripHeaders(); hideZoom(); };
+document.getElementById('crit-none').onclick = () => { STATE.critActive = new Set(); renderChips(); renderStrips(); updateStripHeaders(); hideZoom(); };
+document.getElementById('part-all').onclick  = () => { STATE.partActive = new Set(STATE.partners.map(p=>p.id)); renderChips(); renderStrips(); updateStripHeaders(); renderQuadrant(); hideZoom(); };
+document.getElementById('part-none').onclick = () => { STATE.partActive = new Set(); renderChips(); renderStrips(); updateStripHeaders(); renderQuadrant(); hideZoom(); };
+
+document.querySelectorAll('input[name="sort"]').forEach(inp => inp.addEventListener('change', e => {
+    STATE.sortMode = e.target.value;
+    STATE.order = applySortOrder();
+    renderStrips();
+    hideZoom();
+}));
+
+// --- Strip-Render ---
+function getPartnersForCriterion(cid) {
+    const map = STATE.perfMap[cid] || {};
+    const partnerLookup = {};
+    STATE.partners.forEach(p => partnerLookup[p.id] = p);
+    const result = [];
+    Object.keys(map).forEach(pid => {
+        const pidNum = +pid;
+        if (!STATE.partActive.has(pidNum)) return;
+        const p = partnerLookup[pidNum];
+        if (!p) return;
+        result.push({ id: pidNum, label: p.label, name: p.name, perf: map[pid] });
+    });
+    return result;
+}
+
+function renderStrips() {
+    const container = document.getElementById('strips');
+    container.innerHTML = '';
+
+    if (!STATE.appliedFilter) {
+        container.innerHTML = '<div class="empty-hint">Bitte oben eine Survey auswählen und auf <strong>Anzeigen</strong> klicken.</div>';
+        return;
+    }
+    if (STATE.criteria.length === 0) {
+        container.innerHTML = '<div class="empty-hint">Keine Kriterien für die gewählte Filterung.</div>';
+        return;
+    }
+    if (STATE.partners.length === 0) {
+        container.innerHTML = '<div class="empty-hint">Keine Partner über der Mindestanzahl Antworten ('+STATE.minRatings+').</div>';
+        return;
+    }
+
+    const byId = {};
+    STATE.criteria.forEach(c => byId[c.id] = c);
+
+    STATE.order.forEach(cid => {
+        const c = byId[cid];
+        if (!c) return;
+        if (!STATE.critActive.has(cid)) return;
+        const partners = getPartnersForCriterion(cid);
+
+        const div = document.createElement('div');
+        div.className = 'strip-row';
+        div.draggable = true;
+        div.dataset.cid = cid;
+        const imp = c.imp_avg !== null ? c.imp_avg.toFixed(2) : '–';
+
+        div.innerHTML =
+            '<div class="strip-handle" title="ziehen">⋮⋮</div>'+
+            '<div class="strip-head">'+
+              '<div class="strip-name">'+escapeHtml(c.name)+'</div>'+
+              '<div class="strip-cat">'+escapeHtml(c.category || '')+'</div>'+
+              '<div class="strip-imp">Imp: '+imp+'</div>'+
+            '</div>'+
+            '<div class="strip-svg-wrap">'+renderStripSVG(partners)+'</div>';
+
+        const wrap = div.querySelector('.strip-svg-wrap');
+        wrap.addEventListener('click', e => {
+            const svgEl = wrap.querySelector('svg');
+            if (!svgEl) return;
+            const cluster = findClusterAtClick(svgEl, e.clientX, partners);
+            if (!cluster || cluster.length === 0) return;
+            showZoom(c, cluster, e.clientX, wrap.getBoundingClientRect());
+        });
+
+        attachDrag(div);
+        container.appendChild(div);
+    });
+}
+
+function renderStripSVG(partners) {
+    const W = 1000, H = 70, PAD_L = 20, PAD_R = 20;
+    const plotW = W - PAD_L - PAD_R;
+    const xMin = 1, xMax = 5;
+    const sx = x => PAD_L + (x - xMin)/(xMax - xMin) * plotW;
+    const yMid = H/2;
+    let svg = '<svg class="strip-svg" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">';
+    for (let v = 1; v <= 5; v++) {
+        const x = sx(v);
+        svg += '<line class="grid-line" x1="'+x+'" y1="'+(yMid-22)+'" x2="'+x+'" y2="'+(yMid+22)+'"/>';
+        svg += '<text class="axt" x="'+x+'" y="'+(H-3)+'" text-anchor="middle">'+v+'</text>';
+    }
+    svg += '<line class="axis" x1="'+PAD_L+'" y1="'+yMid+'" x2="'+(W-PAD_R)+'" y2="'+yMid+'"/>';
+    if (!partners || partners.length === 0) {
+        svg += '<text class="axt" x="'+(W/2)+'" y="'+(yMid-26)+'" text-anchor="middle">keine Daten</text>';
+        return svg + '</svg>';
+    }
+    const sorted = partners.slice().sort((a,b) => a.perf - b.perf);
+    const hp = STATE.highlightPid;
+    sorted.forEach((p, i) => {
+        const cx = sx(p.perf);
+        const above = (i % 2 === 0);
+        const lblY = above ? (yMid - 8) : (yMid + 16);
+        svg += '<circle class="pt" cx="'+cx+'" cy="'+yMid+'" r="3"/>';
+        // Anonymisierungsregel: wenn Vorstellungspartner gesetzt, andere Labels unsichtbar (aber im DOM für Cluster-Erkennung)
+        const hidden = (hp !== null && p.id !== hp) ? ' visibility="hidden"' : '';
+        svg += '<text class="lbl" x="'+cx+'" y="'+lblY+'" text-anchor="middle"'+hidden+'>'+escapeHtml(p.label)+'</text>';
+    });
+    return svg + '</svg>';
+}
+
+// --- Cluster-Lupe (unverändert) ---
+const CLUSTER_GAP_PX = 5;
+const POPUP_LBL_GAP_PX = 6;
+
+function findClusterAtClick(stripSvgEl, clickClientX, partners) {
+    const texts = stripSvgEl.querySelectorAll('text.lbl');
+    if (texts.length === 0) return null;
+    const sorted = partners.slice().sort((a,b) => a.perf - b.perf);
+    if (texts.length !== sorted.length) return null;
+
+    const items = [];
+    texts.forEach((t, i) => {
+        const r = t.getBoundingClientRect();
+        items.push({ partner: sorted[i], x1: r.left, x2: r.right });
+    });
+    items.sort((a,b) => a.x1 - b.x1);
+
+    const clusters = [];
+    let cur = [items[0]];
+    for (let i = 1; i < items.length; i++) {
+        const gap = items[i].x1 - items[i-1].x2;
+        if (gap < CLUSTER_GAP_PX) cur.push(items[i]);
+        else { clusters.push(cur); cur = [items[i]]; }
+    }
+    clusters.push(cur);
+
+    let best = clusters[0], bestDist = Infinity;
+    clusters.forEach(c => {
+        const lo = c[0].x1, hi = c[c.length-1].x2;
+        let d;
+        if (clickClientX >= lo && clickClientX <= hi) d = 0;
+        else d = Math.min(Math.abs(clickClientX - lo), Math.abs(clickClientX - hi));
+        if (d < bestDist) { bestDist = d; best = c; }
+    });
+    return best.map(it => it.partner);
+}
+
+function showZoom(criterion, cluster, clickClientX, stripWrapRect) {
+    const popup = document.getElementById('zoom-popup');
+    const svg = document.getElementById('zoom-svg');
+    const maxW = window.innerWidth - 32;
+    const popW = Math.min(maxW, 1400);
+    popup.style.width = popW + 'px';
+    popup.classList.add('open');
+    const svgW = popW - 28;
+    renderZoomCluster(svg, cluster, svgW);
+
+    let left = clickClientX + window.scrollX - popW/2;
+    const minLeft = window.scrollX + 16;
+    const maxLeft = window.scrollX + window.innerWidth - popW - 16;
+    left = Math.max(minLeft, Math.min(maxLeft, left));
+    popup.style.left = left + 'px';
+    popup.style.top  = (stripWrapRect.top + window.scrollY - 5) + 'px';
+}
+
+function hideZoom() { document.getElementById('zoom-popup').classList.remove('open'); }
+document.getElementById('zoom-close').onclick = hideZoom;
+document.addEventListener('click', e => {
+    const popup = document.getElementById('zoom-popup');
+    if (!popup.classList.contains('open')) return;
+    if (popup.contains(e.target)) return;
+    if (e.target.closest('.strip-svg-wrap')) return;
+    hideZoom();
+}, true);
+
+function renderZoomCluster(svgEl, cluster, popWidth) {
+    const PAD_L = 30, PAD_R = 30;
+    const plotW = popWidth - PAD_L - PAD_R;
+    const sorted = cluster.slice().sort((a,b) => a.perf - b.perf);
+    const pMin = sorted[0].perf, pMax = sorted[sorted.length-1].perf;
+    const positions = sorted.map(p => {
+        const t = (pMax === pMin) ? 0.5 : (p.perf - pMin) / (pMax - pMin);
+        return PAD_L + t * plotW;
+    });
+
+    const initialH = 80;
+    let yMid = initialH / 2;
+    svgEl.setAttribute('viewBox', '0 0 ' + popWidth + ' ' + initialH);
+    svgEl.setAttribute('preserveAspectRatio', 'none');
+    svgEl.style.height = initialH + 'px';
+
+    const hp = STATE.highlightPid;
+    let inner = '';
+    inner += '<line class="axis" x1="'+PAD_L+'" y1="'+yMid+'" x2="'+(popWidth-PAD_R)+'" y2="'+yMid+'"/>';
+    sorted.forEach((p, i) => {
+        const cx = positions[i];
+        inner += '<circle class="pt" cx="'+cx+'" cy="'+yMid+'" r="5"/>';
+        const hidden = (hp !== null && p.id !== hp) ? ' visibility="hidden"' : '';
+        inner += '<text class="lbl-zoom" x="'+cx+'" y="'+(yMid+18)+'" text-anchor="middle"'+hidden+'>'+escapeHtml(p.label)+' ('+p.perf.toFixed(2)+')</text>';
+    });
+    svgEl.innerHTML = inner;
+
+    const texts = Array.from(svgEl.querySelectorAll('text.lbl-zoom'));
+    const boxes = texts.map(t => { const r = t.getBoundingClientRect(); return { x1: r.left, x2: r.right }; });
+
+    const rows = [];
+    const rowOf = new Array(boxes.length).fill(0);
+    boxes.forEach((b, i) => {
+        let placed = false;
+        for (let r = 0; r < rows.length; r++) {
+            const last = rows[r][rows[r].length - 1];
+            if (b.x1 > last.x2 + POPUP_LBL_GAP_PX) {
+                rows[r].push({ ...b, i });
+                rowOf[i] = r; placed = true; break;
+            }
+        }
+        if (!placed) { rows.push([{ ...b, i }]); rowOf[i] = rows.length - 1; }
+    });
+
+    if (rows.length <= 1) return;
+
+    const ROW_H_PX = 18;
+    const newH = 30 + rows.length * ROW_H_PX + 14;
+    yMid = 22;
+    svgEl.setAttribute('viewBox', '0 0 ' + popWidth + ' ' + newH);
+    svgEl.style.height = newH + 'px';
+
+    let inner2 = '';
+    inner2 += '<line class="axis" x1="'+PAD_L+'" y1="'+yMid+'" x2="'+(popWidth-PAD_R)+'" y2="'+yMid+'"/>';
+    sorted.forEach((p, i) => {
+        const cx = positions[i];
+        const r = rowOf[i];
+        const lblY = yMid + 18 + r * ROW_H_PX;
+        inner2 += '<line class="grid-line" x1="'+cx+'" y1="'+yMid+'" x2="'+cx+'" y2="'+(lblY-10)+'"/>';
+        inner2 += '<circle class="pt" cx="'+cx+'" cy="'+yMid+'" r="5"/>';
+        const hidden = (hp !== null && p.id !== hp) ? ' visibility="hidden"' : '';
+        inner2 += '<text class="lbl-zoom" x="'+cx+'" y="'+lblY+'" text-anchor="middle"'+hidden+'>'+escapeHtml(p.label)+' ('+p.perf.toFixed(2)+')</text>';
+    });
+    svgEl.innerHTML = inner2;
+}
+
+// --- Drag-Reorder (unverändert) ---
+let dragSrc = null;
+function attachDrag(el) {
+    el.addEventListener('dragstart', e => { dragSrc = el; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+    el.addEventListener('dragend',   () => { el.classList.remove('dragging'); dragSrc = null; });
+    el.addEventListener('dragover',  e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    el.addEventListener('drop', e => {
+        e.preventDefault();
+        if (!dragSrc || dragSrc === el) return;
+        const srcCid = +dragSrc.dataset.cid;
+        const tgtCid = +el.dataset.cid;
+        const srcIdx = STATE.order.indexOf(srcCid);
+        const tgtIdx = STATE.order.indexOf(tgtCid);
+        STATE.order.splice(srcIdx, 1);
+        STATE.order.splice(tgtIdx, 0, srcCid);
+        renderStrips();
+        hideZoom();
+    });
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s) { return escapeHtml(s); }
+
+// =============================================================
+// VISION × EXECUTION QUADRANT
+// =============================================================
+// Werte sind in viewBox-Einheiten und werden mit ~0.75 zum Bildschirm skaliert
+// (max-width 780 / viewBox W 1040). Konstanten daher um Faktor 1.33 hochgesetzt,
+// damit Logos/Schrift in absoluter Pixel-Größe wieder dem Original entsprechen.
+const Q_LOGO_TARGET_H = 53;
+const Q_LOGO_MIN_W = 47, Q_LOGO_MIN_H = 29;
+const Q_LOGO_MAX_W = 147, Q_LOGO_MAX_H = 67;
+const Q_PT_R_MIN = 7, Q_PT_R_MAX = 29;
+const Q_OFF_SCALE_FACTOR = 0.65;
+const logoCache = new Map();
+
+function impFactor(impAvg) {
+    if (impAvg === null || impAvg === undefined) return 0;
+    const r = Math.round(impAvg);
+    if (r >= 5) return 12;
+    if (r === 4) return 7;
+    if (r === 3) return 4;
+    if (r === 2) return 2;
+    return 0;
+}
+
+// Sub-Score-Berechnung: identische Formel wie php/quadrant_proto.php
+//   exec  = Σ_{i ∈ Kat. II,IV}  (perf_i − 3) × impFactor(imp_avg_i)
+//   vis   = Σ_{i ∈ Kat. I,III,V} (perf_i − 3) × impFactor(imp_avg_i)
+// Kategoriezuordnung: criteria[i].category beginnt mit "I.", "II.", "III.", "IV.", "V."
+function calculateSubScores(partner, criteria, perfMap) {
+    const factorByCrit = {};
+    const catByCrit = {};
+    criteria.forEach(c => {
+        factorByCrit[c.id] = impFactor(c.imp_avg);
+        catByCrit[c.id] = c.category || '';
+    });
+    let exec = 0, vis = 0;
+    Object.keys(perfMap).forEach(cidStr => {
+        const cid = +cidStr;
+        const perf = perfMap[cidStr][partner.id];
+        if (perf === undefined || perf === null) return;
+        const f = factorByCrit[cid];
+        if (!f) return;
+        const cat = catByCrit[cid];
+        const contribution = (perf - 3.0) * f;
+        if (cat.startsWith('II.') || cat.startsWith('IV.')) {
+            exec += contribution;
+        } else if (cat.startsWith('I.') || cat.startsWith('III.') || cat.startsWith('V.')) {
+            vis += contribution;
+        }
+    });
+    return { score_execution: exec, score_vision: vis };
+}
+
+function measureLogo(logoFile) {
+    if (logoCache.has(logoFile)) return Promise.resolve(logoCache.get(logoFile));
+    return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+            const ar = img.naturalWidth / img.naturalHeight;
+            let h = Q_LOGO_TARGET_H;
+            let w = ar * h;
+            if (w > Q_LOGO_MAX_W) { const f = Q_LOGO_MAX_W / w; w *= f; h *= f; }
+            if (h > Q_LOGO_MAX_H) { const f = Q_LOGO_MAX_H / h; w *= f; h *= f; }
+            if (w < Q_LOGO_MIN_W) { const f = Q_LOGO_MIN_W / w; w *= f; h *= f; }
+            if (h < Q_LOGO_MIN_H) { const f = Q_LOGO_MIN_H / h; w *= f; h *= f; }
+            const r = { logoW: w, logoH: h };
+            logoCache.set(logoFile, r);
+            resolve(r);
+        };
+        img.onerror = () => {
+            const r = { logoW: 60, logoH: 30 };
+            logoCache.set(logoFile, r);
+            resolve(r);
+        };
+        img.src = 'img/partnerlogo/' + logoFile;
+    });
+}
+
+function measureLogosForPartners(partners) {
+    return Promise.all(partners.map(p => {
+        if (!p.logo_file) return Promise.resolve(Object.assign({}, p, { logoW: 60, logoH: 30 }));
+        return measureLogo(p.logo_file).then(m => Object.assign({}, p, m));
+    }));
+}
+
+async function renderQuadrant() {
+    const container = document.getElementById('quadrant-svg-container');
+    if (!STATE.appliedFilter || STATE.partners.length === 0) {
+        container.innerHTML = '<div class="empty-hint">Quadrant erscheint nach Survey-Auswahl.</div>';
+        return;
+    }
+    // Auf STATE.partActive filtern
+    const visible = STATE.partners.filter(p => STATE.partActive.has(p.id));
+    if (visible.length === 0) {
+        container.innerHTML = '<div class="empty-hint">Keine Partner ausgewählt.</div>';
+        return;
+    }
+    // Sub-Scores berechnen
+    const enriched = visible.map(p => {
+        const sub = calculateSubScores(p, STATE.criteria, STATE.perfMap);
+        return Object.assign({}, p, {
+            score_execution: sub.score_execution,
+            score_vision: sub.score_vision,
+            n_assessors: p.total_assessors
+        });
+    });
+    // Logos vermessen (mit Cache)
+    const measured = await measureLogosForPartners(enriched);
+    const positive = measured.filter(p => p.score_execution >= 0 && p.score_vision >= 0);
+    const offScale = measured.filter(p => p.score_execution < 0 || p.score_vision < 0);
+    if (positive.length === 0) {
+        container.innerHTML = '<div class="empty-hint">Keine Partner mit positiven Sub-Scores in der Auswahl.</div>';
+        return;
+    }
+    container.innerHTML = renderQuadrantSVG(positive, offScale);
+}
+
+function renderQuadrantSVG(partners, offScale) {
+    // Plot-Bereich quadratisch: plotW = plotH = 930
+    const W = 1040, H = 1020;
+    const PAD_L = 80, PAD_R = 30, PAD_T = 30, PAD_B = 60;
+    const plotW = W - PAD_L - PAD_R, plotH = H - PAD_T - PAD_B;
+
+    const xMaxData = Math.max(...partners.map(p => p.score_execution), 1);
+    const yMaxData = Math.max(...partners.map(p => p.score_vision), 1);
+    const xMin = 0, xMax = xMaxData * 1.05;
+    const yMin = 0, yMax = yMaxData * 1.05;
+    const xMid = (xMin + xMax) / 2;
+    const yMid = (yMin + yMax) / 2;
+    const sx = x => PAD_L + (x - xMin) / (xMax - xMin) * plotW;
+    const sy = y => PAD_T + (1 - (y - yMin) / (yMax - yMin)) * plotH;
+
+    const maxN = Math.max(...partners.map(p => p.n_assessors), 1);
+    const minN = Math.min(...partners.map(p => p.n_assessors), 1);
+    const ptRadius = n => Q_PT_R_MIN + ((n - minN) / Math.max(maxN - minN, 1)) * (Q_PT_R_MAX - Q_PT_R_MIN);
+
+    let svg = '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg">';
+
+    // Mittellinien (Achsenmitte)
+    svg += '<line class="q-midline" x1="'+sx(xMid)+'" y1="'+PAD_T+'" x2="'+sx(xMid)+'" y2="'+(H-PAD_B)+'"/>';
+    svg += '<line class="q-midline" x1="'+PAD_L+'" y1="'+sy(yMid)+'" x2="'+(W-PAD_R)+'" y2="'+sy(yMid)+'"/>';
+
+    // Achsen
+    svg += '<line class="q-axis" x1="'+PAD_L+'" y1="'+(H-PAD_B)+'" x2="'+(W-PAD_R)+'" y2="'+(H-PAD_B)+'"/>';
+    svg += '<line class="q-axis" x1="'+PAD_L+'" y1="'+PAD_T+'" x2="'+PAD_L+'" y2="'+(H-PAD_B)+'"/>';
+
+    // Achsentitel
+    svg += '<text class="q-axt-bold" x="'+(PAD_L+plotW/2)+'" y="'+(H-PAD_B+34)+'" text-anchor="middle"><tspan class="q-axt-emph">Execution</tspan> — Vertrieb &amp; Operations <tspan class="q-axt-paren">(Kat. II + IV)</tspan> →</text>';
+    svg += '<text class="q-axt-bold" x="'+(46)+'" y="'+(PAD_T+plotH/2)+'" text-anchor="middle" transform="rotate(-90 46 '+(PAD_T+plotH/2)+')"><tspan class="q-axt-emph">Vision</tspan> — Strategie, Vertikal &amp; Soft <tspan class="q-axt-paren">(Kat. I + III + V)</tspan> →</text>';
+
+    // Punkt-Bounding-Boxes für Kollisionscheck
+    const pointBoxes = [];
+    partners.forEach(p => {
+        const r = ptRadius(p.n_assessors);
+        const cx = sx(p.score_execution), cy = sy(p.score_vision);
+        pointBoxes.push({ x: cx - r, y: cy - r, w: 2*r, h: 2*r });
+    });
+    const plotBounds = { l: PAD_L + 2, t: PAD_T + 2, r: W - PAD_R - 2, b: H - PAD_B - 2 };
+
+    // Greedy-Platzierung der Logos, sortiert nach n absteigend
+    const placed = [];
+    const sorted = partners.slice().sort((a, b) => b.n_assessors - a.n_assessors);
+    sorted.forEach(p => {
+        const cx = sx(p.score_execution);
+        const cy = sy(p.score_vision);
+        const r = ptRadius(p.n_assessors);
+        const frame = qPlaceLogoOffset(cx, cy, r, placed, pointBoxes, plotBounds, p.logoW, p.logoH);
+        placed.push({ partner: p, cx, cy, r, frame });
+    });
+
+    // Verbindungslinien
+    placed.forEach(item => {
+        const anchor = qFrameAnchor(item.frame, item.cx, item.cy, item.partner.logoW, item.partner.logoH);
+        svg += '<line class="q-leader" x1="'+item.cx+'" y1="'+item.cy+'" x2="'+anchor.x+'" y2="'+anchor.y+'"/>';
+    });
+
+    // Logos
+    placed.forEach(item => {
+        const { partner, frame } = item;
+        const lw = partner.logoW, lh = partner.logoH;
+        if (partner.logo_file) {
+            svg += '<image href="img/partnerlogo/'+escapeAttr(partner.logo_file)+'" x="'+frame.x+'" y="'+frame.y+'" width="'+lw+'" height="'+lh+'" preserveAspectRatio="xMidYMid meet"/>';
+        } else {
+            svg += '<text class="q-frame-fb" x="'+(frame.x+lw/2)+'" y="'+(frame.y+lh/2+4)+'">'+escapeHtml(partner.label)+'</text>';
+        }
+    });
+
+    // Datenpunkte (nach Logos, damit sie oben sind)
+    placed.forEach(item => {
+        const { partner, cx, cy, r } = item;
+        svg += '<circle class="q-pt" cx="'+cx+'" cy="'+cy+'" r="'+r.toFixed(1)+'">';
+        svg += '<title>'+escapeHtml(partner.name)+
+               '\nExecution: '+partner.score_execution.toFixed(1)+
+               '\nVision: '+partner.score_vision.toFixed(1)+
+               '\nBewerter: '+partner.n_assessors+'</title>';
+        svg += '</circle>';
+    });
+
+    // Off-Scale: rotes Dreieck am Ursprung, Logo im linken/unteren Padding
+    if (offScale && offScale.length) {
+        offScale.forEach((p, i) => {
+            const stagger = i * 70;
+            const ox = sx(0), oy = sy(0);
+            const tw = 16, th = 19;
+            const tx = ox + stagger;
+            svg += '<polygon class="q-off-arrow" points="'+
+                tx+','+(oy - th)+' '+
+                (tx - tw/2)+','+oy+' '+
+                (tx + tw/2)+','+oy+'"/>';
+            const lw = p.logoW * Q_OFF_SCALE_FACTOR;
+            const lh = p.logoH * Q_OFF_SCALE_FACTOR;
+            const lx = sx(-1) + i * (lw + 8);
+            const ly = sy(-1);
+            if (p.logo_file) {
+                svg += '<image href="img/partnerlogo/'+escapeAttr(p.logo_file)+'" x="'+lx+'" y="'+ly+'" width="'+lw+'" height="'+lh+'" preserveAspectRatio="xMidYMid meet"/>';
+            }
+            svg += '<rect x="'+lx+'" y="'+ly+'" width="'+lw+'" height="'+lh+'" fill="transparent">';
+            svg += '<title>Off-Scale: '+escapeHtml(p.name)+
+                   '\nExecution: '+p.score_execution.toFixed(1)+
+                   '\nVision: '+p.score_vision.toFixed(1)+
+                   '\nBewerter: '+p.n_assessors+'</title></rect>';
+        });
+    }
+
+    svg += '</svg>';
+    return svg;
+}
+
+// Greedy-Platzierung mit Ray-Rect-Offset (kürzeste Pfeillänge pro Distanz-Level)
+function qPlaceLogoOffset(cx, cy, ptR, placedLogos, pointBoxes, bounds, LW, LH) {
+    const dirs = [
+        [1, 0], [1, -1], [0, -1], [-1, -1],
+        [-1, 0], [-1, 1], [0, 1], [1, 1]
+    ];
+    const distances = [4, 8, 14, 22, 32, 45, 60, 80];
+    for (const dist of distances) {
+        let best = null, bestLen = Infinity;
+        for (const [dx, dy] of dirs) {
+            const len = Math.hypot(dx, dy);
+            const ux = dx / len, uy = dy / len;
+            const tx = ux !== 0 ? Math.abs((LW / 2) / ux) : Infinity;
+            const ty = uy !== 0 ? Math.abs((LH / 2) / uy) : Infinity;
+            const edgeDist = Math.min(tx, ty);
+            const offset = ptR + dist + edgeDist;
+            const fcx = cx + ux * offset;
+            const fcy = cy + uy * offset;
+            const fx = fcx - LW / 2;
+            const fy = fcy - LH / 2;
+            if (fx < bounds.l || fy < bounds.t || fx + LW > bounds.r || fy + LH > bounds.b) continue;
+            const candidate = { x: fx, y: fy, w: LW, h: LH };
+            if (qCollidesLogos(candidate, placedLogos)) continue;
+            if (qCollidesPoints(candidate, pointBoxes)) continue;
+            const realLen = Math.hypot(fcx - cx, fcy - cy);
+            if (realLen < bestLen) { bestLen = realLen; best = candidate; }
+        }
+        if (best) return best;
+    }
+    return { x: Math.min(cx + ptR + 16, bounds.r - LW), y: Math.max(cy - LH/2, bounds.t) };
+}
+
+function qCollidesLogos(c, placed) {
+    const PAD = 3;
+    for (const it of placed) {
+        const f = it.frame;
+        const fw = it.partner.logoW, fh = it.partner.logoH;
+        if (c.x < f.x + fw + PAD &&
+            c.x + c.w + PAD > f.x &&
+            c.y < f.y + fh + PAD &&
+            c.y + c.h + PAD > f.y) return true;
+    }
+    return false;
+}
+
+function qCollidesPoints(c, pointBoxes) {
+    const PAD = 3;
+    for (const b of pointBoxes) {
+        if (c.x < b.x + b.w + PAD &&
+            c.x + c.w + PAD > b.x &&
+            c.y < b.y + b.h + PAD &&
+            c.y + c.h + PAD > b.y) return true;
+    }
+    return false;
+}
+
+function qFrameAnchor(frame, px, py, lw, lh) {
+    const fcx = frame.x + lw / 2;
+    const fcy = frame.y + lh / 2;
+    const dx = fcx - px, dy = fcy - py;
+    if (dx === 0 && dy === 0) return { x: fcx, y: frame.y };
+    const halfW = lw / 2, halfH = lh / 2;
+    const tx = halfW / Math.abs(dx || 1e-9);
+    const ty = halfH / Math.abs(dy || 1e-9);
+    const t = Math.min(tx, ty);
+    return { x: fcx - dx * t, y: fcy - dy * t };
+}
+
+// --- BOOT ---
+(function init() {
+    const initialFilter = readFilterFromUrl();
+    if (initialFilter) {
+        loadData(initialFilter);
+    } else {
+        // Standalone: kein initialer Fetch. Picker auffalten, all_surveys laden via leerer Anfrage (Backend liefert all_surveys auch im 400-Fall)
+        document.getElementById('picker-toggle').classList.add('open');
+        document.getElementById('picker-body').classList.add('open');
+        document.getElementById('strips').innerHTML =
+            '<div class="empty-hint">Bitte oben eine Survey auswählen und auf <strong>Anzeigen</strong> klicken.</div>';
+        // Survey-Liste vorladen (Backend antwortet 400 mit all_surveys-Payload)
+        fetch(ENDPOINT, { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' })
+            .then(async r => ({ status: r.status, body: await r.json().catch(()=>({})) }))
+            .then(({status, body}) => {
+                if (status === 401 || body.login_required) {
+                    document.getElementById('strips').innerHTML =
+                        '<div class="err">Nicht eingeloggt — bitte zuerst auf der <a href="score_analyse.html">Analyseseite</a> anmelden.</div>';
+                    return;
+                }
+                if (body.all_surveys) {
+                    STATE.allSurveys = body.all_surveys;
+                    renderSurveyPickerOptions();
+                    syncPickerControls();
+                    updatePickerHeader();
+                }
+            })
+            .catch(() => {});
+    }
+})();
+</script>
+</body>
+</html>

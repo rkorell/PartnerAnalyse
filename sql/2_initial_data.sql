@@ -1,7 +1,7 @@
 -- ============================================================================
 -- CPQI - 2_initial_data.sql
 -- Zweck: Initialdaten (Stammdaten) für alle Tabellen
--- Stand: 2026-03-14
+-- Stand: 2026-05-09
 -- ============================================================================
 
 -- ============================================================================
@@ -117,34 +117,34 @@ SELECT setval('criteria_id_seq', (SELECT MAX(id) FROM criteria));
 -- PARTNER (27 Stück)
 -- ============================================================================
 
-INSERT INTO partners (name, be_geo_id, sortgroup, logo_file) VALUES
-('Accenture', 71517, 3, 'accenture.png'),
-('ACP', 52658, 2, 'acp.png'),
-('Advanced Unibyte', 534900, 2, 'advancedunibyte.png'),
-('Avodaq', 60985, 2, 'avodaq.png'),
-('Axians', 17345, 2, 'axians.png'),
-('Bechtle', 51590, 1, 'bechtle.png'),
-('Cancom', 52777, 1, 'cancom.png'),
-('Computacenter', 63917, 1, 'computacenter.png'),
-('Conscia', 50058, 2, 'conscia.png'),
-('Controlware', 55017, 1, 'controlware.png'),
-('Damovo', 66698, 2, 'damovo.png'),
-('Fundamental', 46304, 2, 'fundamental.png'),
-('Infosys', 695680, 3, 'infosys.png'),
-('Logicalis', 1865, 2, 'logicalis.png'),
-('NTS', 657066, 2, 'nts.png'),
-('NTT Data', 51524, 1, 'ntt.png'),
-('Pandacom', 57342, 2, 'pandacom.png'),
-('Scaltel', 50437, 2, 'scaltel.png'),
-('SPIE', 57447, 3, 'spie.png'),
-('SVA', 107667, 1, 'sva.png'),
-('Systema', 52903, 2, 'systema.png'),
-('Tata Communications', 497984, 3, 'tatacommunications.png'),
-('Tata Consulting', 634901, 3, 'tataconsulting.png'),
-('Tech Mahindra', 625805, 3, 'techmahindra.png'),
-('Telekom', 51272, 1, 'telekom.png'),
-('Telent', 35807, 2, 'telent.png'),
-('Wipro', 606459, 3, 'wipro.svg');
+INSERT INTO partners (name, be_geo_id, sortgroup, logo_file, short_name) VALUES
+('Accenture', 71517, 3, 'accenture.png', 'Acc.'),
+('ACP', 52658, 2, 'acp.png', NULL),
+('Advanced Unibyte', 534900, 2, 'advancedunibyte.png', 'AU'),
+('Avodaq', 60985, 2, 'avodaq.png', NULL),
+('Axians', 17345, 2, 'axians.png', NULL),
+('Bechtle', 51590, 1, 'bechtle.png', NULL),
+('Cancom', 52777, 1, 'cancom.png', NULL),
+('Computacenter', 63917, 1, 'computacenter.png', 'CC'),
+('Conscia', 50058, 2, 'conscia.png', NULL),
+('Controlware', 55017, 1, 'controlware.png', 'CW'),
+('Damovo', 66698, 2, 'damovo.png', NULL),
+('Fundamental', 46304, 2, 'fundamental.png', 'Fund.'),
+('Infosys', 695680, 3, 'infosys.png', NULL),
+('Logicalis', 1865, 2, 'logicalis.png', 'Logic'),
+('NTS', 657066, 2, 'nts.png', NULL),
+('NTT Data', 51524, 1, 'ntt.png', 'NTT'),
+('Pandacom', 57342, 2, 'pandacom.png', NULL),
+('Scaltel', 50437, 2, 'scaltel.png', NULL),
+('SPIE', 57447, 3, 'spie.png', NULL),
+('SVA', 107667, 1, 'sva.png', NULL),
+('Systema', 52903, 2, 'systema.png', NULL),
+('Tata Communications', 497984, 3, 'tatacommunications.png', 'TTCom'),
+('Tata Consulting', 634901, 3, 'tataconsulting.png', 'TTCons'),
+('Tech Mahindra', 625805, 3, 'techmahindra.png', 'TechM'),
+('Telekom', 51272, 1, 'telekom.png', 'DTAG'),
+('Telent', 35807, 2, 'telent.png', NULL),
+('Wipro', 606459, 3, 'wipro.svg', NULL);
 
 -- ============================================================================
 -- ABTEILUNGEN (12 Stück, hierarchisch)
@@ -194,7 +194,7 @@ SELECT setval('surveys_id_seq', (SELECT MAX(id) FROM surveys));
 
 -- ============================================================================
 -- APP_TEXTS (Info-Modals, 6 Stück)
--- Stand: 2026-03-14
+-- Stand: 2026-05-09
 -- ============================================================================
 
 -- 1. entry-mask (Wizard: Methodik & Zielsetzung)

@@ -8,15 +8,14 @@
 /* # Modified: 2026-05-08 10:05 - Bias-Toggle umgebaut auf Switch (.bias-toggle-label / .bias-toggle-slider) */
 /* # Modified: 2026-05-08 13:30 - .column-header-tile sortable mit hover/active-States, Pfeil-Indikator, Schrift 14px */
 /* # Modified: 2026-05-08 14:50 - .score-saldo: Saldo-Anzeige rechts vom Balken im RANKING_MODE */
+/* # Modified: 2026-05-09 - Fix: width:100% raus (hat den Balken in col-score-graph auf 50% gestaucht) */
 .score-saldo {
-    display: inline-block;
-    margin-top: 4px;
+    flex: 0 0 auto;
+    margin-left: 10px;
     font-weight: 700;
     font-size: 14px;
     color: #034d68;
-    text-align: right;
-    width: 100%;
-    padding-right: 8px;
+    white-space: nowrap;
 }
 
 /* Reset und Grundlagen */
