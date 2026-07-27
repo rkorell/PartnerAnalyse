@@ -227,6 +227,9 @@ backup/
 # TuerOeffner Web-App (eigenes Git-Repo)
 tueroeffner/
 
+# PflanzenInventar (eigenes Git-Repo)
+pflanzen/
+
 # Office-Dokumente
 *.docx
 *.pptx
@@ -242,3 +245,5 @@ vault/
 
 # InnoSphere (Cisco x NTT GTM, kein eigenes Repo)
 /innosphere/
+# - FNS - repo: RNSD Verwaltung für das FNS Projekt: Kernbestandteil InnoSphere
+/fns/
