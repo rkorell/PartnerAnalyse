@@ -5,6 +5,7 @@
   (c) - Dr. Ralf Korell, 2025/26
   
   # Created: 28.11.2025, 18:45 - AP 29.2: Initial implementation
+  # Modified: 2026-10-09 14:27 - Telegram-Ping bei erfolgreicher Anmeldung an der Auswertungskonsole (NOTIFY_ON_LOGIN)
 */
 
 header('Content-Type: application/json');
@@ -44,7 +45,17 @@ try {
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = 'admin';
         $_SESSION['login_time'] = time();
-        
+
+        // Telegram-Ping: nur Auswertungskonsole, nur bei Erfolg, asynchron
+        // (blockiert die Login-Antwort nicht). Die Relay-URL kennt nur
+        // fleet-notify über /etc/fleet_telegram/client.conf.
+        if (defined('NOTIFY_ON_LOGIN') && NOTIFY_ON_LOGIN === true
+            && ($input['source'] ?? '') === 'analyse') {
+            $ctx = escapeshellarg('CPQI');
+            $msg = escapeshellarg('Es nutzt gerade jemand die CPQI-Auswertung.');
+            shell_exec("FLEET_CTX=$ctx /usr/local/bin/fleet-notify INFO $msg >/dev/null 2>&1 &");
+        }
+
         echo json_encode(['success' => true]);
     } else {
         // Login fehlgeschlagen

@@ -53,6 +53,7 @@
   # Modified: 2026-05-08 13:50 - Sortier-Defaults pro Spalte: Partner asc, numerische Spalten desc beim ersten Klick
   # Modified: 2026-05-08 14:30 - Balken im neutralen Modus count-basiert (score-bereinigt); RANKING_MODE bleibt score-basiert
   # Modified: 2026-05-08 14:35 - Sortier-Achse "Partner-Profil" im RANKING_MODE = Score-Saldo, neutral = count_positive
+  # Modified: 2026-10-09 14:27 - Login-Request sendet source='analyse' (Grundlage für Telegram-Ping, NOTIFY_ON_LOGIN)
 */
 
 import { CONFIG } from './config.js';
@@ -249,7 +250,7 @@ document.addEventListener("DOMContentLoaded", function() {
         fetch('php/login.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: password })
+            body: JSON.stringify({ password: password, source: 'analyse' })
         })
         .then(response => response.json())
         .then(data => {
